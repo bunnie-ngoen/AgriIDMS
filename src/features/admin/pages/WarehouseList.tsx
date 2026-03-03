@@ -158,6 +158,18 @@ const WarehouseList = () => {
                         <Pencil size={13} className="mr-1" />
                         Sửa
                       </Link>
+                      <Link
+                        to={`/admin/warehouses/${warehouse.id}/config`}
+                        className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+                      >
+                        Cấu hình
+                      </Link>
+                      <Link
+                        to={`/admin/warehouses/${warehouse.id}/map`}
+                        className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+                      >
+                        Sơ đồ
+                      </Link>
                       <button
                         type="button"
                         disabled={isDeleting}
