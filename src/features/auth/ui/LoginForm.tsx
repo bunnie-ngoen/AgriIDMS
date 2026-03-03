@@ -22,9 +22,10 @@ export default function LoginForm() {
         resolver: zodResolver(loginSchema),
         mode: "onChange"
     });
-    const handleClick =()=>{
-        navigate('/register')
-    }
+
+    const handleClick = () => {
+        navigate("/register");
+    };
 
     const onSubmit = async (values: LoginFormValues) => {
         try {
@@ -38,104 +39,149 @@ export default function LoginForm() {
             if (dashboardRoute) {
                 navigate(dashboardRoute);
             } else {
-                navigate('/login');
+                navigate("/login");
             }
-
         } catch (error: any) {
             console.error("Login failed:", error);
         }
     };
 
     return (
-        <div className="flex w-full h-screen items-center justify-center relative">
-            <div className="w-[55%] flex justify-center h-screen items-center">
-                <form onSubmit={form.handleSubmit(onSubmit)} className="w-full max-w-sm">
-                    <div className="flex flex-col gap-3">
-                        <h1 className="text-3xl font-bold pb-4 text-[#7FBB35]">AgriIDMS</h1>
-                        <h5 className="text-md text-gray-400 font-medium">Vui lòng nhập tên đăng nhập hoặc email để đăng nhập</h5>
+        <div className="w-full max-w-5xl bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-2 border border-white/10">
+            {/* Left: Login form */}
+            <div className="px-8 py-10 md:px-10 md:py-12 lg:px-12 lg:py-14 flex items-center">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="w-full max-w-md mx-auto space-y-6">
+                    <div className="space-y-2">
+                        <p className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 mb-1">
+                            Hệ thống quản lý kho nông sản
+                        </p>
+                        <h1 className="text-3xl md:text-3xl font-bold tracking-tight text-slate-900">
+                            Đăng nhập AgriIDMS
+                        </h1>
+                        <p className="text-sm text-slate-500">
+                            Vui lòng nhập tên đăng nhập hoặc email và mật khẩu để tiếp tục.
+                        </p>
+                    </div>
 
+                    <div className="space-y-4">
                         <div className="flex flex-col gap-2">
-                            <label className="font-bold">Tên đăng nhập hoặc email</label>
+                            <label className="font-medium text-sm text-slate-700">
+                                Tên đăng nhập hoặc email
+                            </label>
                             <input
                                 {...form.register("userNameOrEmail")}
-                                placeholder="Username or Email"
-                                className="p-2 pr-10 w-full bg-gray-100 rounded-xl shadow-inner focus:outline-none focus:ring-2 focus:ring-sky-100"
+                                placeholder="username@example.com"
+                                className="p-2.5 w-full bg-slate-50 rounded-xl border border-slate-200 text-sm
+                                           focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-500"
                                 type="text"
                             />
                             {form.formState.errors.userNameOrEmail && (
-                                <p className="text-red-500 text-sm">{form.formState.errors.userNameOrEmail.message}</p>
+                                <p className="text-red-500 text-xs">
+                                    {form.formState.errors.userNameOrEmail.message}
+                                </p>
                             )}
                         </div>
 
                         <div className="flex flex-col gap-2">
-                            <label className="font-bold">Mật Khẩu</label>
+                            <label className="font-medium text-sm text-slate-700">
+                                Mật khẩu
+                            </label>
                             <div className="relative">
                                 <input
                                     {...form.register("password")}
-                                    placeholder="Password"
+                                    placeholder="••••••••"
                                     type={showPassword ? "text" : "password"}
-                                    className="p-2 pr-10 w-full bg-gray-100 rounded-xl shadow-inner focus:outline-none focus:ring-2 focus:ring-sky-100"
+                                    className="p-2.5 pr-10 w-full bg-slate-50 rounded-xl border border-slate-200 text-sm
+                                               focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-500"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(prev => !prev)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
                                 >
                                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
                             </div>
                             {form.formState.errors.password && (
-                                <p className="text-red-500 text-sm">{form.formState.errors.password.message}</p>
+                                <p className="text-red-500 text-xs">
+                                    {form.formState.errors.password.message}
+                                </p>
                             )}
                         </div>
-
-                        {error && (
-                            <p className="text-red-500 text-sm">
-                                Login failed. Please check your credentials.
-                            </p>
-                        )}
-
-                        <div>
-                            <a href="#" className="float-right text-sm hover:underline">
-                                Quên mật khẩu?
-                            </a>
-                        </div>
-
-                        <button
-                            type="submit"
-                            className="bg-[#7FBB35] p-2 text-center font-medium text-white hover:bg-[#598325] w-full rounded-xl shadow-inner focus:outline-none focus:ring-2 focus:ring-sky-400 disabled:opacity-50"
-                            disabled={isLoading}
-                        >
-                            {isLoading ? "Loading..." : "Đăng Nhập"}
-                        </button>
                     </div>
+
+                    {error && (
+                        <p className="text-red-500 text-xs bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                            Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.
+                        </p>
+                    )}
+
+                    <div className="flex items-center justify-between text-xs md:text-sm">
+                        <button
+                            type="button"
+                            className="text-slate-500 hover:text-emerald-600 hover:underline"
+                        >
+                            Quên mật khẩu?
+                        </button>
+                        <div className="flex items-center gap-1">
+                            <span className="text-slate-500">
+                                Chưa có tài khoản?
+                            </span>
+                            <button
+                                type="button"
+                                onClick={handleClick}
+                                className="font-medium text-emerald-600 hover:text-emerald-700 hover:underline"
+                            >
+                                Đăng ký ngay
+                            </button>
+                        </div>
+                    </div>
+
+                    <button
+                        type="submit"
+                        className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#7FBB35]
+                                   px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-emerald-500/30
+                                   hover:bg-[#598325] focus-visible:outline-none focus-visible:ring-2
+                                   focus-visible:ring-offset-2 focus-visible:ring-emerald-500
+                                   disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                        disabled={isLoading}
+                    >
+                        {isLoading ? "Đang đăng nhập..." : "Đăng nhập"}
+                    </button>
                 </form>
             </div>
-            <div className="w-[45%] flex flex-col h-screen items-center justify-center z-50 bg-[#7FBB35] px-10 text-center">
-                <h1 className="text-white text-4xl font-semibold leading-snug mb-4">
-                    Chào mừng đến với<br />
-                    Hệ thống Quản lý Kho Hoa Quả
-                </h1>
 
-                <p className="text-white/90 text-lg max-w-md mb-16">
-                    Đăng ký tài khoản để theo dõi tồn kho chính xác, tối ưu quy trình nhập – xuất
-                    và nâng cao hiệu suất vận hành.
-                </p>
+            {/* Right: Brand / marketing panel (hidden on mobile) */}
+            <div className="relative hidden md:flex flex-col items-center justify-center bg-gradient-to-br from-[#7FBB35] via-[#5f9f2a] to-[#3b6b1a] px-10 py-12 text-center">
+                <div className="pointer-events-none absolute -top-10 -right-10 h-32 w-32 rounded-full bg-white/10 blur-2xl" />
+                <div className="pointer-events-none absolute bottom-0 left-0 h-40 w-40 rounded-full bg-emerald-900/20 blur-3xl" />
 
-                <button
-                    type="submit"
-                    className="w-[300px] py-3 text-lg font-medium text-white
-                   bg-[#87c041] hover:bg-[#598325]
-                   rounded-xl shadow-lg
-                   focus:outline-none focus:ring-2 focus:ring-white/70
-                   disabled:opacity-50 transition-all"
-                    disabled={isLoading}
-                    onClick={()=>handleClick()}
-                >
-                    {isLoading ? "Đang xử lý..." : "Đăng ký tài khoản"}
-                </button>
+                <div className="relative z-10 max-w-md">
+                    <h2 className="text-white text-3xl lg:text-4xl font-semibold leading-snug mb-4">
+                        Chào mừng đến với
+                        <br />
+                        Hệ thống Quản lý Kho Nông Sản
+                    </h2>
+
+                    <p className="text-white/90 text-sm lg:text-base mb-10">
+                        Theo dõi tồn kho chính xác, tối ưu quy trình nhập – xuất
+                        và nâng cao hiệu suất vận hành cho doanh nghiệp nông sản của bạn.
+                    </p>
+
+                    <button
+                        type="button"
+                        className="w-[260px] lg:w-[280px] py-2.5 text-sm lg:text-base font-medium text-emerald-900
+                                   bg-white hover:bg-slate-50
+                                   rounded-xl shadow-lg shadow-emerald-900/30
+                                   focus:outline-none focus:ring-2 focus:ring-white/70
+                                   transition-all"
+                        onClick={handleClick}
+                        disabled={isLoading}
+                    >
+                        {isLoading ? "Đang xử lý..." : "Tạo tài khoản mới"}
+                    </button>
+                </div>
             </div>
-
         </div>
     );
 }

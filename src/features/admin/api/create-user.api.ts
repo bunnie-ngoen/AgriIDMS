@@ -5,6 +5,10 @@ import {
   type CreateEmployeeDto,
   type CreateEmployeeResponse,
 } from "../schemas/create-user.schema";
+import type {
+  PaginationResult,
+  UserListItem,
+} from "../types/user.type";
 
 export const userApi = api.injectEndpoints({
   endpoints: (builder) => ({
@@ -15,15 +19,37 @@ export const userApi = api.injectEndpoints({
         body,
       }),
       transformResponse: (response: unknown) => {
-        // Nếu response là string, wrap nó vào object
-        if (typeof response === 'string') {
+        if (typeof response === "string") {
           return { message: response };
         }
-        // Nếu là object, parse bình thường
         return CreateEmployeeResponseSchema.parse(response);
       },
+    }),
+
+    getUsers: builder.query<
+      PaginationResult<UserListItem>,
+      { pageIndex?: number; pageSize?: number } | void
+    >({
+      query: (args) => {
+        const { pageIndex = 1, pageSize = 10 } = args ?? {};
+        return {
+          url: "../Users",
+          params: { pageIndex, pageSize },
+        };
+      },
+    }),
+
+    deleteUser: builder.mutation<void, string>({
+      query: (userId) => ({
+        url: `../Users/${userId}`,
+        method: "DELETE",
+      }),
     }),
   }),
 });
 
-export const { useCreateUserMutation } = userApi;
+export const {
+  useCreateUserMutation,
+  useGetUsersQuery,
+  useDeleteUserMutation,
+} = userApi;
