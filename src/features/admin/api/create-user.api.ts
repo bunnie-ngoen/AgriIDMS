@@ -13,7 +13,12 @@ import {
   CreateWarehouseSchema,
   type CreateWarehouseFormValues,
 } from "../schemas/create-warehouse.schema";
-import type { WarehouseItem } from "../types/warehouse.type";
+import type {
+  WarehouseItem,
+  ZoneItem,
+  RackItem,
+  SlotItem,
+} from "../types/warehouse.type";
 
 export const userApi = api.injectEndpoints({
   endpoints: (builder) => ({
@@ -113,6 +118,123 @@ export const userApi = api.injectEndpoints({
       }),
     }),
 
+    // ===== Warehouse structure: Zones =====
+    getZones: builder.query<ZoneItem[], number>({
+      query: (warehouseId) => ({
+        url: `../warehouses/${warehouseId}/zones`,
+      }),
+    }),
+
+    createZone: builder.mutation<
+      { message: string; id: number },
+      { warehouseId: number; name: string }
+    >({
+      query: ({ warehouseId, name }) => ({
+        url: `../warehouses/${warehouseId}/zones`,
+        method: "POST",
+        body: { name },
+      }),
+    }),
+
+    updateZone: builder.mutation<
+      { message: string },
+      { warehouseId: number; id: number; name: string }
+    >({
+      query: ({ warehouseId, id, name }) => ({
+        url: `../warehouses/${warehouseId}/zones/${id}`,
+        method: "PUT",
+        body: { name },
+      }),
+    }),
+
+    deleteZone: builder.mutation<
+      { message: string },
+      { warehouseId: number; id: number }
+    >({
+      query: ({ warehouseId, id }) => ({
+        url: `../warehouses/${warehouseId}/zones/${id}`,
+        method: "DELETE",
+      }),
+    }),
+
+    // ===== Racks =====
+    getRacks: builder.query<RackItem[], number>({
+      query: (zoneId) => ({
+        url: `../zones/${zoneId}/racks`,
+      }),
+    }),
+
+    createRack: builder.mutation<
+      { message: string; id: number },
+      { zoneId: number; name: string }
+    >({
+      query: ({ zoneId, name }) => ({
+        url: `../zones/${zoneId}/racks`,
+        method: "POST",
+        body: { name },
+      }),
+    }),
+
+    updateRack: builder.mutation<
+      { message: string },
+      { zoneId: number; id: number; name: string }
+    >({
+      query: ({ zoneId, id, name }) => ({
+        url: `../zones/${zoneId}/racks/${id}`,
+        method: "PUT",
+        body: { name },
+      }),
+    }),
+
+    deleteRack: builder.mutation<
+      { message: string },
+      { zoneId: number; id: number }
+    >({
+      query: ({ zoneId, id }) => ({
+        url: `../zones/${zoneId}/racks/${id}`,
+        method: "DELETE",
+      }),
+    }),
+
+    // ===== Slots =====
+    getSlots: builder.query<SlotItem[], number>({
+      query: (rackId) => ({
+        url: `../racks/${rackId}/slots`,
+      }),
+    }),
+
+    createSlot: builder.mutation<
+      { message: string; id: number },
+      { rackId: number; code: string; capacity: number }
+    >({
+      query: ({ rackId, code, capacity }) => ({
+        url: `../racks/${rackId}/slots`,
+        method: "POST",
+        body: { code, capacity },
+      }),
+    }),
+
+    updateSlot: builder.mutation<
+      { message: string },
+      { rackId: number; id: number; code: string; capacity: number }
+    >({
+      query: ({ rackId, id, code, capacity }) => ({
+        url: `../racks/${rackId}/slots/${id}`,
+        method: "PUT",
+        body: { code, capacity },
+      }),
+    }),
+
+    deleteSlot: builder.mutation<
+      { message: string },
+      { rackId: number; id: number }
+    >({
+      query: ({ rackId, id }) => ({
+        url: `../racks/${rackId}/slots/${id}`,
+        method: "DELETE",
+      }),
+    }),
+
     getUsers: builder.query<
       PaginationResult<UserListItem>,
       { pageIndex?: number; pageSize?: number } | void
@@ -144,4 +266,16 @@ export const {
   useGetWarehouseQuery,
   useUpdateWarehouseMutation,
   useDeleteWarehouseMutation,
+  useGetZonesQuery,
+  useCreateZoneMutation,
+  useUpdateZoneMutation,
+  useDeleteZoneMutation,
+  useGetRacksQuery,
+  useCreateRackMutation,
+  useUpdateRackMutation,
+  useDeleteRackMutation,
+  useGetSlotsQuery,
+  useCreateSlotMutation,
+  useUpdateSlotMutation,
+  useDeleteSlotMutation,
 } = userApi;
