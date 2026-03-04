@@ -3,11 +3,16 @@ import AdminSidebar from "../sidebars/AdminSidebar";
 import AdminHeader from "../header/AdminHeader";
 export default function AdminLayout() {
   return (
-    <div className="bg-[#F4F4F5] flex h-screen">
+    <div className="h-screen flex bg-[#F4F4F5] overflow-hidden">
       <AdminSidebar />
-      <div className="w-[85%] overflow-auto flex flex-col">
-        <AdminHeader/>
-        <Outlet />
+
+      <div className="flex-1 flex flex-col">
+        <AdminHeader />
+
+        {/* Content scroll riêng */}
+        <main className="flex-1 overflow-y-auto px-6 pt-6 pb-10">
+          <Outlet />
+        </main>
       </div>
     </div>
   );
