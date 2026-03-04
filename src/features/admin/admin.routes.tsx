@@ -26,6 +26,9 @@ const WarehouseConfigPage = lazy(
 const WarehouseMapPage = lazy(
   () => import("../admin/pages/WarehouseMap")
 );
+const ProfilePage = lazy(
+  () => import("../admin/pages/Profile")
+);
 
 export const adminRoutes = [
   {
@@ -36,6 +39,9 @@ export const adminRoutes = [
       { path: "dashboard", element: <DashboardPage /> },
       { path: "create-user", element: <CreateUserPage /> },
       { path: "users", element: <UserListPage /> },
+
+       { path: "profile", element: <ProfilePage /> },
+
       { path: "warehouses", element: <WarehouseListPage /> },
       { path: "warehouses/create", element: <CreateWarehousePage /> },
       { path: "warehouses/:id/edit", element: <EditWarehousePage /> },
