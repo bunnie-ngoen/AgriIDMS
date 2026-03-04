@@ -8,12 +8,14 @@ import { ROUTES } from './shared/constants/routes';
 import { AUTH_ROLE } from './features/auth/constants/auth.constants';
 import { adminRoutes } from './features/admin/admin.routes';
 import RegisterPage from './features/auth/pages/RegisterPage';
+import ForgotPasswordPage from './features/auth/pages/ForgotPasswordPage';
 function App() {
     return (
         <BrowserRouter>
             <Routes>
                 <Route path={ROUTES.LOGIN} element={<LoginPage />} />
                 <Route path={ROUTES.REGISTER} element={<RegisterPage />} />
+                <Route path={ROUTES.FORGET_PASSWORD} element={<ForgotPasswordPage />} />
                 <Route path={ROUTES.UNAUTHORIZED} element={<UnauthorizedPage />} />
 
                 {adminRoutes.map((route) => (
