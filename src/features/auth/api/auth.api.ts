@@ -54,7 +54,21 @@ export const authApi = api.injectEndpoints({
         };
       },
     }),
+
+
+    forgotPassword: build.mutation<
+  { message: string },
+  { email: string }
+>({
+  query: (body) => ({
+    url: "/Auth/ForgotPassword/forgot-password",
+    method: "POST",
+    body: {
+      email: body.email.trim(),
+    },
+  }),
+}),
   }),
 });
 
-export const { useLoginMutation, useRegisterCustomerMutation } = authApi;
+export const { useLoginMutation, useRegisterCustomerMutation, useForgotPasswordMutation } = authApi;

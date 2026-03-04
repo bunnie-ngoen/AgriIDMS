@@ -2,6 +2,7 @@ export const ROUTES = {
     LOGIN: "/login",
     REGISTER : '/register',
     UNAUTHORIZED: "/unauthorized",
+    FORGET_PASSWORD : "/forget-password",
     
     // Admin routes
     ADMIN_DASHBOARD: "/admin/dashboard",
