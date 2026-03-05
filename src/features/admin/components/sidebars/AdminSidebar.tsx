@@ -2,7 +2,6 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Archive,
   Users,
-  Table,
   CirclePlus,
   List,
   LogOut,
@@ -45,7 +44,6 @@ const mainMenu: MenuItem[] = [
     children: [
       { name: "Danh sách kho", path: "warehouses", icon: List },
       { name: "Tạo kho", path: "warehouses/create", icon: CirclePlus },
-      { name: "Danh sách kệ/bàn", path: "tables", icon: Table },
     ],
   },
 ];
