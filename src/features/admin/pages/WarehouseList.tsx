@@ -6,6 +6,7 @@ import {
 } from "../api/create-user.api";
 import type { WarehouseItem } from "../types/warehouse.type";
 import { Trash2, Pencil } from "lucide-react";
+import EditWarehouseModal from "../components/EditWarehouseModal";
 
 const PAGE_SIZE = 10;
 
@@ -17,6 +18,9 @@ const WarehouseList = () => {
   const [pageIndex, setPageIndex] = useState(1);
   const [searchName, setSearchName] = useState("");
   const [filterType, setFilterType] = useState<"" | "Normal" | "Cold">("");
+  const [editingWarehouseId, setEditingWarehouseId] = useState<number | null>(
+    null
+  );
 
   const handleDelete = async (warehouse: WarehouseItem) => {
     const ok = window.confirm(
@@ -151,13 +155,14 @@ const WarehouseList = () => {
                       </span>
                     </td>
                     <td className="px-4 py-2 text-right space-x-2">
-                      <Link
-                        to={`/admin/warehouses/${warehouse.id}/edit`}
+                      <button
+                        type="button"
+                        onClick={() => setEditingWarehouseId(warehouse.id)}
                         className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
                       >
                         <Pencil size={13} className="mr-1" />
                         Sửa
-                      </Link>
+                      </button>
                       <Link
                         to={`/admin/warehouses/${warehouse.id}/config`}
                         className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
@@ -227,6 +232,17 @@ const WarehouseList = () => {
           </div>
         )}
       </div>
+
+      {editingWarehouseId !== null && (
+        <EditWarehouseModal
+          warehouseId={editingWarehouseId}
+          onClose={() => setEditingWarehouseId(null)}
+          onSuccess={() => {
+            refetch();
+            setEditingWarehouseId(null);
+          }}
+        />
+      )}
     </div>
   );
 };
