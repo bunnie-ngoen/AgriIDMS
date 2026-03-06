@@ -16,7 +16,7 @@ export const authApi = api.injectEndpoints({
       query: (body) => {
         console.log("Sending login request:", body);
         return {
-          url: "/Auth/Login",
+          url: "/v1/Auth/Login",
           method: "POST",
           body,
         };
@@ -48,7 +48,7 @@ export const authApi = api.injectEndpoints({
         };
 
         return {
-          url: "/Auth/register",
+          url: "/v1/Auth/register",
           method: "POST",
           body: payload,
         };
@@ -61,7 +61,7 @@ export const authApi = api.injectEndpoints({
   { email: string }
 >({
   query: (body) => ({
-    url: "/Auth/ForgotPassword/forgot-password",
+    url: "/v1/Auth/ForgotPassword/forgot-password",
     method: "POST",
     body: {
       email: body.email.trim(),
