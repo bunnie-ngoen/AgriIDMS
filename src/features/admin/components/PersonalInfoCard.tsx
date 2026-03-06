@@ -1,7 +1,8 @@
 import React from "react";
 import { useForm } from "react-hook-form";
 import toast from "react-hot-toast";
-import type { PersonalInfoForm, ProfileUser } from "../types/profile.type";
+import type { ProfileUser } from "../types/profile.type";
+import { profileApi } from "../api/profile.api";
 
 const inputStyle: React.CSSProperties = {
   padding: "10px 13px", fontSize: "13.5px", color: "#111827",
@@ -40,17 +41,41 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
   </div>
 );
 
+type PersonalInfoForm = {
+  fullName: string;
+  phoneNumber: string;
+  address: string;
+};
+
 interface Props {
   user: ProfileUser;
 }
 
 const PersonalInfoCard = ({ user }: Props) => {
+  const [updateProfile, { isLoading }] = profileApi.useUpdateProfileMutation();
+
   const form = useForm<PersonalInfoForm>({
-    defaultValues: { name: user.name, email: user.email },
+    defaultValues: {
+      fullName: user.fullName ?? "",
+      phoneNumber: user.phoneNumber ?? "",
+      address: user.address ?? "",
+    },
   });
 
-  const onSubmit = (_data: PersonalInfoForm) => {
-    toast.success("Profile updated!");
+  const onSubmit = async (data: PersonalInfoForm) => {
+    try {
+      await updateProfile({
+        id: user.id,
+        fullName: data.fullName || null,
+        phoneNumber: data.phoneNumber || null,
+        gender: user.gender,
+        dob: user.dob,
+        address: data.address || null,
+      }).unwrap();
+      toast.success("Profile updated!");
+    } catch {
+      toast.error("Failed to update profile.");
+    }
   };
 
   return (
@@ -58,7 +83,6 @@ const PersonalInfoCard = ({ user }: Props) => {
       background: "#fff", borderRadius: "14px", overflow: "hidden",
       boxShadow: "0 1px 4px rgba(0,0,0,0.05), 0 4px 20px rgba(0,0,0,0.06)",
     }}>
-      {/* Header */}
       <div style={{
         padding: "1.1rem 1.5rem", borderBottom: "1px solid #f3f4f6",
         display: "flex", alignItems: "center", gap: "9px",
@@ -78,7 +102,6 @@ const PersonalInfoCard = ({ user }: Props) => {
         </h2>
       </div>
 
-      {/* Body */}
       <div style={{ padding: "1.4rem 1.5rem" }}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
@@ -86,43 +109,51 @@ const PersonalInfoCard = ({ user }: Props) => {
         >
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <Field label="Full Name">
-              <input {...form.register("name")} style={inputStyle} {...focusHandlers} />
+              <input {...form.register("fullName")} style={inputStyle} {...focusHandlers} />
             </Field>
-            <Field label="Role">
-              <input value={user.role} disabled style={disabledInputStyle} />
+            <Field label="Phone Number">
+              <input {...form.register("phoneNumber")} style={inputStyle} {...focusHandlers} />
             </Field>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <Field label="Email Address">
-              <input {...form.register("email")} disabled style={disabledInputStyle} />
+              <input value={user.email} disabled style={disabledInputStyle} />
             </Field>
-            <Field label="Department">
-              <input value={user.department} disabled style={disabledInputStyle} />
+            <Field label="Status">
+              <input value={user.status} disabled style={disabledInputStyle} />
             </Field>
           </div>
+
+          <Field label="Address">
+            <input {...form.register("address")} style={inputStyle} {...focusHandlers} />
+          </Field>
 
           <div>
             <button
               type="submit"
+              disabled={isLoading}
               style={{
                 padding: "9px 20px",
-                background: "linear-gradient(135deg, #7FBB35, #5c9020)",
+                background: isLoading ? "#a3c76a" : "linear-gradient(135deg, #7FBB35, #5c9020)",
                 color: "#fff", fontWeight: 700, fontSize: "12.5px",
-                border: "none", borderRadius: "8px", cursor: "pointer",
+                border: "none", borderRadius: "8px",
+                cursor: isLoading ? "not-allowed" : "pointer",
                 boxShadow: "0 3px 10px rgba(127,187,53,0.3)",
                 transition: "all 0.2s", fontFamily: "inherit",
               }}
               onMouseEnter={(e) => {
+                if (isLoading) return;
                 (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
                 (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 5px 14px rgba(127,187,53,0.4)";
               }}
               onMouseLeave={(e) => {
+                if (isLoading) return;
                 (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
                 (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 3px 10px rgba(127,187,53,0.3)";
               }}
             >
-              Save Changes
+              {isLoading ? "Saving..." : "Save Changes"}
             </button>
           </div>
         </form>

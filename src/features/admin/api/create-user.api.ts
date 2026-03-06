@@ -24,7 +24,7 @@ export const userApi = api.injectEndpoints({
   endpoints: (builder) => ({
     createUser: builder.mutation<CreateEmployeeResponse, CreateEmployeeDto>({
       query: (body) => ({
-        url: "/Auth/CreateEmployee/admin/create-employee",
+        url: "/v1/Auth/CreateEmployee/admin/create-employee",
         method: "POST",
         body,
       }),
