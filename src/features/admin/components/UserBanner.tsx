@@ -37,18 +37,18 @@ const UserBanner = ({ user }: Props) => (
       fontSize: "18px", fontWeight: 800, color: "#fff", flexShrink: 0,
       letterSpacing: "-0.02em", boxShadow: "0 4px 12px rgba(127,187,53,0.4)",
     }}>
-      {user.avatar}
+      {user.email.charAt(0).toUpperCase()}
     </div>
 
     <div style={{ flex: 1, position: "relative" }}>
       <div style={{ fontSize: "1rem", fontWeight: 700, color: "#fff", letterSpacing: "-0.01em" }}>
-        {user.name}
+        {user.fullName ?? "Unknown User"}
       </div>
       <div style={{ fontSize: "12.5px", color: "rgba(255,255,255,0.55)", marginTop: "2px" }}>
         {user.email}
       </div>
       <div style={{ display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
-        {[user.role, user.department].map((tag) => (
+        {[user.userType == "0" ? "Admin" : "User", user.status].map((tag) => (
           <span key={tag} style={{
             padding: "3px 9px", borderRadius: "20px", fontSize: "11px",
             fontWeight: 600, background: "rgba(127,187,53,0.2)", color: "#a8d96a",
@@ -61,7 +61,7 @@ const UserBanner = ({ user }: Props) => (
           padding: "3px 9px", borderRadius: "20px", fontSize: "11px",
           fontWeight: 600, background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)",
         }}>
-          Since {user.joined}
+          Since {new Date(user.createdAt).getFullYear()}
         </span>
       </div>
     </div>
