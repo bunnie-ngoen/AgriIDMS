@@ -34,7 +34,7 @@ const mainMenu: MenuItem[] = [
     name: "User Management",
     icon: Users,
     children: [
-      { name: "Create user", path: "create-user", icon: CirclePlus },
+      { name: "Create Employee", path: "create-user", icon: CirclePlus },
       { name: "User list", path: "users", icon: List },
     ],
   },

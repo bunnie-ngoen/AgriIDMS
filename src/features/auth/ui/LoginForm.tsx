@@ -26,6 +26,9 @@ export default function LoginForm() {
     const handleClick = () => {
         navigate("/register");
     };
+    const handleForgotPassword = () => {
+        navigate("/forget-password");
+    };
 
     const onSubmit = async (values: LoginFormValues) => {
         try {
@@ -118,6 +121,7 @@ export default function LoginForm() {
 
                     <div className="flex items-center justify-between text-xs md:text-sm">
                         <button
+                            onClick={handleForgotPassword}
                             type="button"
                             className="text-slate-500 hover:text-emerald-600 hover:underline"
                         >

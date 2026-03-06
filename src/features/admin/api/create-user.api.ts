@@ -24,7 +24,7 @@ export const userApi = api.injectEndpoints({
   endpoints: (builder) => ({
     createUser: builder.mutation<CreateEmployeeResponse, CreateEmployeeDto>({
       query: (body) => ({
-        url: "/Auth/CreateEmployee/admin/create-employee",
+        url: "/v1/Auth/CreateEmployee/admin/create-employee",
         method: "POST",
         body,
       }),
@@ -53,7 +53,7 @@ export const userApi = api.injectEndpoints({
         console.log("Create warehouse payload:", payload);
 
         return {
-          url: "../Warehouses",
+          url: "Warehouses",
           method: "POST",
           body: payload,
         };
@@ -62,7 +62,7 @@ export const userApi = api.injectEndpoints({
 
     getWarehouses: builder.query<WarehouseItem[], void>({
       query: () => ({
-        url: "../Warehouses",
+        url: "Warehouses",
       }),
       transformResponse: (response: unknown) => {
         const arr = (response as any[]) ?? [];
@@ -78,7 +78,7 @@ export const userApi = api.injectEndpoints({
 
     getWarehouse: builder.query<WarehouseItem, number>({
       query: (id) => ({
-        url: `../Warehouses/${id}`,
+        url: `Warehouses/${id}`,
       }),
       transformResponse: (w: any) =>
         ({
@@ -104,7 +104,7 @@ export const userApi = api.injectEndpoints({
         };
 
         return {
-          url: `../Warehouses/${id}`,
+          url: `Warehouses/${id}`,
           method: "PUT",
           body: payload,
         };
@@ -113,7 +113,7 @@ export const userApi = api.injectEndpoints({
 
     deleteWarehouse: builder.mutation<{ message: string }, number>({
       query: (id) => ({
-        url: `../Warehouses/${id}`,
+        url: `Warehouses/${id}`,
         method: "DELETE",
       }),
     }),
@@ -121,7 +121,7 @@ export const userApi = api.injectEndpoints({
     // ===== Warehouse structure: Zones =====
     getZones: builder.query<ZoneItem[], number>({
       query: (warehouseId) => ({
-        url: `../warehouses/${warehouseId}/zones`,
+        url: `warehouses/${warehouseId}/zones`,
       }),
     }),
 
@@ -130,7 +130,7 @@ export const userApi = api.injectEndpoints({
       { warehouseId: number; name: string }
     >({
       query: ({ warehouseId, name }) => ({
-        url: `../warehouses/${warehouseId}/zones`,
+        url: `warehouses/${warehouseId}/zones`,
         method: "POST",
         body: { name },
       }),
@@ -141,7 +141,7 @@ export const userApi = api.injectEndpoints({
       { warehouseId: number; id: number; name: string }
     >({
       query: ({ warehouseId, id, name }) => ({
-        url: `../warehouses/${warehouseId}/zones/${id}`,
+        url: `warehouses/${warehouseId}/zones/${id}`,
         method: "PUT",
         body: { name },
       }),
@@ -152,7 +152,7 @@ export const userApi = api.injectEndpoints({
       { warehouseId: number; id: number }
     >({
       query: ({ warehouseId, id }) => ({
-        url: `../warehouses/${warehouseId}/zones/${id}`,
+        url: `warehouses/${warehouseId}/zones/${id}`,
         method: "DELETE",
       }),
     }),
@@ -160,7 +160,7 @@ export const userApi = api.injectEndpoints({
     // ===== Racks =====
     getRacks: builder.query<RackItem[], number>({
       query: (zoneId) => ({
-        url: `../zones/${zoneId}/racks`,
+        url: `zones/${zoneId}/racks`,
       }),
     }),
 
@@ -169,7 +169,7 @@ export const userApi = api.injectEndpoints({
       { zoneId: number; name: string }
     >({
       query: ({ zoneId, name }) => ({
-        url: `../zones/${zoneId}/racks`,
+        url: `zones/${zoneId}/racks`,
         method: "POST",
         body: { name },
       }),
@@ -180,7 +180,7 @@ export const userApi = api.injectEndpoints({
       { zoneId: number; id: number; name: string }
     >({
       query: ({ zoneId, id, name }) => ({
-        url: `../zones/${zoneId}/racks/${id}`,
+        url: `zones/${zoneId}/racks/${id}`,
         method: "PUT",
         body: { name },
       }),
@@ -191,7 +191,7 @@ export const userApi = api.injectEndpoints({
       { zoneId: number; id: number }
     >({
       query: ({ zoneId, id }) => ({
-        url: `../zones/${zoneId}/racks/${id}`,
+        url: `zones/${zoneId}/racks/${id}`,
         method: "DELETE",
       }),
     }),
@@ -199,7 +199,7 @@ export const userApi = api.injectEndpoints({
     // ===== Slots =====
     getSlots: builder.query<SlotItem[], number>({
       query: (rackId) => ({
-        url: `../racks/${rackId}/slots`,
+        url: `racks/${rackId}/slots`,
       }),
     }),
 
@@ -208,7 +208,7 @@ export const userApi = api.injectEndpoints({
       { rackId: number; code: string; capacity: number }
     >({
       query: ({ rackId, code, capacity }) => ({
-        url: `../racks/${rackId}/slots`,
+        url: `racks/${rackId}/slots`,
         method: "POST",
         body: { code, capacity },
       }),
@@ -219,7 +219,7 @@ export const userApi = api.injectEndpoints({
       { rackId: number; id: number; code: string; capacity: number }
     >({
       query: ({ rackId, id, code, capacity }) => ({
-        url: `../racks/${rackId}/slots/${id}`,
+        url: `racks/${rackId}/slots/${id}`,
         method: "PUT",
         body: { code, capacity },
       }),
@@ -230,7 +230,7 @@ export const userApi = api.injectEndpoints({
       { rackId: number; id: number }
     >({
       query: ({ rackId, id }) => ({
-        url: `../racks/${rackId}/slots/${id}`,
+        url: `racks/${rackId}/slots/${id}`,
         method: "DELETE",
       }),
     }),

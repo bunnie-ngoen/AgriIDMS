@@ -16,7 +16,7 @@ export const authApi = api.injectEndpoints({
       query: (body) => {
         console.log("Sending login request:", body);
         return {
-          url: "Auth/Login",
+          url: "/Auth/Login",
           method: "POST",
           body,
         };
@@ -57,8 +57,21 @@ export const authApi = api.injectEndpoints({
         };
       },
     }),
+
+
+    forgotPassword: build.mutation<
+  { message: string },
+  { email: string }
+>({
+  query: (body) => ({
+    url: "/Auth/ForgotPassword/forgot-password",
+    method: "POST",
+    body: {
+      email: body.email.trim(),
+    },
+  }),
+}),
   }),
 });
 
-export const { useLoginMutation, useRegisterCustomerMutation } = authApi;
-
+export const { useLoginMutation, useRegisterCustomerMutation, useForgotPasswordMutation } = authApi;
