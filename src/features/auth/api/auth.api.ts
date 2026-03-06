@@ -16,7 +16,7 @@ export const authApi = api.injectEndpoints({
       query: (body) => {
         console.log("Sending login request:", body);
         return {
-          url: "/v1/Auth/Login",
+          url: "/Auth/Login",
           method: "POST",
           body,
         };
@@ -41,14 +41,17 @@ export const authApi = api.injectEndpoints({
           password: body.password,
           phoneNumber: body.phoneNumber.trim(),
           gender: body.gender === "male",
-          dob: body.dob ? new Date(body.dob).toISOString() : null,
+          // Gửi đúng định dạng \"yyyy-MM-dd\" như swagger, không ISO full datetime
+          dob: body.dob && body.dob !== "" ? body.dob : null,
           fullName: body.fullName.trim(),
           address: body.address?.trim() || null,
           email: body.email?.trim() || null,
         };
 
+        // BE route: [Route("api/v1/[controller]/[action]")] + [HttpPost("register")]
+        // => POST /api/v1/Auth/RegisterCustomer/register
         return {
-          url: "/v1/Auth/register",
+          url: "Auth/RegisterCustomer/register",
           method: "POST",
           body: payload,
         };
@@ -61,7 +64,7 @@ export const authApi = api.injectEndpoints({
   { email: string }
 >({
   query: (body) => ({
-    url: "/v1/Auth/ForgotPassword/forgot-password",
+    url: "/Auth/ForgotPassword/forgot-password",
     method: "POST",
     body: {
       email: body.email.trim(),
