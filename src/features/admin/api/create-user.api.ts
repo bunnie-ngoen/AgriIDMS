@@ -242,7 +242,7 @@ export const userApi = api.injectEndpoints({
       query: (args) => {
         const { pageIndex = 1, pageSize = 10 } = args ?? {};
         return {
-          url: "../Users",
+          url: "/Users",
           params: { pageIndex, pageSize },
         };
       },
