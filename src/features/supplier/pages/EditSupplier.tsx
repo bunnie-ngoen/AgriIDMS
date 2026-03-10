@@ -1,16 +1,12 @@
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useNavigate, useParams } from "react-router-dom";
 import {
-  CreateWarehouseSchema,
-  type CreateWarehouseFormValues,
-} from "../schemas/create-warehouse.schema";
-import {
-  useGetWarehouseQuery,
-  useUpdateWarehouseMutation,
-} from "../api/create-user.api";
-import { useParams } from "react-router-dom";
-import toast from "react-hot-toast";
+  useGetSupplierByIdQuery,
+  useUpdateSupplierMutation,
+} from "../api/supplier.api";
+import { SupplierSchema, type SupplierFormValues } from "../schemas/supplier.schema";
 import {
   getVnDistricts,
   getVnProvinces,
@@ -18,47 +14,34 @@ import {
   type VnDistrict,
   type VnProvince,
   type VnWard,
-} from "../../../shared/api/vn-address.api";
+} from "../api/vn-address.api";
 
-const normalizeName = (s: string) => {
-  const x = (s || "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "");
-  return x
-    .replace(
-      /\b(tp\.?|thanh pho|tinh|quan|huyen|thi xa|phuong|xa|thi tran)\b/g,
-      ""
-    )
-    .replace(/\s+/g, " ")
-    .trim();
-};
-
-const EditWarehouse = () => {
+export default function EditSupplier() {
   const { id } = useParams<{ id: string }>();
-  const warehouseId = Number(id);
+  const supplierId = Number(id);
+  const navigate = useNavigate();
+
+  const { data, isLoading: isLoadingSupplier } = useGetSupplierByIdQuery(
+    supplierId,
+    { skip: Number.isNaN(supplierId) }
+  );
+
+  const [updateSupplier, { isLoading }] = useUpdateSupplierMutation();
+
   const [serverMessage, setServerMessage] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
 
-  const { data, isLoading: isLoadingWarehouse } =
-    useGetWarehouseQuery(warehouseId, {
-      skip: Number.isNaN(warehouseId),
-    });
-
-  const [updateWarehouse, { isLoading }] = useUpdateWarehouseMutation();
-
-  const form = useForm<CreateWarehouseFormValues>({
-    resolver: zodResolver(CreateWarehouseSchema),
+  const form = useForm<SupplierFormValues>({
+    resolver: zodResolver(SupplierSchema),
     defaultValues: {
       name: "",
       provinceCode: 0,
       districtCode: 0,
       wardCode: 0,
       detailAddress: "",
-      titleWarehouse: "Normal",
+      phone: "",
     },
   });
 
@@ -72,12 +55,44 @@ const EditWarehouse = () => {
   const provinceCode = form.watch("provinceCode");
   const districtCode = form.watch("districtCode");
 
-  const [parsedLocation, setParsedLocation] = useState<{
+  const normalizeName = (s: string) => {
+    const x = (s || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "");
+    return x
+      .replace(/\b(tp\.?|thanh pho|tinh|quan|huyen|thi xa|phuong|xa|thi tran)\b/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  };
+
+  const [parsedAddress, setParsedAddress] = useState<{
     provinceName: string;
     districtName: string;
     wardName: string;
     detail: string;
   } | null>(null);
+
+  const loadDistricts = async (pCode: number) => {
+    setLoadingDistricts(true);
+    try {
+      const res = await getVnDistricts(pCode);
+      setDistricts(res);
+    } finally {
+      setLoadingDistricts(false);
+    }
+  };
+
+  const loadWards = async (dCode: number) => {
+    setLoadingWards(true);
+    try {
+      const res = await getVnWards(dCode);
+      setWards(res);
+    } finally {
+      setLoadingWards(false);
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -98,134 +113,105 @@ const EditWarehouse = () => {
 
   useEffect(() => {
     if (data) {
-      const parts = (data.location ?? "")
+      const parts = (data.address ?? "")
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean);
-      const provinceFromApi = parts.at(-1) ?? "";
-      const districtFromApi = parts.at(-2) ?? "";
-      const wardFromApi = parts.at(-3) ?? "";
+
+      const provinceName = parts.at(-1) ?? "";
+      const districtName = parts.at(-2) ?? "";
+      const wardName = parts.at(-3) ?? "";
       const detailAddress =
-        parts.length >= 4
-          ? parts.slice(0, -3).join(", ")
-          : (data.location ?? "");
-      setParsedLocation({
-        provinceName: provinceFromApi,
-        districtName: districtFromApi,
-        wardName: wardFromApi,
+        parts.length >= 4 ? parts.slice(0, -3).join(", ") : (data.address ?? "");
+
+      setParsedAddress({
+        provinceName,
+        districtName,
+        wardName,
         detail: detailAddress,
       });
+
       form.reset({
-        name: data.name,
+        name: data.name ?? "",
         provinceCode: 0,
         districtCode: 0,
         wardCode: 0,
         detailAddress: detailAddress,
-        titleWarehouse: data.titleWarehouse,
+        phone: data.phone ?? "",
       });
     }
   }, [data, form]);
 
   useEffect(() => {
-    if (!parsedLocation || provinces.length === 0) return;
-    const want = normalizeName(parsedLocation.provinceName);
+    if (!parsedAddress || provinces.length === 0) return;
+    const want = normalizeName(parsedAddress.provinceName);
+    if (!want) return;
     const p =
       provinces.find((x) => normalizeName(x.name) === want) ||
       provinces.find((x) => normalizeName(x.name).includes(want)) ||
-      provinces.find((x) => want.includes(normalizeName(x.name))) ||
-      provinces[0];
+      provinces.find((x) => want.includes(normalizeName(x.name)));
     if (!p) return;
-    form.setValue("provinceCode", p.code, { shouldValidate: false });
-    form.setValue("districtCode", 0, { shouldValidate: false });
-    form.setValue("wardCode", 0, { shouldValidate: false });
-  }, [parsedLocation, provinces, form]);
+
+    form.setValue("provinceCode", p.code, { shouldValidate: true });
+    form.setValue("districtCode", 0);
+    form.setValue("wardCode", 0);
+    setDistricts([]);
+    setWards([]);
+    loadDistricts(p.code);
+  }, [parsedAddress, provinces, form]);
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      setDistricts([]);
-      setWards([]);
-      if (!provinceCode || provinceCode < 1) return;
-      setLoadingDistricts(true);
-      try {
-        const res = await getVnDistricts(provinceCode);
-        if (!mounted) return;
-        setDistricts(res);
-      } finally {
-        if (mounted) setLoadingDistricts(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [provinceCode]);
-
-  useEffect(() => {
-    if (!parsedLocation || districts.length === 0) return;
-    const want = normalizeName(parsedLocation.districtName);
+    if (!parsedAddress || !provinceCode || districts.length === 0) return;
+    const want = normalizeName(parsedAddress.districtName);
+    if (!want) return;
     const d =
       districts.find((x) => normalizeName(x.name) === want) ||
       districts.find((x) => normalizeName(x.name).includes(want)) ||
-      districts.find((x) => want.includes(normalizeName(x.name))) ||
-      districts[0];
+      districts.find((x) => want.includes(normalizeName(x.name)));
     if (!d) return;
-    form.setValue("districtCode", d.code, { shouldValidate: false });
-    form.setValue("wardCode", 0, { shouldValidate: false });
-  }, [parsedLocation, districts, form]);
+    form.setValue("districtCode", d.code, { shouldValidate: true });
+    form.setValue("wardCode", 0);
+    setWards([]);
+    loadWards(d.code);
+  }, [parsedAddress, provinceCode, districts, form]);
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      setWards([]);
-      if (!districtCode || districtCode < 1) return;
-      setLoadingWards(true);
-      try {
-        const res = await getVnWards(districtCode);
-        if (!mounted) return;
-        setWards(res);
-      } finally {
-        if (mounted) setLoadingWards(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [districtCode]);
-
-  useEffect(() => {
-    if (!parsedLocation || wards.length === 0) return;
-    const want = normalizeName(parsedLocation.wardName);
+    if (!parsedAddress || !districtCode || wards.length === 0) return;
+    const want = normalizeName(parsedAddress.wardName);
+    if (!want) return;
     const w =
       wards.find((x) => normalizeName(x.name) === want) ||
       wards.find((x) => normalizeName(x.name).includes(want)) ||
-      wards.find((x) => want.includes(normalizeName(x.name))) ||
-      wards[0];
+      wards.find((x) => want.includes(normalizeName(x.name)));
     if (!w) return;
-    form.setValue("wardCode", w.code, { shouldValidate: false });
-  }, [parsedLocation, wards, form]);
+    form.setValue("wardCode", w.code, { shouldValidate: true });
+  }, [parsedAddress, districtCode, wards, form]);
 
-  const onSubmit = async (values: CreateWarehouseFormValues) => {
-    if (Number.isNaN(warehouseId)) return;
-    const provinceName =
-      provinces.find((p) => p.code === values.provinceCode)?.name ?? "";
-    const districtName =
-      districts.find((d) => d.code === values.districtCode)?.name ?? "";
-    const wardName =
-      wards.find((w) => w.code === values.wardCode)?.name ?? "";
-    const location = `${values.detailAddress}, ${wardName}, ${districtName}, ${provinceName}`;
-    const toastId = toast.loading("Đang cập nhật kho...");
+  const onSubmit = async (values: SupplierFormValues) => {
+    if (Number.isNaN(supplierId)) return;
+    setServerMessage(null);
     try {
-      await updateWarehouse({
-        id: warehouseId,
-        data: { name: values.name, location, titleWarehouse: values.titleWarehouse },
+      const provinceName =
+        provinces.find((p) => p.code === values.provinceCode)?.name ?? "";
+      const districtName =
+        districts.find((d) => d.code === values.districtCode)?.name ?? "";
+      const wardName = wards.find((w) => w.code === values.wardCode)?.name ?? "";
+
+      await updateSupplier({
+        id: supplierId,
+        data: {
+          name: values.name,
+          address: `${values.detailAddress}, ${wardName}, ${districtName}, ${provinceName}`,
+          phone: values.phone,
+        },
       }).unwrap();
-      toast.success("Cập nhật kho thành công", { id: toastId });
-      setServerMessage({ type: "success", text: "Cập nhật kho thành công" });
-    } catch (error: unknown) {
+
+      setServerMessage({ type: "success", text: "Cập nhật nhà cung cấp thành công" });
+    } catch (error: any) {
       const msg =
-        (error as { data?: { message?: string } })?.data?.message ||
-        "Cập nhật kho thất bại. Vui lòng kiểm tra lại thông tin.";
-      toast.error(msg, { id: toastId });
+        error?.data?.error ||
+        error?.data?.message ||
+        "Cập nhật nhà cung cấp thất bại. Vui lòng kiểm tra lại thông tin.";
       setServerMessage({ type: "error", text: msg });
     }
   };
@@ -234,12 +220,12 @@ const EditWarehouse = () => {
     <div className="px-5">
       <div className="bg-white rounded-[15px] p-8 shadow-sm">
         <h1 className="text-xl md:text-2xl font-bold text-center mb-6">
-          CẬP NHẬT THÔNG TIN KHO
+          CẬP NHẬT NHÀ CUNG CẤP
         </h1>
 
-        {isLoadingWarehouse && (
+        {isLoadingSupplier && (
           <p className="text-center text-sm text-slate-500 mb-4">
-            Đang tải thông tin kho...
+            Đang tải thông tin nhà cung cấp...
           </p>
         )}
 
@@ -249,7 +235,7 @@ const EditWarehouse = () => {
         >
           <div className="flex flex-col gap-2">
             <label className="font-medium text-sm text-slate-700">
-              Tên kho *
+              Tên nhà cung cấp *
             </label>
             <input
               {...form.register("name")}
@@ -271,10 +257,13 @@ const EditWarehouse = () => {
                 {...form.register("provinceCode", { valueAsNumber: true })}
                 className="w-full p-3 rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
                 onChange={(e) => {
-                  const code = Number(e.target.value) || 0;
-                  form.setValue("provinceCode", code, { shouldValidate: true });
-                  form.setValue("districtCode", 0, { shouldValidate: true });
-                  form.setValue("wardCode", 0, { shouldValidate: true });
+                  const pCode = Number(e.target.value) || 0;
+                  form.setValue("provinceCode", pCode);
+                  form.setValue("districtCode", 0);
+                  form.setValue("wardCode", 0);
+                  setDistricts([]);
+                  setWards([]);
+                  if (pCode > 0) loadDistricts(pCode);
                 }}
               >
                 <option value={0}>Chọn tỉnh / thành</option>
@@ -293,6 +282,7 @@ const EditWarehouse = () => {
                 </p>
               )}
             </div>
+
             <div className="flex flex-col gap-2">
               <label className="font-medium text-sm text-slate-700">
                 Quận / Huyện *
@@ -300,11 +290,13 @@ const EditWarehouse = () => {
               <select
                 {...form.register("districtCode", { valueAsNumber: true })}
                 className="w-full p-3 rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                disabled={!provinceCode || provinceCode < 1}
+                disabled={!provinceCode}
                 onChange={(e) => {
-                  const code = Number(e.target.value) || 0;
-                  form.setValue("districtCode", code, { shouldValidate: true });
-                  form.setValue("wardCode", 0, { shouldValidate: true });
+                  const dCode = Number(e.target.value) || 0;
+                  form.setValue("districtCode", dCode);
+                  form.setValue("wardCode", 0);
+                  setWards([]);
+                  if (dCode > 0) loadWards(dCode);
                 }}
               >
                 <option value={0}>Chọn quận / huyện</option>
@@ -323,6 +315,7 @@ const EditWarehouse = () => {
                 </p>
               )}
             </div>
+
             <div className="flex flex-col gap-2">
               <label className="font-medium text-sm text-slate-700">
                 Phường / Xã *
@@ -330,7 +323,7 @@ const EditWarehouse = () => {
               <select
                 {...form.register("wardCode", { valueAsNumber: true })}
                 className="w-full p-3 rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                disabled={!districtCode || districtCode < 1}
+                disabled={!districtCode}
               >
                 <option value={0}>Chọn phường / xã</option>
                 {wards.map((w) => (
@@ -366,6 +359,21 @@ const EditWarehouse = () => {
             )}
           </div>
 
+          <div className="flex flex-col gap-2 max-w-sm">
+            <label className="font-medium text-sm text-slate-700">
+              Số điện thoại *
+            </label>
+            <input
+              {...form.register("phone")}
+              className="w-full p-3 rounded-xl border border-gray-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            />
+            {form.formState.errors.phone && (
+              <p className="text-red-500 text-xs">
+                {form.formState.errors.phone.message}
+              </p>
+            )}
+          </div>
+
           {serverMessage && (
             <p
               className={`text-xs px-3 py-2 rounded-lg border ${
@@ -378,35 +386,25 @@ const EditWarehouse = () => {
             </p>
           )}
 
-          <div className="flex flex-col gap-2 max-w-xs">
-            <label className="font-medium text-sm text-slate-700">
-              Loại kho *
-            </label>
-            <select
-              {...form.register("titleWarehouse")}
-              className="w-full p-3 rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+          <div className="flex items-center gap-3">
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="bg-[#7FBB35] px-5 py-3 rounded-xl text-white font-semibold text-sm hover:bg-[#598325] transition disabled:opacity-50"
             >
-              <option value="Normal">Kho thường</option>
-              <option value="Cold">Kho lạnh</option>
-            </select>
-            {form.formState.errors.titleWarehouse && (
-              <p className="text-red-500 text-xs">
-                {form.formState.errors.titleWarehouse.message}
-              </p>
-            )}
+              {isLoading ? "Đang lưu..." : "Lưu thay đổi"}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/admin/suppliers")}
+              className="px-5 py-3 rounded-xl border border-slate-200 text-slate-700 text-sm hover:bg-slate-50"
+            >
+              Quay lại
+            </button>
           </div>
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="mt-2 bg-[#7FBB35] p-3 rounded-xl text-white font-semibold text-sm hover:bg-[#598325] transition disabled:opacity-50"
-          >
-            {isLoading ? "Đang lưu..." : "Lưu thay đổi"}
-          </button>
         </form>
       </div>
     </div>
   );
-};
+}
 
-export default EditWarehouse;

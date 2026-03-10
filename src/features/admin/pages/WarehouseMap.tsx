@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   useGetWarehouseQuery,
@@ -220,28 +220,20 @@ const WarehouseMap = () => {
   const [selectedRackId, setSelectedRackId] = useState<number | null>(null);
   const [detailSlot, setDetailSlot] = useState<SlotItem | null>(null);
 
-  const { data: racks } = useGetRacksQuery(selectedZoneId ?? 0, {
-    skip: !selectedZoneId,
+  const effectiveZoneId = selectedZoneId ?? zones?.[0]?.id ?? null;
+
+  const { data: racks } = useGetRacksQuery(effectiveZoneId ?? 0, {
+    skip: !effectiveZoneId,
   });
 
+  const effectiveRackId = selectedRackId ?? racks?.[0]?.id ?? null;
+
   const { data: slots, isLoading: isSlotsLoading } = useGetSlotsQuery(
-    selectedRackId ?? 0,
+    effectiveRackId ?? 0,
     {
-      skip: !selectedRackId,
+      skip: !effectiveRackId,
     }
   );
-
-  useEffect(() => {
-    if (!selectedZoneId && zones && zones.length > 0) {
-      setSelectedZoneId(zones[0].id);
-    }
-  }, [zones, selectedZoneId]);
-
-  useEffect(() => {
-    if (!selectedRackId && racks && racks.length > 0) {
-      setSelectedRackId(racks[0].id);
-    }
-  }, [racks, selectedRackId]);
 
   const legend = [
     { label: "Trống", className: "bg-slate-200 border-slate-300" },
@@ -260,14 +252,14 @@ const WarehouseMap = () => {
   };
 
   const selectedZoneName = useMemo(() => {
-    if (!zones || !selectedZoneId) return "";
-    return zones.find((z) => z.id === selectedZoneId)?.name ?? "";
-  }, [zones, selectedZoneId]);
+    if (!zones || !effectiveZoneId) return "";
+    return zones.find((z) => z.id === effectiveZoneId)?.name ?? "";
+  }, [zones, effectiveZoneId]);
 
   const selectedRackName = useMemo(() => {
-    if (!racks || !selectedRackId) return "";
-    return racks.find((r) => r.id === selectedRackId)?.name ?? "";
-  }, [racks, selectedRackId]);
+    if (!racks || !effectiveRackId) return "";
+    return racks.find((r) => r.id === effectiveRackId)?.name ?? "";
+  }, [racks, effectiveRackId]);
 
   if (Number.isNaN(warehouseId)) {
     return (
@@ -358,7 +350,7 @@ const WarehouseMap = () => {
                 Zone:
               </span>
               <select
-                value={selectedZoneId ?? ""}
+                value={effectiveZoneId ?? ""}
                 onChange={(e) => {
                   const value = e.target.value;
                   setSelectedZoneId(value ? Number(value) : null);
@@ -380,7 +372,7 @@ const WarehouseMap = () => {
                 Rack:
               </span>
               <select
-                value={selectedRackId ?? ""}
+                value={effectiveRackId ?? ""}
                 onChange={(e) => {
                   const value = e.target.value;
                   setSelectedRackId(value ? Number(value) : null);
@@ -414,25 +406,25 @@ const WarehouseMap = () => {
             <p className="text-xs text-slate-500">Đang tải sơ đồ kho...</p>
           )}
 
-          {!selectedZoneId && (
+          {!effectiveZoneId && (
             <p className="text-xs text-slate-500">
               Chưa có zone nào. Hãy vào phần cấu hình để thêm zone.
             </p>
           )}
 
-          {selectedZoneId && !selectedRackId && (
+          {effectiveZoneId && !effectiveRackId && (
             <p className="text-xs text-slate-500">
               Chọn rack trong zone "{selectedZoneName}" để xem sơ đồ slot.
             </p>
           )}
 
-          {selectedRackId && slots && slots.length === 0 && (
+          {effectiveRackId && slots && slots.length === 0 && (
             <p className="text-xs text-slate-500">
               Chưa có slot nào trong rack "{selectedRackName}".
             </p>
           )}
 
-          {selectedRackId && slots && slots.length > 0 && (
+          {effectiveRackId && slots && slots.length > 0 && (
             <div className="mt-3 border border-slate-200 rounded-2xl p-4 bg-slate-50/60">
               <div className="flex items-center justify-between mb-3">
                 <div>

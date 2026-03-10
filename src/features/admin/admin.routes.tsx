@@ -30,6 +30,36 @@ const ProfilePage = lazy(
   () => import("../admin/pages/Profile")
 );
 
+const SupplierListPage = lazy(
+  () => import("../supplier/pages/SupplierList")
+);
+const CreateSupplierPage = lazy(
+  () => import("../supplier/pages/CreateSupplier")
+);
+const EditSupplierPage = lazy(
+  () => import("../supplier/pages/EditSupplier")
+);
+
+const CategoryListPage = lazy(
+  () => import("../category/pages/CategoryList")
+);
+const CreateCategoryPage = lazy(
+  () => import("../category/pages/CreateCategory")
+);
+const EditCategoryPage = lazy(
+  () => import("../category/pages/EditCategory")
+);
+
+const ProductListPage = lazy(
+  () => import("../product/pages/ProductList")
+);
+const CreateProductPage = lazy(
+  () => import("../product/pages/CreateProduct")
+);
+const EditProductPage = lazy(
+  () => import("../product/pages/EditProduct")
+);
+
 export const adminRoutes = [
   {
     path: "/admin",
@@ -47,6 +77,18 @@ export const adminRoutes = [
       { path: "warehouses/:id/edit", element: <EditWarehousePage /> },
       { path: "warehouses/:id/config", element: <WarehouseConfigPage /> },
       { path: "warehouses/:id/map", element: <WarehouseMapPage /> },
+
+      { path: "suppliers", element: <SupplierListPage /> },
+      { path: "suppliers/create", element: <CreateSupplierPage /> },
+      { path: "suppliers/:id/edit", element: <EditSupplierPage /> },
+
+      { path: "categories", element: <CategoryListPage /> },
+      { path: "categories/create", element: <CreateCategoryPage /> },
+      { path: "categories/:id/edit", element: <EditCategoryPage /> },
+
+      { path: "products", element: <ProductListPage /> },
+      { path: "products/create", element: <CreateProductPage /> },
+      { path: "products/:id/edit", element: <EditProductPage /> },
     ],
   },
 ];
