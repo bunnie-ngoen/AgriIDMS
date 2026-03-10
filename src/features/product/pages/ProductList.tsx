@@ -5,9 +5,12 @@ import toast from "react-hot-toast";
 import {
   useDeleteProductMutation,
   useGetProductsQuery,
+  useUpdateProductStatusMutation,
 } from "../api/product.api";
 import type { Product } from "../types/product.type";
 import EditProductModal from "../components/EditProductModal";
+import { useGetCategoriesQuery } from "../../category/api/category.api";
+import type { Category } from "../../category/types/category.type";
 
 const PAGE_SIZE = 10;
 
@@ -16,23 +19,48 @@ export default function ProductList() {
   const initialPage = Number(searchParams.get("page") ?? "1") || 1;
 
   const { data, isLoading, isError, refetch } = useGetProductsQuery();
+  const { data: categoryData } = useGetCategoriesQuery();
   const [deleteProduct, { isLoading: isDeleting }] = useDeleteProductMutation();
+  const [updateStatus, { isLoading: isUpdatingStatus }] =
+    useUpdateProductStatusMutation();
 
   const [pageIndex, setPageIndex] = useState(initialPage);
   const [searchText, setSearchText] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | "all">(
+    "all"
+  );
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
+
+  const categoryOptions = useMemo(
+    () => (categoryData ?? []) as Category[],
+    [categoryData]
+  );
 
   const filtered = useMemo(() => {
     const list = (data ?? []) as Product[];
     const q = searchText.toLowerCase().trim();
-    if (!q) return list;
+
+    const selectedCategoryName =
+      selectedCategoryId === "all"
+        ? null
+        : categoryOptions.find((c) => c.id === selectedCategoryId)?.name ?? null;
+
     return list.filter((p) => {
       const name = (p.name ?? "").toLowerCase();
       const desc = (p.description ?? "").toLowerCase();
       const cat = (p.category ?? "").toLowerCase();
-      return name.includes(q) || desc.includes(q) || cat.includes(q);
+
+      const matchesText =
+        !q || name.includes(q) || desc.includes(q) || cat.includes(q);
+
+      const matchesCategory =
+        !selectedCategoryName ||
+        (p.category ?? "").toLowerCase() ===
+          selectedCategoryName.toLowerCase();
+
+      return matchesText && matchesCategory;
     });
-  }, [data, searchText]);
+  }, [data, searchText, selectedCategoryId, categoryOptions]);
 
   const totalItems = filtered.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / PAGE_SIZE));
@@ -73,6 +101,33 @@ export default function ProductList() {
     }
   };
 
+  const handleToggleStatus = async (product: Product) => {
+    const current = product.isActive ?? true;
+    const next = !current;
+    const actionLabel = next ? "kích hoạt" : "vô hiệu hóa";
+
+    const ok = window.confirm(
+      `Bạn có chắc muốn ${actionLabel} sản phẩm "${product.name}"?`
+    );
+    if (!ok) return;
+
+    const toastId = toast.loading(`Đang ${actionLabel} sản phẩm...`);
+    try {
+      await updateStatus({
+        id: product.id,
+        data: { isActive: next },
+      }).unwrap();
+      await refetch();
+      toast.success(`Đã ${actionLabel} sản phẩm thành công`, { id: toastId });
+    } catch (error) {
+      console.error("Update product status failed:", error);
+      toast.error(
+        `Thao tác ${actionLabel} sản phẩm thất bại. Vui lòng thử lại.`,
+        { id: toastId }
+      );
+    }
+  };
+
   return (
     <div className="px-5">
       <div className="bg-white rounded-[15px] p-6 shadow-sm">
@@ -105,6 +160,24 @@ export default function ProductList() {
             placeholder="Tìm theo tên / mô tả / danh mục..."
             className="w-full md:w-1/2 p-2.5 rounded-lg border border-slate-200 bg-slate-50 text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
           />
+
+          <select
+            value={selectedCategoryId === "all" ? "all" : String(selectedCategoryId)}
+            onChange={(e) => {
+              const value = e.target.value;
+              setSelectedCategoryId(value === "all" ? "all" : Number(value));
+              setPageIndex(1);
+              updatePageInUrl(1);
+            }}
+            className="w-full md:w-48 p-2.5 rounded-lg border border-slate-200 bg-white text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          >
+            <option value="all">Tất cả danh mục</option>
+            {categoryOptions.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
         </div>
 
         {isError && (
@@ -186,6 +259,14 @@ export default function ProductList() {
                         >
                           <Pencil size={13} className="mr-1" />
                           Sửa
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isUpdatingStatus}
+                          onClick={() => handleToggleStatus(p)}
+                          className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                        >
+                          {p.isActive ? "Vô hiệu hóa" : "Kích hoạt"}
                         </button>
                         <button
                           type="button"

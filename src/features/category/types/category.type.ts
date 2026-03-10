@@ -14,3 +14,7 @@ export type UpdateCategoryRequest = {
   description?: string | null;
 };
 
+export type UpdateCategoryStatusRequest = {
+  status: number;
+};
+
