@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   useGetUsersQuery,
   useDeleteUserMutation,
@@ -10,7 +10,7 @@ import { Trash2, ChevronDown, Search, X, ShieldCheck, AlertTriangle } from "luci
 
 const PAGE_SIZE = 10;
 
-type UserStatus = 0 | 1 | 2 | 3;
+type UserStatus = 1 | 2 | 3;
 
 type StatusConfig = {
   label: string;
@@ -20,17 +20,16 @@ type StatusConfig = {
 };
 
 const STATUS_CONFIG: Record<UserStatus, StatusConfig> = {
-  0: { label: "Active",   color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
-  1: { label: "Inactive", color: "text-slate-600",   bg: "bg-slate-100",  border: "border-slate-200"  },
-  2: { label: "Locked",   color: "text-amber-700",   bg: "bg-amber-50",   border: "border-amber-200"  },
-  3: { label: "Deleted",  color: "text-red-600",     bg: "bg-red-50",     border: "border-red-200"    },
+  1: { label: "Active", color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
+  2: { label: "Inactive", color: "text-slate-600", bg: "bg-slate-100", border: "border-slate-200" },
+  3: { label: "Locked", color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200" },
 };
 
 const ROLES = ["Manager", "PurchasingStaff", "WarehouseStaff", "SalesStaff", "Customer"];
 
 const toUserStatus = (status?: number): UserStatus => {
-  if (status === 0 || status === 1 || status === 2 || status === 3) return status;
-  return 0;
+  if (status === 1 || status === 2 || status === 3) return status;
+  return 1;
 };
 
 // ── Confirm Modal ────────────────────────────────────────────
@@ -74,11 +73,10 @@ const ConfirmModal = ({
           <button
             type="button"
             onClick={onConfirm}
-            className={`flex-1 rounded-lg py-2 text-xs font-medium text-white transition-colors ${
-              variant === "danger"
+            className={`flex-1 rounded-lg py-2 text-xs font-medium text-white transition-colors ${variant === "danger"
                 ? "bg-red-500 hover:bg-red-600"
                 : "bg-blue-600 hover:bg-blue-700"
-            }`}
+              }`}
           >
             {confirmLabel}
           </button>
@@ -202,13 +200,14 @@ type ConfirmState = {
 };
 
 const CONFIRM_INITIAL: ConfirmState = {
-  open: false, title: "", description: "", variant: "primary", onConfirm: () => {},
+  open: false, title: "", description: "", variant: "primary", onConfirm: () => { },
 };
 
 const UserList = () => {
   const [pageIndex, setPageIndex] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [emailFilter, setEmailFilter] = useState("");
   const [confirm, setConfirm] = useState<ConfirmState>(CONFIRM_INITIAL);
 
   const { data, isLoading, isError, refetch, isFetching } = useGetUsersQuery(
@@ -219,6 +218,19 @@ const UserList = () => {
   const [deleteUser, { isLoading: isDeleting }] = useDeleteUserMutation();
   const [updateUserStatus, { isLoading: isUpdatingStatus }] = useUpdateUserStatusMutation();
   const [updateUserRole, { isLoading: isUpdatingRole }] = useUpdateUserRoleMutation();
+
+  // ── Client-side email filter ─────────────────────────────
+  const filteredItems = useMemo(() => {
+    const items = data?.items ?? [];
+    const nonAdminItems = items.filter((u) =>
+      !u.roles?.some((r) => r.toLowerCase() === "admin")
+    );
+    const q = emailFilter.toLowerCase().trim();
+    if (!q) return nonAdminItems;
+    return nonAdminItems.filter((u) =>
+      (u.email ?? "").toLowerCase().includes(q)
+    );
+  }, [data?.items, emailFilter]);
 
   const closeConfirm = () => setConfirm(CONFIRM_INITIAL);
 
@@ -241,7 +253,7 @@ const UserList = () => {
 
   const handleStatusChange = (id: string, status: UserStatus) => {
     const labelMap: Record<UserStatus, string> = {
-      0: "Active", 1: "Inactive", 2: "Locked", 3: "Deleted",
+      1: "Active", 2: "Inactive", 3: "Locked"
     };
     setConfirm({
       open: true,
@@ -295,20 +307,20 @@ const UserList = () => {
           <div className="text-xs text-slate-500">{isFetching && <span>Đang tải...</span>}</div>
         </div>
 
-        {/* Search bar */}
-        <div className="flex items-center gap-2 mb-4">
-          <div className="relative flex-1 max-w-sm">
+        {/* Search bars */}
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+
+          <div className="relative flex-1 min-w-[180px] max-w-sm">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
               type="text"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              placeholder="Tìm theo username hoặc email..."
+              value={emailFilter}
+              onChange={(e) => setEmailFilter(e.target.value)}
+              placeholder="Lọc theo email..."
               className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-8 text-xs text-slate-700 placeholder-slate-400 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-100"
             />
-            {searchInput && (
-              <button type="button" onClick={handleClearSearch} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+            {emailFilter && (
+              <button type="button" onClick={() => setEmailFilter("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                 <X size={13} />
               </button>
             )}
@@ -321,6 +333,7 @@ const UserList = () => {
             <Search size={13} />
             Tìm kiếm
           </button>
+
         </div>
 
         {isError && <p className="text-red-500 text-sm mb-3">Không tải được danh sách người dùng. Vui lòng thử lại.</p>}
@@ -340,8 +353,8 @@ const UserList = () => {
             <tbody>
               {isLoading ? (
                 <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-500">Đang tải dữ liệu...</td></tr>
-              ) : data && data.items.length > 0 ? (
-                data.items.map((user) => (
+              ) : filteredItems.length > 0 ? (
+                filteredItems.map((user) => (
                   <tr key={user.id} className="border-t border-slate-100 hover:bg-slate-50">
                     <td className="px-4 py-2">{user.userName}</td>
                     <td className="px-4 py-2">{user.fullName}</td>
@@ -368,7 +381,9 @@ const UserList = () => {
               ) : (
                 <tr>
                   <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
-                    {searchQuery ? `Không tìm thấy kết quả cho "${searchQuery}".` : "Không có người dùng nào."}
+                    {searchQuery || emailFilter
+                      ? "Không tìm thấy kết quả phù hợp."
+                      : "Không có người dùng nào."}
                   </td>
                 </tr>
               )}
