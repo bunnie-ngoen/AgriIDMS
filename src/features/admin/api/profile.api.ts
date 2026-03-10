@@ -4,7 +4,6 @@ import type {
   ChangePasswordResponse,
   ProfileUser
 } from "../types/profile.type";
-import type { ProfileResponse } from "../types/profile.type";
 
 export const profileApi = api.injectEndpoints({
   endpoints: (builder) => ({

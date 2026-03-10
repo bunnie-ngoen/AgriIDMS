@@ -25,4 +25,3 @@ export type CreateWarehousePayload = {
   location: string;
   titleWarehouse: "Normal" | "Cold";
 };
-
