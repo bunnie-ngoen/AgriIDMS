@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const CreateEmployeeSchema = z.object({
   email: z.string().email(),
-  role: z.enum(["Admin", "Manager", "WarehouseStaff", "SalesStaff"]),
+  role: z.enum(["Manager", "PurchasingStaff", "WarehouseStaff", "SalesStaff"]), 
 });
 
 export type CreateEmployeeDto = z.infer<typeof CreateEmployeeSchema>;

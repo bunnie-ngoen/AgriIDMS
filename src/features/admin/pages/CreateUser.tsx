@@ -15,6 +15,11 @@ const roleOptions = [
     description: "Full access & team oversight",
   },
   {
+    value: "PurchasingStaff",
+    label: "Purchasing Staff",
+    description: "Procurement & supplier management",
+  },
+  {
     value: "WarehouseStaff",
     label: "Warehouse Staff",
     description: "Inventory & logistics",

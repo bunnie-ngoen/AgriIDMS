@@ -16,12 +16,13 @@ import type {
   RackItem,
   SlotItem,
 } from "../types/warehouse.type";
+import type { UserStatus } from "../types/user.type";
 
 export const userApi = api.injectEndpoints({
   endpoints: (builder) => ({
     createUser: builder.mutation<CreateEmployeeResponse, CreateEmployeeDto>({
       query: (body) => ({
-        url: "/v1/Auth/CreateEmployee/admin/create-employee",
+        url: "/Auth/CreateEmployee/admin/create-employee",
         method: "POST",
         body,
       }),
@@ -255,15 +256,16 @@ export const userApi = api.injectEndpoints({
 
     getUsers: builder.query<
       PaginationResult<UserListItem>,
-      { pageIndex?: number; pageSize?: number } | void
+      { pageIndex?: number; pageSize?: number; search?: string } | void
     >({
       query: (args) => {
-        const { pageIndex = 1, pageSize = 10 } = args ?? {};
+        const { pageIndex = 1, pageSize = 10, search = "" } = args ?? {};
         return {
-          url: "../Users",
-          params: { pageIndex, pageSize },
+          url: "/Users",
+          params: { pageIndex, pageSize }, ...(search ? { search } : {}),
         };
       },
+      providesTags: ["User"],
     }),
 
     deleteUser: builder.mutation<void, string>({
@@ -272,10 +274,27 @@ export const userApi = api.injectEndpoints({
         method: "DELETE",
       }),
     }),
+    updateUserStatus: builder.mutation<void, { id: string; status: number }>({
+      query: ({ id, status }) => ({
+        url: `/Users/status/${id}`,
+        method: "PATCH",
+        body: { status },
+      }),
+       invalidatesTags: ["User"],
+    }),
+    updateUserRole: builder.mutation<{ message: string }, { id: string; roleName: string }>({
+      query: ({ id, roleName }) => ({
+        url: `/Users/${id}/role`,
+        method: "PATCH",
+        body: { roleName },
+      }),
+    }),
   }),
 });
 
 export const {
+  useUpdateUserRoleMutation,
+  useUpdateUserStatusMutation,
   useCreateUserMutation,
   useGetUsersQuery,
   useDeleteUserMutation,
