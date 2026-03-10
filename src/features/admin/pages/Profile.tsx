@@ -1,4 +1,3 @@
-import React from "react";
 import UserBanner from "../components/UserBanner";
 import PersonalInfoCard from "../components/PersonalInfoCard";
 import ChangePasswordCard from "../components/ChangePasswordCard";

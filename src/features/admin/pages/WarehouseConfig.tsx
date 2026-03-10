@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import toast from "react-hot-toast";
 import {
   useGetWarehousesQuery,
   useGetZonesQuery,
@@ -17,6 +18,8 @@ import {
 } from "../api/create-user.api";
 import type { ZoneItem, RackItem, SlotItem } from "../types/warehouse.type";
 
+const MIN_NAME_LENGTH = 3;
+
 type FormMode = "idle" | "create" | "edit";
 
 const WarehouseConfig = () => {
@@ -33,11 +36,11 @@ const WarehouseConfig = () => {
   const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
   const [selectedRackId, setSelectedRackId] = useState<number | null>(null);
 
-  const { data: racks, refetch: refetchRacks } = useGetRacksQuery(selectedZoneId ?? 0, {
+  const { data: racks } = useGetRacksQuery(selectedZoneId ?? 0, {
     skip: !selectedZoneId,
   });
 
-  const { data: slots, refetch: refetchSlots } = useGetSlotsQuery(selectedRackId ?? 0, {
+  const { data: slots } = useGetSlotsQuery(selectedRackId ?? 0, {
     skip: !selectedRackId,
   });
 
@@ -92,59 +95,131 @@ const WarehouseConfig = () => {
 
   const handleSubmitZone = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!zoneFormName.trim() || Number.isNaN(warehouseId)) return;
-
-    if (zoneFormMode === "create") {
-      await createZone({ warehouseId, name: zoneFormName.trim() }).unwrap();
-    } else if (zoneFormMode === "edit" && editingZone) {
-      await updateZone({
-        warehouseId: editingZone.warehouseId,
-        id: editingZone.id,
-        name: zoneFormName.trim(),
-      }).unwrap();
+    const name = zoneFormName.trim();
+    if (Number.isNaN(warehouseId)) return;
+    if (!name) {
+      toast.error("Vui lòng nhập tên zone.");
+      return;
     }
-    resetZoneForm();
+    if (name.length < MIN_NAME_LENGTH) {
+      toast.error("Tên zone tối thiểu 3 ký tự.");
+      return;
+    }
+
+    const toastId = toast.loading(
+      zoneFormMode === "create" ? "Đang tạo zone..." : "Đang cập nhật zone..."
+    );
+    try {
+      if (zoneFormMode === "create") {
+        await createZone({ warehouseId, name }).unwrap();
+        toast.success("Tạo zone thành công.", { id: toastId });
+      } else if (zoneFormMode === "edit" && editingZone) {
+        await updateZone({
+          warehouseId: editingZone.warehouseId,
+          id: editingZone.id,
+          name,
+        }).unwrap();
+        toast.success("Cập nhật zone thành công.", { id: toastId });
+      }
+      resetZoneForm();
+    } catch (err: unknown) {
+      const msg =
+        (err as { data?: { error?: string; message?: string } })?.data
+          ?.error ||
+        (err as { data?: { message?: string } })?.data?.message ||
+        (zoneFormMode === "create"
+          ? "Tạo zone thất bại."
+          : "Cập nhật zone thất bại.");
+      toast.error(msg, { id: toastId });
+    }
   };
 
   const handleSubmitRack = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rackFormName.trim() || !selectedZoneId) return;
-
-    if (rackFormMode === "create") {
-      await createRack({ zoneId: selectedZoneId, name: rackFormName.trim() }).unwrap();
-    } else if (rackFormMode === "edit" && editingRack) {
-      await updateRack({
-        zoneId: editingRack.zoneId,
-        id: editingRack.id,
-        name: rackFormName.trim(),
-      }).unwrap();
+    const name = rackFormName.trim();
+    if (!selectedZoneId) return;
+    if (!name) {
+      toast.error("Vui lòng nhập tên rack.");
+      return;
     }
-    resetRackForm();
-    refetchRacks();
+    if (name.length < MIN_NAME_LENGTH) {
+      toast.error("Tên rack tối thiểu 3 ký tự.");
+      return;
+    }
+
+    const toastId = toast.loading(
+      rackFormMode === "create" ? "Đang tạo rack..." : "Đang cập nhật rack..."
+    );
+    try {
+      if (rackFormMode === "create") {
+        await createRack({ zoneId: selectedZoneId, name }).unwrap();
+        toast.success("Tạo rack thành công.", { id: toastId });
+      } else if (rackFormMode === "edit" && editingRack) {
+        await updateRack({
+          zoneId: editingRack.zoneId,
+          id: editingRack.id,
+          name,
+        }).unwrap();
+        toast.success("Cập nhật rack thành công.", { id: toastId });
+      }
+      resetRackForm();
+    } catch (err: unknown) {
+      const msg =
+        (err as { data?: { error?: string; message?: string } })?.data
+          ?.error ||
+        (err as { data?: { message?: string } })?.data?.message ||
+        (rackFormMode === "create"
+          ? "Tạo rack thất bại."
+          : "Cập nhật rack thất bại.");
+      toast.error(msg, { id: toastId });
+    }
   };
 
   const handleSubmitSlot = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRackId) return;
+    const code = slotForm.code.trim();
     const capacity = Number(slotForm.capacity);
-    if (Number.isNaN(capacity) || capacity <= 0) return;
-
-    if (slotFormMode === "create") {
-      await createSlot({
-        rackId: selectedRackId,
-        code: slotForm.code.trim(),
-        capacity,
-      }).unwrap();
-    } else if (slotFormMode === "edit" && editingSlot) {
-      await updateSlot({
-        rackId: editingSlot.rackId,
-        id: editingSlot.id,
-        code: slotForm.code.trim(),
-        capacity,
-      }).unwrap();
+    if (!selectedRackId) return;
+    if (!code) {
+      toast.error("Vui lòng nhập mã slot.");
+      return;
     }
-    resetSlotForm();
-    refetchSlots();
+    if (Number.isNaN(capacity) || capacity <= 0) {
+      toast.error("Sức chứa phải lớn hơn 0.");
+      return;
+    }
+
+    const toastId = toast.loading(
+      slotFormMode === "create" ? "Đang tạo slot..." : "Đang cập nhật slot..."
+    );
+    try {
+      if (slotFormMode === "create") {
+        await createSlot({
+          rackId: selectedRackId,
+          code,
+          capacity,
+        }).unwrap();
+        toast.success("Tạo slot thành công.", { id: toastId });
+      } else if (slotFormMode === "edit" && editingSlot) {
+        await updateSlot({
+          rackId: editingSlot.rackId,
+          id: editingSlot.id,
+          code,
+          capacity,
+        }).unwrap();
+        toast.success("Cập nhật slot thành công.", { id: toastId });
+      }
+      resetSlotForm();
+    } catch (err: unknown) {
+      const msg =
+        (err as { data?: { error?: string; message?: string } })?.data
+          ?.error ||
+        (err as { data?: { message?: string } })?.data?.message ||
+        (slotFormMode === "create"
+          ? "Tạo slot thất bại."
+          : "Cập nhật slot thất bại.");
+      toast.error(msg, { id: toastId });
+    }
   };
 
   if (Number.isNaN(warehouseId)) {
@@ -301,15 +376,27 @@ const WarehouseConfig = () => {
                   <button
                     type="button"
                     onClick={async () => {
-                      await deleteZone({
-                        warehouseId: zoneDeleteTarget.warehouseId,
-                        id: zoneDeleteTarget.id,
-                      }).unwrap();
-                      if (selectedZoneId === zoneDeleteTarget.id) {
-                        setSelectedZoneId(null);
-                        setSelectedRackId(null);
+                      const toastId = toast.loading("Đang xóa zone...");
+                      try {
+                        await deleteZone({
+                          warehouseId: zoneDeleteTarget.warehouseId,
+                          id: zoneDeleteTarget.id,
+                        }).unwrap();
+                        toast.success("Xóa zone thành công.", { id: toastId });
+                        if (selectedZoneId === zoneDeleteTarget.id) {
+                          setSelectedZoneId(null);
+                          setSelectedRackId(null);
+                        }
+                        setZoneDeleteTarget(null);
+                      } catch (err: unknown) {
+                        const msg =
+                          (err as { data?: { error?: string; message?: string } })
+                            ?.data?.error ||
+                          (err as { data?: { message?: string } })?.data
+                            ?.message ||
+                          "Xóa zone thất bại.";
+                        toast.error(msg, { id: toastId });
                       }
-                      setZoneDeleteTarget(null);
                     }}
                     className="px-3 py-1 rounded-md bg-red-600 text-white hover:bg-red-700"
                   >
@@ -443,15 +530,26 @@ const WarehouseConfig = () => {
                   <button
                     type="button"
                     onClick={async () => {
-                      await deleteRack({
-                        zoneId: rackDeleteTarget.zoneId,
-                        id: rackDeleteTarget.id,
-                      }).unwrap();
-                      if (selectedRackId === rackDeleteTarget.id) {
-                        setSelectedRackId(null);
+                      const toastId = toast.loading("Đang xóa rack...");
+                      try {
+                        await deleteRack({
+                          zoneId: rackDeleteTarget.zoneId,
+                          id: rackDeleteTarget.id,
+                        }).unwrap();
+                        toast.success("Xóa rack thành công.", { id: toastId });
+                        if (selectedRackId === rackDeleteTarget.id) {
+                          setSelectedRackId(null);
+                        }
+                        setRackDeleteTarget(null);
+                      } catch (err: unknown) {
+                        const msg =
+                          (err as { data?: { error?: string; message?: string } })
+                            ?.data?.error ||
+                          (err as { data?: { message?: string } })?.data
+                            ?.message ||
+                          "Xóa rack thất bại.";
+                        toast.error(msg, { id: toastId });
                       }
-                      setRackDeleteTarget(null);
-                      refetchRacks();
                     }}
                     className="px-3 py-1 rounded-md bg-red-600 text-white hover:bg-red-700"
                   >
@@ -617,12 +715,23 @@ const WarehouseConfig = () => {
                   <button
                     type="button"
                     onClick={async () => {
-                      await deleteSlot({
-                        rackId: slotDeleteTarget.rackId,
-                        id: slotDeleteTarget.id,
-                      }).unwrap();
-                      setSlotDeleteTarget(null);
-                      refetchSlots();
+                      const toastId = toast.loading("Đang xóa slot...");
+                      try {
+                        await deleteSlot({
+                          rackId: slotDeleteTarget.rackId,
+                          id: slotDeleteTarget.id,
+                        }).unwrap();
+                        toast.success("Xóa slot thành công.", { id: toastId });
+                        setSlotDeleteTarget(null);
+                      } catch (err: unknown) {
+                        const msg =
+                          (err as { data?: { error?: string; message?: string } })
+                            ?.data?.error ||
+                          (err as { data?: { message?: string } })?.data
+                            ?.message ||
+                          "Xóa slot thất bại.";
+                        toast.error(msg, { id: toastId });
+                      }
                     }}
                     className="px-3 py-1 rounded-md bg-red-600 text-white hover:bg-red-700"
                   >

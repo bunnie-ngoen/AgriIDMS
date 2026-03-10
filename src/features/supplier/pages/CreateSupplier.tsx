@@ -1,34 +1,29 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  CreateWarehouseSchema,
-  type CreateWarehouseFormValues,
-} from "../schemas/create-warehouse.schema";
-import { useCreateWarehouseMutation } from "../api/create-user.api";
-import {
-  getVnDistricts,
-  getVnProvinces,
-  getVnWards,
-  type VnDistrict,
-  type VnProvince,
-  type VnWard,
-} from "../../../shared/api/vn-address.api";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { Link, useNavigate } from "react-router-dom";
+import { SupplierSchema, type SupplierFormValues } from "../schemas/supplier.schema";
+import { useCreateSupplierMutation } from "../api/supplier.api";
+import toast from "react-hot-toast";
+import { getVnDistricts, getVnProvinces, getVnWards, type VnDistrict, type VnProvince, type VnWard } from "../api/vn-address.api";
 
-const CreateWarehouse = () => {
-  const [createWarehouse, { isLoading }] = useCreateWarehouseMutation();
-  const [serverMessage, setServerMessage] = useState<string | null>(null);
+export default function CreateSupplier() {
+  const navigate = useNavigate();
+  const [createSupplier, { isLoading }] = useCreateSupplierMutation();
+  const [serverMessage, setServerMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
-  const form = useForm<CreateWarehouseFormValues>({
-    resolver: zodResolver(CreateWarehouseSchema),
+  const form = useForm<SupplierFormValues>({
+    resolver: zodResolver(SupplierSchema),
     defaultValues: {
       name: "",
       provinceCode: 0,
       districtCode: 0,
       wardCode: 0,
       detailAddress: "",
-      titleWarehouse: "Normal",
+      phone: "",
     },
   });
 
@@ -42,6 +37,7 @@ const CreateWarehouse = () => {
   const provinceCode = form.watch("provinceCode");
   const districtCode = form.watch("districtCode");
 
+  // Load provinces once
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -59,77 +55,58 @@ const CreateWarehouse = () => {
     };
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      setDistricts([]);
-      setWards([]);
-      form.setValue("districtCode", 0, { shouldValidate: false });
-      form.setValue("wardCode", 0, { shouldValidate: false });
-      if (!provinceCode || provinceCode < 1) return;
-      setLoadingDistricts(true);
-      try {
-        const res = await getVnDistricts(provinceCode);
-        if (!mounted) return;
-        setDistricts(res);
-      } finally {
-        if (mounted) setLoadingDistricts(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [provinceCode]);
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      setWards([]);
-      form.setValue("wardCode", 0, { shouldValidate: false });
-      if (!districtCode || districtCode < 1) return;
-      setLoadingWards(true);
-      try {
-        const res = await getVnWards(districtCode);
-        if (!mounted) return;
-        setWards(res);
-      } finally {
-        if (mounted) setLoadingWards(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [districtCode]);
-
-  const onSubmit = async (values: CreateWarehouseFormValues) => {
-    setServerMessage(null);
-    const provinceName =
-      provinces.find((p) => p.code === values.provinceCode)?.name ?? "";
-    const districtName =
-      districts.find((d) => d.code === values.districtCode)?.name ?? "";
-    const wardName =
-      wards.find((w) => w.code === values.wardCode)?.name ?? "";
-    const location = `${values.detailAddress}, ${wardName}, ${districtName}, ${provinceName}`;
+  const loadDistricts = async (pCode: number) => {
+    setLoadingDistricts(true);
     try {
-      const res = await createWarehouse({
+      const res = await getVnDistricts(pCode);
+      setDistricts(res);
+    } finally {
+      setLoadingDistricts(false);
+    }
+  };
+
+  const loadWards = async (dCode: number) => {
+    setLoadingWards(true);
+    try {
+      const res = await getVnWards(dCode);
+      setWards(res);
+    } finally {
+      setLoadingWards(false);
+    }
+  };
+
+  const onSubmit = async (values: SupplierFormValues) => {
+    setServerMessage(null);
+    const toastId = toast.loading("Đang tạo nhà cung cấp...");
+    try {
+      const provinceName = provinces.find((p) => p.code === values.provinceCode)?.name ?? "";
+      const districtName = districts.find((d) => d.code === values.districtCode)?.name ?? "";
+      const wardName = wards.find((w) => w.code === values.wardCode)?.name ?? "";
+
+      await createSupplier({
         name: values.name,
-        location,
-        titleWarehouse: values.titleWarehouse,
+        address: `${values.detailAddress}, ${wardName}, ${districtName}, ${provinceName}`,
+        phone: values.phone,
       }).unwrap();
-      setServerMessage(res.message ?? "Tạo kho thành công");
+
+      toast.success("Tạo nhà cung cấp thành công", { id: toastId });
+      setServerMessage({ type: "success", text: "Tạo nhà cung cấp thành công" });
       form.reset({
         name: "",
         provinceCode: 0,
         districtCode: 0,
         wardCode: 0,
         detailAddress: "",
-        titleWarehouse: "Normal",
+        phone: "",
       });
-    } catch (error: unknown) {
+      setTimeout(() => navigate("/admin/suppliers"), 400);
+    } catch (error: any) {
       const msg =
-        (error as { data?: { message?: string } })?.data?.message ||
-        "Tạo kho thất bại. Vui lòng kiểm tra lại thông tin.";
-      setServerMessage(msg);
+        error?.data?.error ||
+        error?.data?.message ||
+        "Tạo nhà cung cấp thất bại. Vui lòng kiểm tra lại thông tin.";
+      toast.error(msg, { id: toastId });
+      setServerMessage({ type: "error", text: msg });
     }
   };
 
@@ -137,13 +114,13 @@ const CreateWarehouse = () => {
     <div className="px-5">
       <div className="bg-white rounded-[15px] p-8 shadow-sm">
         <Link
-          to="/admin/warehouses"
+          to="/admin/suppliers"
           className="inline-block text-sm text-emerald-600 hover:underline mb-4"
         >
-          ← Quay lại danh sách kho
+          ← Quay lại danh sách nhà cung cấp
         </Link>
         <h1 className="text-xl md:text-2xl font-bold text-center mb-6">
-          TẠO THÔNG TIN KHO
+          TẠO NHÀ CUNG CẤP
         </h1>
 
         <form
@@ -152,11 +129,11 @@ const CreateWarehouse = () => {
         >
           <div className="flex flex-col gap-2">
             <label className="font-medium text-sm text-slate-700">
-              Tên kho *
+              Tên nhà cung cấp *
             </label>
             <input
               {...form.register("name")}
-              placeholder="Ví dụ: Kho chính, Kho lạnh số 1"
+              placeholder="Ví dụ: Công ty ABC"
               className="w-full p-3 rounded-xl border border-gray-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"
             />
             {form.formState.errors.name && (
@@ -175,10 +152,13 @@ const CreateWarehouse = () => {
                 {...form.register("provinceCode", { valueAsNumber: true })}
                 className="w-full p-3 rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
                 onChange={(e) => {
-                  const code = Number(e.target.value) || 0;
-                  form.setValue("provinceCode", code, { shouldValidate: true });
-                  form.setValue("districtCode", 0, { shouldValidate: true });
-                  form.setValue("wardCode", 0, { shouldValidate: true });
+                  const pCode = Number(e.target.value) || 0;
+                  form.setValue("provinceCode", pCode);
+                  form.setValue("districtCode", 0);
+                  form.setValue("wardCode", 0);
+                  setDistricts([]);
+                  setWards([]);
+                  if (pCode > 0) loadDistricts(pCode);
                 }}
               >
                 <option value={0}>Chọn tỉnh / thành</option>
@@ -205,11 +185,13 @@ const CreateWarehouse = () => {
               <select
                 {...form.register("districtCode", { valueAsNumber: true })}
                 className="w-full p-3 rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                disabled={!provinceCode || provinceCode < 1}
+                disabled={!provinceCode}
                 onChange={(e) => {
-                  const code = Number(e.target.value) || 0;
-                  form.setValue("districtCode", code, { shouldValidate: true });
-                  form.setValue("wardCode", 0, { shouldValidate: true });
+                  const dCode = Number(e.target.value) || 0;
+                  form.setValue("districtCode", dCode);
+                  form.setValue("wardCode", 0);
+                  setWards([]);
+                  if (dCode > 0) loadWards(dCode);
                 }}
               >
                 <option value={0}>Chọn quận / huyện</option>
@@ -236,7 +218,7 @@ const CreateWarehouse = () => {
               <select
                 {...form.register("wardCode", { valueAsNumber: true })}
                 className="w-full p-3 rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                disabled={!districtCode || districtCode < 1}
+                disabled={!districtCode}
               >
                 <option value={0}>Chọn phường / xã</option>
                 {wards.map((w) => (
@@ -273,20 +255,18 @@ const CreateWarehouse = () => {
             )}
           </div>
 
-          <div className="flex flex-col gap-2 max-w-xs">
+          <div className="flex flex-col gap-2 max-w-sm">
             <label className="font-medium text-sm text-slate-700">
-              Loại kho *
+              Số điện thoại *
             </label>
-            <select
-              {...form.register("titleWarehouse")}
-              className="w-full p-3 rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
-            >
-              <option value="Normal">Kho thường</option>
-              <option value="Cold">Kho lạnh</option>
-            </select>
-            {form.formState.errors.titleWarehouse && (
+            <input
+              {...form.register("phone")}
+              placeholder="Ví dụ: 0912345678"
+              className="w-full p-3 rounded-xl border border-gray-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            />
+            {form.formState.errors.phone && (
               <p className="text-red-500 text-xs">
-                {form.formState.errors.titleWarehouse.message}
+                {form.formState.errors.phone.message}
               </p>
             )}
           </div>
@@ -294,26 +274,34 @@ const CreateWarehouse = () => {
           {serverMessage && (
             <p
               className={`text-xs px-3 py-2 rounded-lg border ${
-                serverMessage.toLowerCase().includes("thành công")
+                serverMessage.type === "success"
                   ? "bg-emerald-50 border-emerald-200 text-emerald-700"
                   : "bg-red-50 border-red-200 text-red-600"
               }`}
             >
-              {serverMessage}
+              {serverMessage.text}
             </p>
           )}
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="mt-2 bg-[#7FBB35] p-3 rounded-xl text-white font-semibold text-sm hover:bg-[#598325] transition disabled:opacity-50"
-          >
-            {isLoading ? "Đang tạo kho..." : "Lưu thông tin kho"}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="bg-[#7FBB35] px-5 py-3 rounded-xl text-white font-semibold text-sm hover:bg-[#598325] transition disabled:opacity-50"
+            >
+              {isLoading ? "Đang tạo..." : "Lưu"}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/admin/suppliers")}
+              className="px-5 py-3 rounded-xl border border-slate-200 text-slate-700 text-sm hover:bg-slate-50"
+            >
+              Hủy
+            </button>
+          </div>
         </form>
       </div>
     </div>
   );
-};
+}
 
-export default CreateWarehouse;

@@ -8,6 +8,8 @@ import {
   LayoutDashboard,
   ChevronRight,
   Boxes,
+  Truck,
+  Tags,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
@@ -44,6 +46,30 @@ const mainMenu: MenuItem[] = [
     children: [
       { name: "Danh sách kho", path: "warehouses", icon: List },
       { name: "Tạo kho", path: "warehouses/create", icon: CirclePlus },
+    ],
+  },
+  {
+    name: "Nhà cung cấp",
+    icon: Truck,
+    children: [
+      { name: "Danh sách NCC", path: "suppliers", icon: List },
+      { name: "Tạo NCC", path: "suppliers/create", icon: CirclePlus },
+    ],
+  },
+  {
+    name: "Danh mục sản phẩm",
+    icon: Tags,
+    children: [
+      { name: "Danh sách danh mục", path: "categories", icon: List },
+      { name: "Tạo danh mục", path: "categories/create", icon: CirclePlus },
+    ],
+  },
+  {
+    name: "Sản phẩm",
+    icon: Archive,
+    children: [
+      { name: "Danh sách sản phẩm", path: "products", icon: List },
+      { name: "Tạo sản phẩm", path: "products/create", icon: CirclePlus },
     ],
   },
 ];
