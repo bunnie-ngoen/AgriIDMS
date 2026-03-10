@@ -22,3 +22,7 @@ export type UpdateProductRequest = {
   imageUrl?: string | null;
 };
 
+export type UpdateProductStatusRequest = {
+  isActive: boolean;
+};
+
