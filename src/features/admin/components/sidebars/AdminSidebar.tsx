@@ -10,6 +10,7 @@ import {
   Boxes,
   Truck,
   Tags,
+  Layers,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
@@ -23,12 +24,23 @@ type SubMenuItem = {
   icon?: LucideIcon;
 };
 
+type NestedMenuItem = {
+  name: string;
+  icon: LucideIcon;
+  children: SubMenuItem[];
+};
+
 type MenuItem = {
   name: string;
   path?: string;
   icon: LucideIcon;
-  children?: SubMenuItem[];
+  children?: (SubMenuItem | NestedMenuItem)[];
 };
+
+// Type guard để phân biệt NestedMenuItem vs SubMenuItem
+function isNestedMenuItem(item: SubMenuItem | NestedMenuItem): item is NestedMenuItem {
+  return "children" in item && !("path" in item);
+}
 
 const mainMenu: MenuItem[] = [
   { name: "Dashboard", path: "dashboard", icon: Archive },
@@ -70,6 +82,15 @@ const mainMenu: MenuItem[] = [
     children: [
       { name: "Danh sách sản phẩm", path: "products", icon: List },
       { name: "Tạo sản phẩm", path: "products/create", icon: CirclePlus },
+      // ← Nested dropdown cho Product Variant
+      {
+        name: "Product Variant",
+        icon: Layers,
+        children: [
+          { name: "Danh sách biến thể", path: "product-variants", icon: List },
+          { name: "Tạo biến thể", path: "product-variants/create", icon: CirclePlus },
+        ],
+      },
     ],
   },
 ];
@@ -94,16 +115,28 @@ export default function AdminSidebar() {
     navigate("/login");
   };
 
-  const toggleMenu = (name: string) => {
+  const toggleMenu = (key: string) => {
     setOpenMenus((prev) => ({
       ...prev,
-      [name]: !prev[name],
+      [key]: !prev[key],
     }));
   };
 
-  const isParentActive = (item: MenuItem) =>
-    item.children?.some((child) => child.path === currentLastSegment) ?? false;
+  // Kiểm tra xem parent có child đang active không (hỗ trợ cả nested)
+  const isParentActive = (item: MenuItem): boolean => {
+    if (!item.children) return false;
+    return item.children.some((child) => {
+      if (isNestedMenuItem(child)) {
+        return child.children.some((gc) => gc.path === currentLastSegment);
+      }
+      return child.path === currentLastSegment;
+    });
+  };
 
+  const isNestedParentActive = (nested: NestedMenuItem): boolean =>
+    nested.children.some((c) => c.path === currentLastSegment);
+
+  // ── Render leaf (không có children) ──────────────────────────────────────
   const renderLeafItem = (item: MenuItem) => {
     const Icon = item.icon;
     if (!item.path) return null;
@@ -122,11 +155,7 @@ export default function AdminSidebar() {
             >
               <span
                 className={`inline-flex h-7 w-7 items-center justify-center rounded mr-3
-                ${
-                  isActive
-                    ? "bg-sky-500 text-white"
-                    : "bg-[#1f2d3a] text-slate-200"
-                }`}
+                ${isActive ? "bg-sky-500 text-white" : "bg-[#1f2d3a] text-slate-200"}`}
               >
                 <Icon size={15} />
               </span>
@@ -138,6 +167,72 @@ export default function AdminSidebar() {
     );
   };
 
+  // ── Render nested dropdown (cấp 3) ────────────────────────────────────────
+  const renderNestedItem = (nested: NestedMenuItem, parentKey: string) => {
+    const Icon = nested.icon;
+    const active = isNestedParentActive(nested);
+    const key = `${parentKey}__${nested.name}`;
+    const isOpen = openMenus[key] ?? active;
+
+    return (
+      <li key={nested.name}>
+        <button
+          type="button"
+          onClick={() => toggleMenu(key)}
+          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] transition-colors
+          ${
+            active || isOpen
+              ? "bg-[#1a2530] text-sky-300"
+              : "text-slate-300 hover:bg-[#1b2225]"
+          }`}
+        >
+          <span className="flex items-center min-w-0">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded mr-2 bg-[#1f2d3a] text-slate-200">
+              <Icon size={13} />
+            </span>
+            <span className="truncate">{nested.name}</span>
+          </span>
+          <ChevronRight
+            size={12}
+            className={`ml-2 transition-transform ${isOpen ? "rotate-90" : ""}`}
+          />
+        </button>
+
+        {isOpen && (
+          <ul className="mt-1 pl-4 space-y-1">
+            {nested.children.map((child) => {
+              const ChildIcon = child.icon;
+              return (
+                <li key={child.path}>
+                  <NavLink to={child.path}>
+                    {({ isActive }) => (
+                      <button
+                        className={`w-full flex items-center px-2 py-1.5 rounded-lg text-[10px] transition-colors
+                        ${
+                          isActive
+                            ? "bg-[#1e282c] text-sky-300"
+                            : "text-slate-400 hover:bg-[#1b2225] hover:text-slate-200"
+                        }`}
+                      >
+                        {ChildIcon && (
+                          <span className="inline-flex h-5 w-5 items-center justify-center rounded mr-2 bg-[#1f2d3a] text-slate-300">
+                            <ChildIcon size={11} />
+                          </span>
+                        )}
+                        <span className="truncate">{child.name}</span>
+                      </button>
+                    )}
+                  </NavLink>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </li>
+    );
+  };
+
+  // ── Render parent (cấp 1 có children) ────────────────────────────────────
   const renderParentItem = (item: MenuItem) => {
     const Icon = item.icon;
     const active = isParentActive(item);
@@ -170,15 +265,19 @@ export default function AdminSidebar() {
           </span>
           <ChevronRight
             size={13}
-            className={`ml-2 transition-transform ${
-              isOpen ? "rotate-90" : ""
-            }`}
+            className={`ml-2 transition-transform ${isOpen ? "rotate-90" : ""}`}
           />
         </button>
 
         {isOpen && item.children && (
           <ul className="mt-1 pl-4 space-y-1">
             {item.children.map((child) => {
+              // Nếu child là nested menu (có children riêng)
+              if (isNestedMenuItem(child)) {
+                return renderNestedItem(child, item.name);
+              }
+
+              // Nếu child là leaf bình thường
               const ChildIcon = child.icon;
               return (
                 <li key={child.path}>
@@ -218,9 +317,7 @@ export default function AdminSidebar() {
           <LayoutDashboard size={18} />
         </div>
         <div>
-          <p className="text-sm font-semibold tracking-wide">
-            AgriIDMS Admin
-          </p>
+          <p className="text-sm font-semibold tracking-wide">AgriIDMS Admin</p>
           <p className="text-[11px] text-slate-300">Dashboard</p>
         </div>
       </div>
