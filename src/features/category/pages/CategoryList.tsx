@@ -77,8 +77,10 @@ export default function CategoryList() {
     }
   };
 
-  const handleChangeStatus = async (category: Category, status: number) => {
-    const actionLabel = status === 1 ? "kích hoạt" : "vô hiệu hóa";
+  const handleToggleStatus = async (category: Category) => {
+    const isActive = category.status === 1;
+    const nextStatus = isActive ? 0 : 1;
+    const actionLabel = isActive ? "vô hiệu hóa" : "kích hoạt";
     const ok = window.confirm(
       `Bạn có chắc muốn ${actionLabel} danh mục "${category.name}"?`
     );
@@ -86,7 +88,7 @@ export default function CategoryList() {
 
     const toastId = toast.loading(`Đang ${actionLabel} danh mục...`);
     try {
-      await updateStatus({ id: category.id, data: { status } }).unwrap();
+      await updateStatus({ id: category.id, data: { status: nextStatus } }).unwrap();
       await refetch();
       toast.success(`Đã ${actionLabel} danh mục thành công`, { id: toastId });
     } catch (error) {
@@ -171,8 +173,14 @@ export default function CategoryList() {
                         : "-"}
                     </td>
                     <td className="px-4 py-2">
-                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium bg-slate-100 text-slate-600">
-                        Trạng thái nội bộ
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                          c.status === 1
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {c.status === 1 ? "Đang hoạt động" : "Đã vô hiệu"}
                       </span>
                     </td>
                     <td className="px-4 py-2 text-right space-x-2">
@@ -187,10 +195,10 @@ export default function CategoryList() {
                       <button
                         type="button"
                         disabled={isUpdatingStatus}
-                        onClick={() => handleChangeStatus(c, 1)}
+                        onClick={() => handleToggleStatus(c)}
                         className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
                       >
-                        Kích hoạt
+                        {c.status === 1 ? "Vô hiệu hóa" : "Kích hoạt"}
                       </button>
                       <button
                         type="button"

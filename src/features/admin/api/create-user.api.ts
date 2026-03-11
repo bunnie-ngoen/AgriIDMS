@@ -16,13 +16,12 @@ import type {
   RackItem,
   SlotItem,
 } from "../types/warehouse.type";
-import type { UserStatus } from "../types/user.type";
 
 export const userApi = api.injectEndpoints({
   endpoints: (builder) => ({
     createUser: builder.mutation<CreateEmployeeResponse, CreateEmployeeDto>({
       query: (body) => ({
-        url: "/Auth/CreateEmployee/admin/create-employee",
+        url: "/v1/Auth/CreateEmployee/admin/create-employee",
         method: "POST",
         body,
       }),
@@ -54,7 +53,7 @@ export const userApi = api.injectEndpoints({
         url: "Warehouses",
       }),
       transformResponse: (response: unknown) => {
-        const arr = (response as any[]) ?? [];
+        const arr = (response as Array<Record<string, unknown>>) ?? [];
         return arr.map((w) => ({
           ...w,
           titleWarehouse:
@@ -69,14 +68,14 @@ export const userApi = api.injectEndpoints({
       query: (id) => ({
         url: `Warehouses/${id}`,
       }),
-      transformResponse: (w: any) =>
-        ({
-          ...w,
-          titleWarehouse:
-            w.titleWarehouse === 2 || w.titleWarehouse === "Cold"
-              ? "Cold"
-              : "Normal",
-        }) as WarehouseItem,
+      transformResponse: (w: unknown) => {
+        const item = w as Record<string, unknown>;
+        const tw = item.titleWarehouse;
+        return {
+          ...item,
+          titleWarehouse: tw === 2 || tw === "Cold" ? "Cold" : "Normal",
+        } as WarehouseItem;
+      },
     }),
 
     updateWarehouse: builder.mutation<
@@ -106,9 +105,6 @@ export const userApi = api.injectEndpoints({
       query: (warehouseId) => ({
         url: `warehouses/${warehouseId}/zones`,
       }),
-      providesTags: (_result, _error, warehouseId) => [
-        { type: "Zone" as const, id: `W-${warehouseId}` },
-      ],
     }),
 
     createZone: builder.mutation<
@@ -120,9 +116,6 @@ export const userApi = api.injectEndpoints({
         method: "POST",
         body: { name },
       }),
-      invalidatesTags: (_result, _error, { warehouseId }) => [
-        { type: "Zone" as const, id: `W-${warehouseId}` },
-      ],
     }),
 
     updateZone: builder.mutation<
@@ -134,9 +127,6 @@ export const userApi = api.injectEndpoints({
         method: "PUT",
         body: { name },
       }),
-      invalidatesTags: (_result, _error, { warehouseId }) => [
-        { type: "Zone" as const, id: `W-${warehouseId}` },
-      ],
     }),
 
     deleteZone: builder.mutation<
@@ -147,9 +137,6 @@ export const userApi = api.injectEndpoints({
         url: `warehouses/${warehouseId}/zones/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: (_result, _error, { warehouseId }) => [
-        { type: "Zone" as const, id: `W-${warehouseId}` },
-      ],
     }),
 
     // ===== Racks =====
@@ -157,9 +144,6 @@ export const userApi = api.injectEndpoints({
       query: (zoneId) => ({
         url: `zones/${zoneId}/racks`,
       }),
-      providesTags: (_result, _error, zoneId) => [
-        { type: "Rack" as const, id: `Z-${zoneId}` },
-      ],
     }),
 
     createRack: builder.mutation<
@@ -171,9 +155,6 @@ export const userApi = api.injectEndpoints({
         method: "POST",
         body: { name },
       }),
-      invalidatesTags: (_result, _error, { zoneId }) => [
-        { type: "Rack" as const, id: `Z-${zoneId}` },
-      ],
     }),
 
     updateRack: builder.mutation<
@@ -185,9 +166,6 @@ export const userApi = api.injectEndpoints({
         method: "PUT",
         body: { name },
       }),
-      invalidatesTags: (_result, _error, { zoneId }) => [
-        { type: "Rack" as const, id: `Z-${zoneId}` },
-      ],
     }),
 
     deleteRack: builder.mutation<
@@ -198,9 +176,6 @@ export const userApi = api.injectEndpoints({
         url: `zones/${zoneId}/racks/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: (_result, _error, { zoneId }) => [
-        { type: "Rack" as const, id: `Z-${zoneId}` },
-      ],
     }),
 
     // ===== Slots =====
@@ -208,9 +183,6 @@ export const userApi = api.injectEndpoints({
       query: (rackId) => ({
         url: `racks/${rackId}/slots`,
       }),
-      providesTags: (_result, _error, rackId) => [
-        { type: "Slot" as const, id: `R-${rackId}` },
-      ],
     }),
 
     createSlot: builder.mutation<
@@ -222,9 +194,6 @@ export const userApi = api.injectEndpoints({
         method: "POST",
         body: { code, capacity },
       }),
-      invalidatesTags: (_result, _error, { rackId }) => [
-        { type: "Slot" as const, id: `R-${rackId}` },
-      ],
     }),
 
     updateSlot: builder.mutation<
@@ -236,9 +205,6 @@ export const userApi = api.injectEndpoints({
         method: "PUT",
         body: { code, capacity },
       }),
-      invalidatesTags: (_result, _error, { rackId }) => [
-        { type: "Slot" as const, id: `R-${rackId}` },
-      ],
     }),
 
     deleteSlot: builder.mutation<
@@ -249,9 +215,6 @@ export const userApi = api.injectEndpoints({
         url: `racks/${rackId}/slots/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: (_result, _error, { rackId }) => [
-        { type: "Slot" as const, id: `R-${rackId}` },
-      ],
     }),
 
     getUsers: builder.query<
@@ -259,45 +222,53 @@ export const userApi = api.injectEndpoints({
       { pageIndex?: number; pageSize?: number; search?: string } | void
     >({
       query: (args) => {
-        const { pageIndex = 1, pageSize = 10, search = "" } = args ?? {};
+        const { pageIndex = 1, pageSize = 10 } = args ?? {};
         return {
-          url: "/Users",
-          params: { pageIndex, pageSize }, ...(search ? { search } : {}),
+          url: "Users",
+          params: { pageIndex, pageSize },
         };
       },
-      providesTags: ["User"],
     }),
 
     deleteUser: builder.mutation<void, string>({
       query: (userId) => ({
-        url: `../Users/${userId}`,
+        url: `Users/${userId}`,
         method: "DELETE",
       }),
     }),
-    updateUserStatus: builder.mutation<void, { id: string; status: number }>({
+
+    updateUserStatus: builder.mutation<
+      { message: string },
+      { id: string; status: number }
+    >({
       query: ({ id, status }) => ({
-        url: `/Users/status/${id}`,
+        url: `Users/status/${id}`,
         method: "PATCH",
         body: { status },
       }),
-       invalidatesTags: ["User"],
+      invalidatesTags: [{ type: "User" as const, id: "LIST" }],
     }),
-    updateUserRole: builder.mutation<{ message: string }, { id: string; roleName: string }>({
+
+    updateUserRole: builder.mutation<
+      { message: string },
+      { id: string; roleName: string }
+    >({
       query: ({ id, roleName }) => ({
-        url: `/Users/${id}/role`,
+        url: `Users/${id}/role`,
         method: "PATCH",
         body: { roleName },
       }),
+      invalidatesTags: [{ type: "User" as const, id: "LIST" }],
     }),
   }),
 });
 
 export const {
-  useUpdateUserRoleMutation,
-  useUpdateUserStatusMutation,
   useCreateUserMutation,
   useGetUsersQuery,
   useDeleteUserMutation,
+  useUpdateUserStatusMutation,
+  useUpdateUserRoleMutation,
   useCreateWarehouseMutation,
   useGetWarehousesQuery,
   useGetWarehouseQuery,

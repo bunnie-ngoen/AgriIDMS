@@ -11,6 +11,7 @@ import {
   Truck,
   Tags,
   Layers,
+  FileText,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
@@ -66,6 +67,13 @@ const mainMenu: MenuItem[] = [
     children: [
       { name: "Danh sách NCC", path: "suppliers", icon: List },
       { name: "Tạo NCC", path: "suppliers/create", icon: CirclePlus },
+    ],
+  },
+  {
+    name: "Đơn mua hàng",
+    icon: FileText,
+    children: [
+      { name: "Duyệt đơn mua", path: "purchase-orders", icon: List },
     ],
   },
   {

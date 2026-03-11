@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, FileText, X } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   useDeleteProductMutation,
@@ -13,6 +13,7 @@ import { useGetCategoriesQuery } from "../../category/api/category.api";
 import type { Category } from "../../category/types/category.type";
 
 const PAGE_SIZE = 10;
+const DESC_PREVIEW_LEN = 50; // Số ký tự mô tả hiển thị trên bảng (1 dòng)
 
 export default function ProductList() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -30,6 +31,7 @@ export default function ProductList() {
     "all"
   );
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
+  const [detailProduct, setDetailProduct] = useState<Product | null>(null);
 
   const categoryOptions = useMemo(
     () => (categoryData ?? []) as Category[],
@@ -193,7 +195,7 @@ export default function ProductList() {
                 <th className="px-4 py-2 text-left font-medium">Ảnh</th>
                 <th className="px-4 py-2 text-left font-medium">Tên sản phẩm</th>
                 <th className="px-4 py-2 text-left font-medium">Danh mục</th>
-                <th className="px-4 py-2 text-left font-medium">Mô tả</th>
+                <th className="px-4 py-2 text-left font-medium w-[180px] max-w-[220px]">Mô tả</th>
                 <th className="px-4 py-2 text-left font-medium">Trạng thái</th>
                 <th className="px-4 py-2 text-left font-medium">Ngày tạo</th>
                 <th className="px-4 py-2 text-right font-medium">Thao tác</th>
@@ -234,10 +236,17 @@ export default function ProductList() {
                       </td>
                       <td className="px-4 py-2">{p.name}</td>
                       <td className="px-4 py-2">{p.category ?? "-"}</td>
-                      <td className="px-4 py-2">
-                        {p.description && p.description.trim().length > 0
-                          ? p.description
-                          : "-"}
+                      <td className="px-4 py-2 w-[180px] max-w-[220px]">
+                        <span
+                          className="block overflow-hidden text-ellipsis whitespace-nowrap"
+                          title={p.description?.trim() || undefined}
+                        >
+                          {p.description && p.description.trim().length > 0
+                            ? p.description.length <= DESC_PREVIEW_LEN
+                              ? p.description
+                              : p.description.slice(0, DESC_PREVIEW_LEN) + "..."
+                            : "-"}
+                        </span>
                       </td>
                       <td className="px-4 py-2">
                         <span
@@ -254,11 +263,11 @@ export default function ProductList() {
                       <td className="px-4 py-2 text-right space-x-2">
                         <button
                           type="button"
-                          onClick={() => setEditingProductId(p.id)}
+                          onClick={() => setDetailProduct(p)}
                           className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
                         >
-                          <Pencil size={13} className="mr-1" />
-                          Sửa
+                          <FileText size={13} className="mr-1" />
+                          Chi tiết
                         </button>
                         <button
                           type="button"
@@ -335,6 +344,92 @@ export default function ProductList() {
           </div>
         )}
       </div>
+
+      {detailProduct !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setDetailProduct(null)}>
+          <div
+            className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+              <h3 className="font-semibold text-slate-800">Chi tiết sản phẩm</h3>
+              <button
+                type="button"
+                onClick={() => setDetailProduct(null)}
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              {detailProduct.imageUrl && (
+                <div>
+                  <p className="text-xs font-medium text-slate-500 mb-1">Ảnh</p>
+                  <img
+                    src={detailProduct.imageUrl}
+                    alt={detailProduct.name}
+                    className="h-24 w-24 rounded-lg object-cover border border-slate-200"
+                  />
+                </div>
+              )}
+              <div>
+                <p className="text-xs font-medium text-slate-500 mb-1">Tên sản phẩm</p>
+                <p className="text-sm text-slate-800">{detailProduct.name}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500 mb-1">Danh mục</p>
+                <p className="text-sm text-slate-800">{detailProduct.category ?? "-"}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500 mb-1">Mô tả</p>
+                <p className="text-sm text-slate-700 whitespace-pre-wrap break-words">
+                  {detailProduct.description && detailProduct.description.trim().length > 0
+                    ? detailProduct.description
+                    : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500 mb-1">Trạng thái</p>
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                    detailProduct.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  {detailProduct.isActive ? "Đang hoạt động" : "Đã vô hiệu"}
+                </span>
+              </div>
+              {detailProduct.createdAt && (
+                <div>
+                  <p className="text-xs font-medium text-slate-500 mb-1">Ngày tạo</p>
+                  <p className="text-sm text-slate-700">
+                    {new Date(detailProduct.createdAt).toLocaleString("vi-VN")}
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2 p-4 border-t border-slate-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingProductId(detailProduct.id);
+                  setDetailProduct(null);
+                }}
+                className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              >
+                <Pencil size={14} className="mr-1.5" />
+                Sửa
+              </button>
+              <button
+                type="button"
+                onClick={() => setDetailProduct(null)}
+                className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editingProductId !== null && (
         <EditProductModal
