@@ -60,6 +60,17 @@ const EditProductPage = lazy(
   () => import("../product/pages/EditProduct")
 );
 
+// Product Variant
+const ProductVariantListPage = lazy(
+  () => import("../product/pages/ProductVariantList")
+);
+const CreateProductVariantPage = lazy(
+  () => import("../product/pages/CreateProductVariant")
+);
+const EditProductVariantPage = lazy(
+  () => import("../product/pages/EditProductVariant")
+);
+
 export const adminRoutes = [
   {
     path: "/admin",
@@ -70,7 +81,7 @@ export const adminRoutes = [
       { path: "create-user", element: <CreateUserPage /> },
       { path: "users", element: <UserListPage /> },
 
-       { path: "profile", element: <ProfilePage /> },
+      { path: "profile", element: <ProfilePage /> },
 
       { path: "warehouses", element: <WarehouseListPage /> },
       { path: "warehouses/create", element: <CreateWarehousePage /> },
@@ -89,6 +100,11 @@ export const adminRoutes = [
       { path: "products", element: <ProductListPage /> },
       { path: "products/create", element: <CreateProductPage /> },
       { path: "products/:id/edit", element: <EditProductPage /> },
+
+      // Product Variant
+      { path: "product-variants", element: <ProductVariantListPage /> },
+      { path: "product-variants/create", element: <CreateProductVariantPage /> },
+      { path: "product-variants/:id/edit", element: <EditProductVariantPage /> },
     ],
   },
 ];
