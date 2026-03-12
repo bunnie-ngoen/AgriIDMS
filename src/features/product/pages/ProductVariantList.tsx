@@ -7,9 +7,11 @@ import {
 import type { ProductVariant } from "../types/product-variant.type";
 import {
   Plus, Pencil, Trash2, AlertTriangle, PackageOpen,
-  ImageOff, TrendingUp, Package, Activity,
+  ImageOff, TrendingUp, Package, Activity, Eye
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useToggleProductVariantStatusMutation } from "../api/product-variant.api";
+
 
 type ConfirmState = {
   open: boolean;
@@ -17,7 +19,7 @@ type ConfirmState = {
   description: string;
   onConfirm: () => void;
 };
-const CONFIRM_INITIAL: ConfirmState = { open: false, title: "", description: "", onConfirm: () => {} };
+const CONFIRM_INITIAL: ConfirmState = { open: false, title: "", description: "", onConfirm: () => { } };
 
 const ConfirmModal = ({ open, title, description, onConfirm, onCancel }: ConfirmState & { onCancel: () => void }) => {
   if (!open) return null;
@@ -49,11 +51,30 @@ const ProductVariantList = () => {
   const navigate = useNavigate();
   const { data, isLoading, isError } = useGetProductVariantsQuery();
   const [deleteVariant, { isLoading: isDeleting }] = useDeleteProductVariantMutation();
+  const [toggleStatus] = useToggleProductVariantStatusMutation();
   const [confirm, setConfirm] = useState<ConfirmState>(CONFIRM_INITIAL);
   const closeConfirm = () => setConfirm(CONFIRM_INITIAL);
 
   const activeCount = data?.filter((v) => v.isActive).length ?? 0;
   const totalCount = data?.length ?? 0;
+  const handleToggleStatus = (variant: ProductVariant) => {
+    const nextStatus = !variant.isActive;
+    setConfirm({
+      open: true,
+      title: nextStatus ? "Kích hoạt variant" : "Vô hiệu hóa variant",
+      description: `Bạn có chắc muốn ${nextStatus ? "kích hoạt" : "vô hiệu hóa"} variant #${variant.id} — "${variant.productName}"?`,
+      onConfirm: async () => {
+        closeConfirm();
+        const toastId = toast.loading("Đang cập nhật...");
+        try {
+          await toggleStatus({ id: variant.id, isActive: nextStatus }).unwrap();
+          toast.success("Cập nhật trạng thái thành công!", { id: toastId });
+        } catch {
+          toast.error("Cập nhật thất bại!", { id: toastId });
+        }
+      },
+    });
+  };
 
   const handleDelete = (variant: ProductVariant) => {
     setConfirm({
@@ -178,17 +199,18 @@ const ProductVariantList = () => {
                       <p className="text-xs text-slate-600">{variant.shelfLifeDays.toLocaleString()} ngày</p>
                     </td>
                     <td className="px-5 py-3.5">
-                      {variant.isActive ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          Active
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
-                          <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-                          Inactive
-                        </span>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleToggleStatus(variant)}
+                        className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold border transition-all hover:scale-105 ${variant.isActive
+                            ? "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                            : "bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200"
+                          }`}
+                        title="Click để đổi trạng thái"
+                      >
+                        <span className={`h-1.5 w-1.5 rounded-full ${variant.isActive ? "bg-emerald-500" : "bg-slate-400"}`} />
+                        {variant.isActive ? "Active" : "Inactive"}
+                      </button>
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <div className="inline-flex items-center gap-2">
@@ -208,6 +230,13 @@ const ProductVariantList = () => {
                         >
                           <Trash2 size={11} />
                           Xóa
+                        </button>
+                        <button
+                          onClick={() => navigate(`/admin/product-variants/${variant.id}/detail`, { state: { variant } })}
+                          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-sky-500 hover:bg-sky-50 transition-all"
+                          title="Xem chi tiết"
+                        >
+                          <Eye size={15} />
                         </button>
                       </div>
                     </td>

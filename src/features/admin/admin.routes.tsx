@@ -70,6 +70,10 @@ const CreateProductVariantPage = lazy(
 const EditProductVariantPage = lazy(
   () => import("../product/pages/EditProductVariant")
 );
+const ProductVariantDetailPage = lazy(
+  () => import("../product/pages/ProductVariantDetail")
+);
+const DeletedUserListPage = lazy(() => import("../admin/pages/DeletedUserList"));
 
 export const adminRoutes = [
   {
@@ -105,6 +109,8 @@ export const adminRoutes = [
       { path: "product-variants", element: <ProductVariantListPage /> },
       { path: "product-variants/create", element: <CreateProductVariantPage /> },
       { path: "product-variants/:id/edit", element: <EditProductVariantPage /> },
+      { path: "product-variants/:id/detail", element: <ProductVariantDetailPage /> },
+      { path: "users/deleted", element: <DeletedUserListPage /> },
     ],
   },
 ];

@@ -270,9 +270,10 @@ export const userApi = api.injectEndpoints({
 
     deleteUser: builder.mutation<void, string>({
       query: (userId) => ({
-        url: `../Users/${userId}`,
+        url: `Users/${userId}`,  // bỏ ../
         method: "DELETE",
       }),
+      invalidatesTags: ["User"],  
     }),
     updateUserStatus: builder.mutation<void, { id: string; status: number }>({
       query: ({ id, status }) => ({
@@ -280,7 +281,7 @@ export const userApi = api.injectEndpoints({
         method: "PATCH",
         body: { status },
       }),
-       invalidatesTags: ["User"],
+      invalidatesTags: ["User"],
     }),
     updateUserRole: builder.mutation<{ message: string }, { id: string; roleName: string }>({
       query: ({ id, roleName }) => ({
@@ -289,10 +290,24 @@ export const userApi = api.injectEndpoints({
         body: { roleName },
       }),
     }),
+    getDeletedUsers: builder.query<UserListItem[], void>({
+      query: () => "/Users/by-status-deleted",
+      providesTags: ["User"],
+    }),
+
+    restoreUser: builder.mutation<void, string>({
+      query: (id) => ({
+        url: `/Users/${id}/restore`,
+        method: "PATCH",
+      }),
+      invalidatesTags: ["User"],
+    }),
   }),
 });
 
 export const {
+  useGetDeletedUsersQuery,
+  useRestoreUserMutation,
   useUpdateUserRoleMutation,
   useUpdateUserStatusMutation,
   useCreateUserMutation,

@@ -10,7 +10,7 @@ import {
   Boxes,
   Truck,
   Tags,
-  Layers,
+  Layers,UserX
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
@@ -50,6 +50,7 @@ const mainMenu: MenuItem[] = [
     children: [
       { name: "Create Employee", path: "create-user", icon: CirclePlus },
       { name: "User list", path: "users", icon: List },
+      { name: "Tài khoản đã xóa", path: "users/deleted", icon: UserX },
     ],
   },
   {
