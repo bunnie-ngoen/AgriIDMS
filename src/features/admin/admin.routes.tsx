@@ -75,6 +75,20 @@ const ProductVariantDetailPage = lazy(
 );
 const DeletedUserListPage = lazy(() => import("../admin/pages/DeletedUserList"));
 
+// Purchase Order (Admin: duyệt đơn — danh sách + chi tiết)
+const PurchaseOrderListPage = lazy(
+  () => import("../purchase-staff/pages/PurchaseOrderList")
+);
+const CreatePurchaseOrderPage = lazy(
+  () => import("../purchase-staff/pages/CreatePurchaseOrder")
+);
+const PurchaseOrderDetailPage = lazy(
+  () => import("../purchase-staff/pages/PurchaseOrderDetail")
+);
+const EditPurchaseOrderPage = lazy(
+  () => import("../purchase-staff/pages/EditPurchaseOrder")
+);
+
 export const adminRoutes = [
   {
     path: "/admin",
@@ -111,6 +125,12 @@ export const adminRoutes = [
       { path: "product-variants/:id/edit", element: <EditProductVariantPage /> },
       { path: "product-variants/:id/detail", element: <ProductVariantDetailPage /> },
       { path: "users/deleted", element: <DeletedUserListPage /> },
+
+      // Đơn mua hàng (Admin: danh sách + duyệt)
+      { path: "purchase-orders", element: <PurchaseOrderListPage /> },
+      { path: "purchase-orders/create", element: <CreatePurchaseOrderPage /> },
+      { path: "purchase-orders/:id", element: <PurchaseOrderDetailPage /> },
+      { path: "purchase-orders/:id/edit", element: <EditPurchaseOrderPage /> },
     ],
   },
 ];

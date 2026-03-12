@@ -3,6 +3,7 @@ import type {
   Category,
   CreateCategoryRequest,
   UpdateCategoryRequest,
+  UpdateCategoryStatusRequest,
 } from "../types/category.type";
 
 export const categoryApi = api.injectEndpoints({
@@ -53,6 +54,21 @@ export const categoryApi = api.injectEndpoints({
       ],
     }),
 
+    updateCategoryStatus: builder.mutation<
+      void,
+      { id: number; data: UpdateCategoryStatusRequest }
+    >({
+      query: ({ id, data }) => ({
+        url: `Categories/${id}`,
+        method: "PATCH",
+        body: data,
+      }),
+      invalidatesTags: (_res, _err, arg) => [
+        { type: "Category" as const, id: "LIST" },
+        { type: "Category" as const, id: arg.id },
+      ],
+    }),
+
     deleteCategory: builder.mutation<void, number>({
       query: (id) => ({
         url: `Categories/${id}`,
@@ -72,5 +88,6 @@ export const {
   useCreateCategoryMutation,
   useUpdateCategoryMutation,
   useDeleteCategoryMutation,
+  useUpdateCategoryStatusMutation,
 } = categoryApi;
 

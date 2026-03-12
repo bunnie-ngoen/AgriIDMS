@@ -3,6 +3,7 @@ import type {
   Product,
   CreateProductRequest,
   UpdateProductRequest,
+  UpdateProductStatusRequest,
 } from "../types/product.type";
 
 export const productApi = api.injectEndpoints({
@@ -12,9 +13,23 @@ export const productApi = api.injectEndpoints({
         url: "Products",
         method: "GET",
       }),
-      transformResponse: (response: unknown) => {
-        const raw = response as any;
-        let arr: any[] = [];
+      transformResponse: (response: unknown): Product[] => {
+        type RawProduct = {
+          id: number;
+          name: string;
+          description?: string | null;
+          category?: string | null;
+          imageUrl?: string | null;
+          isActive?: boolean;
+          createdAt?: string;
+        };
+
+        const raw = response as
+          | RawProduct[]
+          | { result?: RawProduct[]; data?: RawProduct[] }
+          | undefined
+          | null;
+        let arr: RawProduct[] = [];
 
         if (Array.isArray(raw)) {
           arr = raw;
@@ -35,7 +50,7 @@ export const productApi = api.injectEndpoints({
           imageUrl: p.imageUrl,
           isActive: p.isActive,
           createdAt: p.createdAt,
-        })) as Product[];
+        }));
       },
       providesTags: (result) =>
         result
@@ -51,7 +66,15 @@ export const productApi = api.injectEndpoints({
         url: `Products/${id}`,
         method: "GET",
       }),
-      transformResponse: (p: any) =>
+      transformResponse: (p: {
+        id: number;
+        name: string;
+        description?: string | null;
+        category?: string | null;
+        imageUrl?: string | null;
+        isActive?: boolean;
+        createdAt?: string;
+      }): Product =>
         ({
           id: p.id,
           name: p.name,
@@ -60,7 +83,7 @@ export const productApi = api.injectEndpoints({
           imageUrl: p.imageUrl,
           isActive: p.isActive,
           createdAt: p.createdAt,
-        }) as Product,
+        }),
       providesTags: (_res, _err, id) => [{ type: "Product" as const, id }],
     }),
 
@@ -88,6 +111,21 @@ export const productApi = api.injectEndpoints({
       ],
     }),
 
+    updateProductStatus: builder.mutation<
+      void,
+      { id: number; data: UpdateProductStatusRequest }
+    >({
+      query: ({ id, data }) => ({
+        url: `Products/${id}`,
+        method: "PATCH",
+        body: data,
+      }),
+      invalidatesTags: (_res, _err, arg) => [
+        { type: "Product" as const, id: "LIST" },
+        { type: "Product" as const, id: arg.id },
+      ],
+    }),
+
     deleteProduct: builder.mutation<void, number>({
       query: (id) => ({
         url: `Products/${id}`,
@@ -106,6 +144,7 @@ export const {
   useGetProductByIdQuery,
   useCreateProductMutation,
   useUpdateProductMutation,
+  useUpdateProductStatusMutation,
   useDeleteProductMutation,
 } = productApi;
 

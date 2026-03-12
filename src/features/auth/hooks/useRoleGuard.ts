@@ -30,6 +30,10 @@ export const useRoleGuard = () => {
         return auth.user?.roles[0] === AUTH_ROLE.CUSTOMER;
     };
 
+    const isPurchasingStaff = (): boolean => {
+        return auth.user?.roles[0] === AUTH_ROLE.PURCHASING_STAFF;
+    };
+
     const getDefaultRoute = (): string => {
         if (!auth.user || !auth.user.roles || auth.user.roles.length === 0) {
             return '/login';
@@ -44,6 +48,7 @@ export const useRoleGuard = () => {
         isManager,
         isWarehouseStaff,
         isSalesStaff,
+        isPurchasingStaff,
         isCustomer,
         currentRole: auth.user?.roles[0] as UserRole,
         getDefaultRoute,
