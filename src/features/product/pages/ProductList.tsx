@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Pencil, Trash2, FileText, X } from "lucide-react";
+import { Pencil, Trash2, FileText, X, Plus, Package, Activity, PackageOpen, ImageOff } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   useDeleteProductMutation,
@@ -76,6 +76,10 @@ export default function ProductList() {
   const hasPrev = currentPage > 1;
   const hasNext = currentPage < totalPages;
 
+  const allProducts = (data ?? []) as Product[];
+  const activeCount = allProducts.filter((p) => p.isActive !== false).length;
+  const inactiveCount = allProducts.length - activeCount;
+
   const updatePageInUrl = (page: number) => {
     setSearchParams((prev) => {
       const sp = new URLSearchParams(prev);
@@ -131,26 +135,48 @@ export default function ProductList() {
   };
 
   return (
-    <div className="px-5">
-      <div className="bg-white rounded-[15px] p-6 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-          <div>
-            <h1 className="text-xl font-semibold text-slate-900">
-              Quản lý sản phẩm
-            </h1>
-            <p className="text-xs text-slate-500 mt-1">
-              Danh sách sản phẩm và danh mục liên quan.
-            </p>
-          </div>
-          <Link
-            to="/admin/products/create"
-            className="inline-flex items-center rounded-lg bg-[#7FBB35] px-3 py-2 text-xs font-semibold text-white hover:bg-[#598325]"
-          >
-            + Thêm sản phẩm
-          </Link>
+    <div className="px-5 py-2 space-y-5">
+      {/* Header — giống ProductVariantList */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            Danh sách sản phẩm
+          </h1>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Quản lý toàn bộ sản phẩm và danh mục liên quan trong hệ thống
+          </p>
         </div>
+        <Link
+          to="/admin/products/create"
+          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-slate-700 transition-colors shadow-sm"
+        >
+          <Plus size={14} />
+          Thêm sản phẩm
+        </Link>
+      </div>
 
-        <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
+      {/* Stats — giống ProductVariantList */}
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label: "Tổng sản phẩm", value: allProducts.length, icon: Package, color: "bg-blue-50 text-blue-600 border-blue-100" },
+          { label: "Đang hoạt động", value: activeCount, icon: Activity, color: "bg-emerald-50 text-emerald-600 border-emerald-100" },
+          { label: "Vô hiệu hóa", value: inactiveCount, icon: PackageOpen, color: "bg-orange-50 text-orange-600 border-orange-100" },
+        ].map((stat) => (
+          <div key={stat.label} className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm flex items-center gap-3">
+            <div className={`h-10 w-10 rounded-xl border flex items-center justify-center ${stat.color}`}>
+              <stat.icon size={18} />
+            </div>
+            <div>
+              <p className="text-xl font-bold text-slate-800">{stat.value}</p>
+              <p className="text-[11px] text-slate-400">{stat.label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Bộ lọc + Table card — giống ProductVariantList */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center gap-3">
           <input
             type="text"
             value={searchText}
@@ -160,9 +186,8 @@ export default function ProductList() {
               updatePageInUrl(1);
             }}
             placeholder="Tìm theo tên / mô tả / danh mục..."
-            className="w-full md:w-1/2 p-2.5 rounded-lg border border-slate-200 bg-slate-50 text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="flex-1 min-w-0 rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
           />
-
           <select
             value={selectedCategoryId === "all" ? "all" : String(selectedCategoryId)}
             onChange={(e) => {
@@ -171,74 +196,77 @@ export default function ProductList() {
               setPageIndex(1);
               updatePageInUrl(1);
             }}
-            className="w-full md:w-48 p-2.5 rounded-lg border border-slate-200 bg-white text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
+            className="w-full sm:w-44 rounded-xl border border-slate-200 px-4 py-2.5 pr-9 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all appearance-none"
           >
             <option value="all">Tất cả danh mục</option>
             {categoryOptions.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
+              <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
         </div>
 
         {isError && (
-          <p className="text-red-500 text-sm mb-3">
-            Không tải được danh sách sản phẩm. Vui lòng thử lại.
-          </p>
+          <div className="px-6 py-3 bg-red-50 border-b border-red-100">
+            <p className="text-xs text-red-500">Không tải được dữ liệu. Vui lòng thử lại.</p>
+          </div>
         )}
 
-        <div className="overflow-x-auto border border-slate-200 rounded-xl">
-          <table className="min-w-full text-xs md:text-sm">
-            <thead className="bg-slate-50 text-slate-600">
-              <tr>
-                <th className="px-4 py-2 text-left font-medium">Ảnh</th>
-                <th className="px-4 py-2 text-left font-medium">Tên sản phẩm</th>
-                <th className="px-4 py-2 text-left font-medium">Danh mục</th>
-                <th className="px-4 py-2 text-left font-medium w-[180px] max-w-[220px]">Mô tả</th>
-                <th className="px-4 py-2 text-left font-medium">Trạng thái</th>
-                <th className="px-4 py-2 text-left font-medium">Ngày tạo</th>
-                <th className="px-4 py-2 text-right font-medium">Thao tác</th>
+        <div className="overflow-x-auto">
+          <table className="min-w-full">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-100">
+                <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Ảnh</th>
+                <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Tên sản phẩm</th>
+                <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Danh mục</th>
+                <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider max-w-[200px]">Mô tả</th>
+                <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Trạng thái</th>
+                <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Ngày tạo</th>
+                <th className="px-5 py-3.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Thao tác</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-50">
               {isLoading ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className="px-4 py-6 text-center text-slate-500"
-                  >
-                    Đang tải dữ liệu...
-                  </td>
-                </tr>
+                Array.from({ length: 4 }).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td className="px-5 py-4"><div className="h-10 w-10 rounded-xl bg-slate-100" /></td>
+                    <td className="px-5 py-4"><div className="h-3 w-32 rounded bg-slate-100" /></td>
+                    <td className="px-5 py-4"><div className="h-3 w-20 rounded bg-slate-100" /></td>
+                    <td className="px-5 py-4"><div className="h-3 w-40 rounded bg-slate-100" /></td>
+                    <td className="px-5 py-4"><div className="h-5 w-16 rounded-full bg-slate-100" /></td>
+                    <td className="px-5 py-4"><div className="h-3 w-24 rounded bg-slate-100" /></td>
+                    <td className="px-5 py-4"><div className="h-7 w-28 rounded-lg bg-slate-100 ml-auto" /></td>
+                  </tr>
+                ))
               ) : paged.length > 0 ? (
                 paged.map((p) => {
                   const createdAt = p.createdAt
                     ? new Date(p.createdAt).toLocaleString("vi-VN")
                     : "-";
                   return (
-                    <tr
-                      key={p.id}
-                      className="border-t border-slate-100 hover:bg-slate-50"
-                    >
-                      <td className="px-4 py-2">
+                    <tr key={p.id} className="hover:bg-slate-50/60 transition-colors group">
+                      <td className="px-5 py-3.5">
                         {p.imageUrl ? (
                           <img
                             src={p.imageUrl}
                             alt={p.name}
-                            className="h-12 w-12 rounded-lg object-cover border border-slate-200"
+                            className="h-10 w-10 rounded-xl object-cover border border-slate-200 shadow-sm"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                           />
                         ) : (
-                          <span className="inline-flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-slate-200 text-[10px] text-slate-400">
-                            Không có ảnh
-                          </span>
+                          <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center border border-slate-200">
+                            <ImageOff size={14} className="text-slate-300" />
+                          </div>
                         )}
                       </td>
-                      <td className="px-4 py-2">{p.name}</td>
-                      <td className="px-4 py-2">{p.category ?? "-"}</td>
-                      <td className="px-4 py-2 w-[180px] max-w-[220px]">
+                      <td className="px-5 py-3.5">
+                        <p className="text-sm font-semibold text-slate-800">{p.name}</p>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className="text-sm text-slate-600">{p.category ?? "-"}</span>
+                      </td>
+                      <td className="px-5 py-3.5 max-w-[200px]">
                         <span
-                          className="block overflow-hidden text-ellipsis whitespace-nowrap"
+                          className="block overflow-hidden text-ellipsis whitespace-nowrap text-xs text-slate-600"
                           title={p.description?.trim() || undefined}
                         >
                           {p.description && p.description.trim().length > 0
@@ -248,55 +276,78 @@ export default function ProductList() {
                             : "-"}
                         </span>
                       </td>
-                      <td className="px-4 py-2">
-                        <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                            p.isActive
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-slate-100 text-slate-500"
-                          }`}
-                        >
-                          {p.isActive ? "Đang hoạt động" : "Đã vô hiệu"}
-                        </span>
+                      <td className="px-5 py-3.5">
+                        {p.isActive !== false ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            Active
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                            <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                            Inactive
+                          </span>
+                        )}
                       </td>
-                      <td className="px-4 py-2">{createdAt}</td>
-                      <td className="px-4 py-2 text-right space-x-2">
-                        <button
-                          type="button"
-                          onClick={() => setDetailProduct(p)}
-                          className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
-                        >
-                          <FileText size={13} className="mr-1" />
-                          Chi tiết
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isUpdatingStatus}
-                          onClick={() => handleToggleStatus(p)}
-                          className="inline-flex items-center rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
-                        >
-                          {p.isActive ? "Vô hiệu hóa" : "Kích hoạt"}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={isDeleting}
-                          onClick={() => handleDelete(p)}
-                          className="inline-flex items-center rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-medium text-red-600 hover:bg-red-100 disabled:opacity-50"
-                        >
-                          <Trash2 size={13} className="mr-1" />
-                          Xóa
-                        </button>
+                      <td className="px-5 py-3.5 text-xs text-slate-600">{createdAt}</td>
+                      <td className="px-5 py-3.5 text-right">
+                        <div className="inline-flex items-center gap-2 flex-wrap justify-end">
+                          <button
+                            type="button"
+                            onClick={() => setDetailProduct(p)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition-colors shadow-sm"
+                          >
+                            <FileText size={11} />
+                            Chi tiết
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isUpdatingStatus}
+                            onClick={() => handleToggleStatus(p)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50 transition-colors shadow-sm disabled:opacity-50"
+                          >
+                            {p.isActive !== false ? "Vô hiệu" : "Kích hoạt"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingProductId(p.id);
+                              setDetailProduct(null);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 transition-colors shadow-sm"
+                          >
+                            <Pencil size={11} />
+                            Sửa
+                          </button>
+                          <button
+                            type="button"
+                            disabled={isDeleting}
+                            onClick={() => handleDelete(p)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:border-red-300 hover:text-red-600 hover:bg-red-50 transition-colors shadow-sm disabled:opacity-50"
+                          >
+                            <Trash2 size={11} />
+                            Xóa
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td
-                    colSpan={7}
-                    className="px-4 py-6 text-center text-slate-500"
-                  >
-                    Không tìm thấy sản phẩm phù hợp.
+                  <td colSpan={7} className="px-5 py-16 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="h-16 w-16 rounded-2xl bg-slate-100 flex items-center justify-center">
+                        <PackageOpen size={28} className="text-slate-300" />
+                      </div>
+                      <p className="text-sm font-medium text-slate-400">Chưa có sản phẩm nào</p>
+                      <Link
+                        to="/admin/products/create"
+                        className="text-xs text-blue-600 hover:underline"
+                      >
+                        Tạo sản phẩm đầu tiên →
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -304,8 +355,9 @@ export default function ProductList() {
           </table>
         </div>
 
+        {/* Phân trang */}
         {totalItems > 0 && (
-          <div className="flex items-center justify-between mt-4 text-xs md:text-sm">
+          <div className="px-6 py-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-sm">
             <p className="text-slate-500">
               Trang {currentPage} / {totalPages} — {totalItems} sản phẩm
             </p>
@@ -321,7 +373,7 @@ export default function ProductList() {
                     return next;
                   });
                 }}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs hover:bg-slate-50 disabled:opacity-40"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium transition-colors"
               >
                 Trước
               </button>
@@ -336,7 +388,7 @@ export default function ProductList() {
                     return next;
                   });
                 }}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs hover:bg-slate-50 disabled:opacity-40"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium transition-colors"
               >
                 Sau
               </button>
@@ -346,85 +398,108 @@ export default function ProductList() {
       </div>
 
       {detailProduct !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setDetailProduct(null)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          onClick={() => setDetailProduct(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="detail-product-title"
+        >
           <div
-            className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-3xl border border-slate-100 shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between p-4 border-b border-slate-200">
-              <h3 className="font-semibold text-slate-800">Chi tiết sản phẩm</h3>
+            <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between rounded-t-3xl">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
+                  <Package size={14} className="text-white" />
+                </div>
+                <div>
+                  <h3 id="detail-product-title" className="text-base font-semibold text-slate-900">
+                    Chi tiết sản phẩm
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Xem thông tin sản phẩm</p>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => setDetailProduct(null)}
-                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                className="h-9 w-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition-all"
+                aria-label="Đóng"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
             </div>
-            <div className="p-4 space-y-4">
+            <div className="p-6 space-y-5">
               {detailProduct.imageUrl && (
                 <div>
-                  <p className="text-xs font-medium text-slate-500 mb-1">Ảnh</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">Ảnh</p>
                   <img
                     src={detailProduct.imageUrl}
                     alt={detailProduct.name}
-                    className="h-24 w-24 rounded-lg object-cover border border-slate-200"
+                    className="h-28 w-28 rounded-xl object-cover border border-slate-200 shadow-sm"
                   />
                 </div>
               )}
               <div>
-                <p className="text-xs font-medium text-slate-500 mb-1">Tên sản phẩm</p>
-                <p className="text-sm text-slate-800">{detailProduct.name}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">Tên sản phẩm</p>
+                <p className="text-sm font-medium text-slate-800">{detailProduct.name}</p>
               </div>
               <div>
-                <p className="text-xs font-medium text-slate-500 mb-1">Danh mục</p>
-                <p className="text-sm text-slate-800">{detailProduct.category ?? "-"}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">Danh mục</p>
+                <p className="text-sm text-slate-800">{detailProduct.category ?? "—"}</p>
               </div>
               <div>
-                <p className="text-xs font-medium text-slate-500 mb-1">Mô tả</p>
-                <p className="text-sm text-slate-700 whitespace-pre-wrap break-words">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">Mô tả</p>
+                <p className="text-sm text-slate-700 whitespace-pre-wrap break-words rounded-xl border border-slate-100 bg-slate-50/50 px-4 py-3">
                   {detailProduct.description && detailProduct.description.trim().length > 0
                     ? detailProduct.description
                     : "—"}
                 </p>
               </div>
               <div>
-                <p className="text-xs font-medium text-slate-500 mb-1">Trạng thái</p>
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">Trạng thái</p>
                 <span
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                    detailProduct.isActive ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${
+                    detailProduct.isActive !== false
+                      ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                      : "bg-slate-100 border-slate-200 text-slate-500"
                   }`}
                 >
-                  {detailProduct.isActive ? "Đang hoạt động" : "Đã vô hiệu"}
+                  {detailProduct.isActive !== false ? (
+                    <><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Đang hoạt động</>
+                  ) : (
+                    <><span className="h-1.5 w-1.5 rounded-full bg-slate-400" />Đã vô hiệu</>
+                  )}
                 </span>
               </div>
               {detailProduct.createdAt && (
                 <div>
-                  <p className="text-xs font-medium text-slate-500 mb-1">Ngày tạo</p>
-                  <p className="text-sm text-slate-700">
+                  <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">Ngày tạo</p>
+                  <p className="text-sm text-slate-600">
                     {new Date(detailProduct.createdAt).toLocaleString("vi-VN")}
                   </p>
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-2 p-4 border-t border-slate-200">
+            <div className="px-6 py-4 border-t border-slate-100 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setDetailProduct(null)}
+                className="flex-1 rounded-2xl border border-slate-200 py-3 text-sm font-semibold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 bg-white shadow-sm"
+              >
+                Đóng
+              </button>
               <button
                 type="button"
                 onClick={() => {
                   setEditingProductId(detailProduct.id);
                   setDetailProduct(null);
                 }}
-                className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                className="flex-[2] rounded-2xl py-3 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 flex items-center justify-center gap-2 transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5"
               >
-                <Pencil size={14} className="mr-1.5" />
-                Sửa
-              </button>
-              <button
-                type="button"
-                onClick={() => setDetailProduct(null)}
-                className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
-              >
-                Đóng
+                <Pencil size={14} />
+                Sửa sản phẩm
               </button>
             </div>
           </div>

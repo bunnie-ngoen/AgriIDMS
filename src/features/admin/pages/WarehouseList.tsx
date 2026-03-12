@@ -5,7 +5,7 @@ import {
   useDeleteWarehouseMutation,
 } from "../api/create-user.api";
 import type { WarehouseItem } from "../types/warehouse.type";
-import { Trash2, Pencil } from "lucide-react";
+import { Trash2, Pencil, Package, Plus, ChevronDown, RotateCw } from "lucide-react";
 import EditWarehouseModal from "../components/EditWarehouseModal";
 
 const PAGE_SIZE = 10;
@@ -14,7 +14,7 @@ const WarehouseList = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialPage = Number(searchParams.get("page") ?? "1") || 1;
 
-  const { data, isLoading, isError, refetch } = useGetWarehousesQuery();
+  const { data, isLoading, isError, error, refetch } = useGetWarehousesQuery();
   const [deleteWarehouse, { isLoading: isDeleting }] =
     useDeleteWarehouseMutation();
 
@@ -76,188 +76,233 @@ const WarehouseList = () => {
   const hasPrev = currentPage > 1;
   const hasNext = currentPage < totalPages;
 
+  const errorStatus = (error as { status?: number })?.status;
+  const errorMessage =
+    errorStatus === 401
+      ? "Vui lòng đăng nhập lại."
+      : errorStatus === 404
+        ? "API không tìm thấy."
+        : errorStatus === 500
+          ? "Lỗi server. Vui lòng thử lại sau."
+          : "Không tải được danh sách kho. Vui lòng thử lại.";
+
   return (
-    <div className="px-5">
-      <div className="bg-white rounded-[15px] p-6 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-          <div>
-            <h1 className="text-xl font-semibold text-slate-900">
-              Danh sách kho
-            </h1>
-            <p className="text-xs text-slate-500 mt-1">
-              Quản lý thông tin các kho hàng trong hệ thống.
-            </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-4 sm:px-6 py-6">
+      <div className="w-full max-w-[1600px] mx-auto">
+        {/* Header — giống Tạo kho */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center">
+              <Package size={18} className="text-emerald-600" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                Danh sách kho
+              </h1>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Quản lý thông tin các kho hàng trong hệ thống.
+              </p>
+            </div>
           </div>
           <Link
             to="/admin/warehouses/create"
-            className="inline-flex items-center rounded-lg bg-[#7FBB35] px-3 py-2 text-xs font-semibold text-white hover:bg-[#598325]"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl py-3 px-5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
           >
-            + Thêm kho
+            <Plus size={16} />
+            Thêm kho
           </Link>
         </div>
 
-        {/* Bộ lọc */}
-        <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
-          <input
-            type="text"
-            value={searchName}
-            onChange={(e) => {
-              setSearchName(e.target.value);
-              setPageIndex(1);
-              updatePageInUrl(1);
-            }}
-            placeholder="Tìm theo tên kho..."
-            className="w-full md:w-1/2 p-2.5 rounded-lg border border-slate-200 bg-slate-50 text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
-          />
-          <select
-            value={filterType}
-            onChange={(e) => {
-              setFilterType(e.target.value as "" | "Normal" | "Cold");
-              setPageIndex(1);
-              updatePageInUrl(1);
-            }}
-            className="w-full md:w-40 p-2.5 rounded-lg border border-slate-200 bg-white text-xs md:text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
-          >
-            <option value="">Tất cả loại kho</option>
-            <option value="Normal">Kho thường</option>
-            <option value="Cold">Kho lạnh</option>
-          </select>
-        </div>
-
-        {isError && (
-          <p className="text-red-500 text-sm mb-3">
-            Không tải được danh sách kho. Vui lòng thử lại.
-          </p>
-        )}
-
-        <div className="overflow-x-auto border border-slate-200 rounded-xl">
-          <table className="min-w-full text-xs md:text-sm">
-            <thead className="bg-slate-50 text-slate-600">
-              <tr>
-                <th className="px-4 py-2 text-left font-medium">Tên kho</th>
-                <th className="px-4 py-2 text-left font-medium">
-                  Địa chỉ
-                </th>
-                <th className="px-4 py-2 text-left font-medium">
-                  Loại kho
-                </th>
-                <th className="px-4 py-2 text-right font-medium">
-                  Thao tác
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-4 py-6 text-center text-slate-500"
-                  >
-                    Đang tải dữ liệu...
-                  </td>
-                </tr>
-              ) : paged.length > 0 ? (
-                paged.map((warehouse) => (
-                  <tr
-                    key={warehouse.id}
-                    className="border-t border-slate-100 hover:bg-slate-50"
-                  >
-                    <td className="px-4 py-2">{warehouse.name}</td>
-                    <td className="px-4 py-2">{warehouse.location}</td>
-                    <td className="px-4 py-2">
-                      <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                        {warehouse.titleWarehouse === "Cold"
-                          ? "Kho lạnh"
-                          : "Kho thường"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2 text-right space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => setEditingWarehouseId(warehouse.id)}
-                        className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
-                      >
-                        <Pencil size={13} className="mr-1" />
-                        Sửa
-                      </button>
-                      <Link
-                        to={`/admin/warehouses/${warehouse.id}/config`}
-                        className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
-                      >
-                        Cấu hình
-                      </Link>
-                      <Link
-                        to={`/admin/warehouses/${warehouse.id}/map`}
-                        className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
-                      >
-                        Sơ đồ
-                      </Link>
-                      <button
-                        type="button"
-                        disabled={isDeleting}
-                        onClick={() => handleDelete(warehouse)}
-                        className="inline-flex items-center rounded-md border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-medium text-red-600 hover:bg-red-100 disabled:opacity-50"
-                      >
-                        <Trash2 size={13} className="mr-1" />
-                        Xóa
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-4 py-6 text-center text-slate-500"
-                  >
-                    Không tìm thấy kho phù hợp.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Phân trang */}
-        {totalItems > 0 && (
-          <div className="flex items-center justify-between mt-4 text-xs md:text-sm">
-            <p className="text-slate-500">
-              Trang {currentPage} / {totalPages} — {totalItems} kho
-            </p>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={!hasPrev}
-                onClick={() => {
-                  if (!hasPrev) return;
-                  setPageIndex((p) => {
-                    const next = Math.max(1, p - 1);
-                    updatePageInUrl(next);
-                    return next;
-                  });
+        {/* Card nội dung */}
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+          {/* Bộ lọc */}
+          <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center gap-3">
+            <input
+              type="text"
+              value={searchName}
+              onChange={(e) => {
+                setSearchName(e.target.value);
+                setPageIndex(1);
+                updatePageInUrl(1);
+              }}
+              placeholder="Tìm theo tên kho..."
+              className="flex-1 min-w-0 rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
+            />
+            <div className="relative w-full sm:w-44">
+              <select
+                value={filterType}
+                onChange={(e) => {
+                  setFilterType(e.target.value as "" | "Normal" | "Cold");
+                  setPageIndex(1);
+                  updatePageInUrl(1);
                 }}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs hover:bg-slate-50 disabled:opacity-40"
+                className="w-full appearance-none rounded-xl border border-slate-200 px-4 py-2.5 pr-9 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
               >
-                Trước
-              </button>
-              <button
-                type="button"
-                disabled={!hasNext}
-                onClick={() => {
-                  if (!hasNext) return;
-                  setPageIndex((p) => {
-                    const next = p + 1;
-                    updatePageInUrl(next);
-                    return next;
-                  });
-                }}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs hover:bg-slate-50 disabled:opacity-40"
-              >
-                Sau
-              </button>
+                <option value="">Tất cả loại kho</option>
+                <option value="Normal">Kho thường</option>
+                <option value="Cold">Kho lạnh</option>
+              </select>
+              <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
           </div>
-        )}
+
+          {isError && (
+            <div className="mx-6 mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <p className="text-sm text-red-700">{errorMessage}</p>
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100 transition-colors"
+              >
+                <RotateCw size={14} />
+                Thử lại
+              </button>
+            </div>
+          )}
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-100">
+                  <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    Tên kho
+                  </th>
+                  <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    Địa chỉ
+                  </th>
+                  <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    Loại kho
+                  </th>
+                  <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    Thao tác
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td
+                      colSpan={4}
+                      className="px-5 py-10 text-center text-slate-500"
+                    >
+                      Đang tải dữ liệu...
+                    </td>
+                  </tr>
+                ) : paged.length > 0 ? (
+                  paged.map((warehouse) => (
+                    <tr
+                      key={warehouse.id}
+                      className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors"
+                    >
+                      <td className="px-5 py-3.5 font-medium text-slate-900">
+                        {warehouse.name}
+                      </td>
+                      <td className="px-5 py-3.5 text-slate-600 max-w-xs truncate">
+                        {warehouse.location}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                            warehouse.titleWarehouse === "Cold"
+                              ? "bg-sky-50 text-sky-700"
+                              : "bg-emerald-50 text-emerald-700"
+                          }`}
+                        >
+                          {warehouse.titleWarehouse === "Cold"
+                            ? "Kho lạnh"
+                            : "Kho thường"}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-right">
+                        <div className="flex flex-wrap items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setEditingWarehouseId(warehouse.id)}
+                            className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                          >
+                            <Pencil size={12} />
+                            Sửa
+                          </button>
+                          <Link
+                            to={`/admin/warehouses/${warehouse.id}/config`}
+                            className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                          >
+                            Cấu hình
+                          </Link>
+                          <Link
+                            to={`/admin/warehouses/${warehouse.id}/map`}
+                            className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                          >
+                            Sơ đồ
+                          </Link>
+                          <button
+                            type="button"
+                            disabled={isDeleting}
+                            onClick={() => handleDelete(warehouse)}
+                            className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors"
+                          >
+                            <Trash2 size={12} />
+                            Xóa
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan={4}
+                      className="px-5 py-10 text-center text-slate-500"
+                    >
+                      Không tìm thấy kho phù hợp.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Phân trang */}
+          {totalItems > 0 && (
+            <div className="px-6 py-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-sm">
+              <p className="text-slate-500">
+                Trang {currentPage} / {totalPages} — {totalItems} kho
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!hasPrev}
+                  onClick={() => {
+                    if (!hasPrev) return;
+                    setPageIndex((p) => {
+                      const next = Math.max(1, p - 1);
+                      updatePageInUrl(next);
+                      return next;
+                    });
+                  }}
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+                >
+                  Trước
+                </button>
+                <button
+                  type="button"
+                  disabled={!hasNext}
+                  onClick={() => {
+                    if (!hasNext) return;
+                    setPageIndex((p) => {
+                      const next = p + 1;
+                      updatePageInUrl(next);
+                      return next;
+                    });
+                  }}
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium transition-colors"
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {editingWarehouseId !== null && (
