@@ -9,18 +9,26 @@ import type {
 export const purchaseOrderApi = api.injectEndpoints({
   endpoints: (builder) => ({
     getPurchaseOrders: builder.query<PurchaseOrderListItem[], void>({
-      query: () => ({ url: "PurchaseOrder/list" }),
+      query: () => ({ url: "PurchaseOrder" }),
       transformResponse: (raw: unknown): PurchaseOrderListItem[] => {
-        const arr = Array.isArray(raw) ? raw : [];
+        let arr: unknown[] = [];
+        if (Array.isArray(raw)) {
+          arr = raw;
+        } else if (raw && typeof raw === "object") {
+          const obj = raw as Record<string, unknown>;
+          if (Array.isArray(obj.data)) arr = obj.data;
+          else if (Array.isArray(obj.result)) arr = obj.result;
+        }
         return arr.map((r: unknown) => {
-          const row = r as Record<string, unknown>;
+          const row = (r ?? {}) as Record<string, unknown>;
+          const orderDate = row.orderDate ?? row.OrderDate;
           return {
-            id: (row.id as number) ?? (row.Id as number),
+            id: (row.id as number) ?? (row.Id as number) ?? 0,
             orderCode: (row.orderCode as string) ?? (row.OrderCode as string) ?? "",
             supplierId: (row.supplierId as number) ?? (row.SupplierId as number) ?? 0,
             supplierName: (row.supplierName as string) ?? (row.SupplierName as string) ?? "",
             status: (row.status as string) ?? (row.Status as string) ?? "",
-            orderDate: (row.orderDate as string) ?? (row.OrderDate as string) ?? "",
+            orderDate: orderDate != null ? (typeof orderDate === "string" ? orderDate : new Date(orderDate as number).toISOString()) : "",
           };
         });
       },
