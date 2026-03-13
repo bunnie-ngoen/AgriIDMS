@@ -22,13 +22,36 @@ export const purchaseOrderApi = api.injectEndpoints({
         return arr.map((r: unknown) => {
           const row = (r ?? {}) as Record<string, unknown>;
           const orderDate = row.orderDate ?? row.OrderDate;
+          const createdByName =
+            (row.createdByName as string) ??
+            (row.CreatedByName as string) ??
+            (row.createdBy as string) ??
+            (row.CreatedBy as string) ??
+            (row.creatorName as string) ??
+            (row.CreatorName as string) ??
+            (row.createdUser as string) ??
+            (row.CreatedUser as string) ??
+            (row.nameCreater as string) ??
+            (row.NameCreater as string) ??
+            "";
           return {
             id: (row.id as number) ?? (row.Id as number) ?? 0,
-            orderCode: (row.orderCode as string) ?? (row.OrderCode as string) ?? "",
-            supplierId: (row.supplierId as number) ?? (row.SupplierId as number) ?? 0,
-            supplierName: (row.supplierName as string) ?? (row.SupplierName as string) ?? "",
+            orderCode:
+              (row.orderCode as string) ?? (row.OrderCode as string) ?? "",
+            supplierId:
+              (row.supplierId as number) ?? (row.SupplierId as number) ?? 0,
+            supplierName:
+              (row.supplierName as string) ??
+              (row.SupplierName as string) ??
+              "",
             status: (row.status as string) ?? (row.Status as string) ?? "",
-            orderDate: orderDate != null ? (typeof orderDate === "string" ? orderDate : new Date(orderDate as number).toISOString()) : "",
+            orderDate:
+              orderDate != null
+                ? typeof orderDate === "string"
+                  ? orderDate
+                  : new Date(orderDate as number).toISOString()
+                : "",
+            createdByName: createdByName || undefined,
           };
         });
       },
@@ -43,6 +66,47 @@ export const purchaseOrderApi = api.injectEndpoints({
 
     getPurchaseOrderById: builder.query<PurchaseOrderResponse, number>({
       query: (id) => ({ url: `PurchaseOrder/${id}` }),
+      transformResponse: (raw: unknown): PurchaseOrderResponse => {
+        const row = (raw ?? {}) as Record<string, unknown>;
+        const orderDate = row.orderDate ?? row.OrderDate;
+        const createdByName =
+          (row.createdByName as string) ??
+          (row.CreatedByName as string) ??
+          (row.createdBy as string) ??
+          (row.CreatedBy as string) ??
+          (row.creatorName as string) ??
+          (row.CreatorName as string) ??
+          (row.createdUser as string) ??
+          (row.CreatedUser as string) ??
+          (row.nameCreater as string) ??
+          (row.NameCreater as string) ??
+          "";
+
+        return {
+          id: (row.id as number) ?? (row.Id as number) ?? 0,
+          orderCode:
+            (row.orderCode as string) ?? (row.OrderCode as string) ?? "",
+          supplierId:
+            (row.supplierId as number) ?? (row.SupplierId as number) ?? 0,
+          supplierName:
+            (row.supplierName as string) ?? (row.SupplierName as string) ?? "",
+          status: (row.status as string) ?? (row.Status as string) ?? "",
+          orderDate:
+            orderDate != null
+              ? typeof orderDate === "string"
+                ? orderDate
+                : new Date(orderDate as number).toISOString()
+              : "",
+          createdByName: createdByName || undefined,
+          // Nếu BE trả details với tên khác (Details / purchaseOrderDetails)
+          details:
+            (row.details as any[]) ??
+            (row.Details as any[]) ??
+            (row.purchaseOrderDetails as any[]) ??
+            (row.PurchaseOrderDetails as any[]) ??
+            [],
+        };
+      },
       providesTags: (_res, _err, id) => [{ type: "PurchaseOrder" as const, id }],
     }),
 

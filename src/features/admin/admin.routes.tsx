@@ -89,6 +89,17 @@ const EditPurchaseOrderPage = lazy(
   () => import("../purchase-staff/pages/EditPurchaseOrder")
 );
 
+// Goods Receipt (Admin/Warehouse)
+const GoodsReceiptListPage = lazy(
+  () => import("../goods-receipt/pages/GoodsReceiptList")
+);
+const CreateGoodsReceiptPage = lazy(
+  () => import("../goods-receipt/pages/CreateGoodsReceipt")
+);
+const GoodsReceiptDetailPage = lazy(
+  () => import("../goods-receipt/pages/GoodsReceiptDetail")
+);
+
 export const adminRoutes = [
   {
     path: "/admin",
@@ -131,6 +142,11 @@ export const adminRoutes = [
       { path: "purchase-orders/create", element: <CreatePurchaseOrderPage /> },
       { path: "purchase-orders/:id", element: <PurchaseOrderDetailPage /> },
       { path: "purchase-orders/:id/edit", element: <EditPurchaseOrderPage /> },
+
+      // Nhập kho (Goods Receipt)
+      { path: "goods-receipts", element: <GoodsReceiptListPage /> },
+      { path: "goods-receipts/create", element: <CreateGoodsReceiptPage /> },
+      { path: "goods-receipts/:id", element: <GoodsReceiptDetailPage /> },
     ],
   },
 ];

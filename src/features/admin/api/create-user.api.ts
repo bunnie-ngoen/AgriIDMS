@@ -105,6 +105,9 @@ export const userApi = api.injectEndpoints({
       query: (warehouseId) => ({
         url: `warehouses/${warehouseId}/zones`,
       }),
+      providesTags: (_result, _error, warehouseId) => [
+        { type: "Zone" as const, id: `WAREHOUSE-${warehouseId}` },
+      ],
     }),
 
     createZone: builder.mutation<
@@ -116,6 +119,9 @@ export const userApi = api.injectEndpoints({
         method: "POST",
         body: { name },
       }),
+      invalidatesTags: (_res, _err, { warehouseId }) => [
+        { type: "Zone" as const, id: `WAREHOUSE-${warehouseId}` },
+      ],
     }),
 
     updateZone: builder.mutation<
@@ -127,6 +133,10 @@ export const userApi = api.injectEndpoints({
         method: "PUT",
         body: { name },
       }),
+      invalidatesTags: (_res, _err, { warehouseId, id }) => [
+        { type: "Zone" as const, id: `WAREHOUSE-${warehouseId}` },
+        { type: "Rack" as const, id: `ZONE-${id}` },
+      ],
     }),
 
     deleteZone: builder.mutation<
@@ -137,6 +147,10 @@ export const userApi = api.injectEndpoints({
         url: `warehouses/${warehouseId}/zones/${id}`,
         method: "DELETE",
       }),
+      invalidatesTags: (_res, _err, { warehouseId, id }) => [
+        { type: "Zone" as const, id: `WAREHOUSE-${warehouseId}` },
+        { type: "Rack" as const, id: `ZONE-${id}` },
+      ],
     }),
 
     // ===== Racks =====
@@ -144,6 +158,9 @@ export const userApi = api.injectEndpoints({
       query: (zoneId) => ({
         url: `zones/${zoneId}/racks`,
       }),
+      providesTags: (_result, _error, zoneId) => [
+        { type: "Rack" as const, id: `ZONE-${zoneId}` },
+      ],
     }),
 
     createRack: builder.mutation<
@@ -155,6 +172,9 @@ export const userApi = api.injectEndpoints({
         method: "POST",
         body: { name },
       }),
+      invalidatesTags: (_res, _err, { zoneId }) => [
+        { type: "Rack" as const, id: `ZONE-${zoneId}` },
+      ],
     }),
 
     updateRack: builder.mutation<
@@ -166,6 +186,10 @@ export const userApi = api.injectEndpoints({
         method: "PUT",
         body: { name },
       }),
+      invalidatesTags: (_res, _err, { zoneId, id }) => [
+        { type: "Rack" as const, id: `ZONE-${zoneId}` },
+        { type: "Slot" as const, id: `RACK-${id}` },
+      ],
     }),
 
     deleteRack: builder.mutation<
@@ -176,6 +200,10 @@ export const userApi = api.injectEndpoints({
         url: `zones/${zoneId}/racks/${id}`,
         method: "DELETE",
       }),
+      invalidatesTags: (_res, _err, { zoneId, id }) => [
+        { type: "Rack" as const, id: `ZONE-${zoneId}` },
+        { type: "Slot" as const, id: `RACK-${id}` },
+      ],
     }),
 
     // ===== Slots =====
@@ -183,6 +211,9 @@ export const userApi = api.injectEndpoints({
       query: (rackId) => ({
         url: `racks/${rackId}/slots`,
       }),
+      providesTags: (_result, _error, rackId) => [
+        { type: "Slot" as const, id: `RACK-${rackId}` },
+      ],
     }),
 
     createSlot: builder.mutation<
@@ -194,6 +225,9 @@ export const userApi = api.injectEndpoints({
         method: "POST",
         body: { code, capacity },
       }),
+      invalidatesTags: (_res, _err, { rackId }) => [
+        { type: "Slot" as const, id: `RACK-${rackId}` },
+      ],
     }),
 
     updateSlot: builder.mutation<
@@ -205,6 +239,9 @@ export const userApi = api.injectEndpoints({
         method: "PUT",
         body: { code, capacity },
       }),
+      invalidatesTags: (_res, _err, { rackId }) => [
+        { type: "Slot" as const, id: `RACK-${rackId}` },
+      ],
     }),
 
     deleteSlot: builder.mutation<
@@ -215,6 +252,9 @@ export const userApi = api.injectEndpoints({
         url: `racks/${rackId}/slots/${id}`,
         method: "DELETE",
       }),
+      invalidatesTags: (_res, _err, { rackId }) => [
+        { type: "Slot" as const, id: `RACK-${rackId}` },
+      ],
     }),
 
     getUsers: builder.query<
@@ -284,8 +324,6 @@ export const {
   useCreateUserMutation,
   useGetUsersQuery,
   useDeleteUserMutation,
-  useUpdateUserStatusMutation,
-  useUpdateUserRoleMutation,
   useCreateWarehouseMutation,
   useGetWarehousesQuery,
   useGetWarehouseQuery,

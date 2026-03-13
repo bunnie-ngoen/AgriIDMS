@@ -10,8 +10,10 @@ import {
   Boxes,
   Truck,
   Tags,
-  Layers,UserX,
+  Layers,
+  UserX,
   FileText,
+  PackageSearch,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
@@ -75,6 +77,14 @@ const mainMenu: MenuItem[] = [
     icon: FileText,
     children: [
       { name: "Duyệt đơn mua", path: "purchase-orders", icon: List },
+    ],
+  },
+  {
+    name: "Nhập kho",
+    icon: PackageSearch,
+    children: [
+      { name: "Danh sách phiếu nhập", path: "goods-receipts", icon: List },
+      { name: "Tạo phiếu nhập", path: "goods-receipts/create", icon: CirclePlus },
     ],
   },
   {
