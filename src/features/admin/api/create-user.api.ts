@@ -54,13 +54,26 @@ export const userApi = api.injectEndpoints({
       }),
       transformResponse: (response: unknown) => {
         const arr = (response as Array<Record<string, unknown>>) ?? [];
-        return arr.map((w) => ({
-          ...w,
-          titleWarehouse:
-            w.titleWarehouse === 2 || w.titleWarehouse === "Cold"
-              ? "Cold"
-              : "Normal",
-        })) as WarehouseItem[];
+        return arr.map((w) => {
+          const titleRaw = w.titleWarehouse;
+          const title: "Normal" | "Cold" =
+            titleRaw === 2 || titleRaw === "Cold" ? "Cold" : "Normal";
+
+          return {
+            id: (w.id as number) ?? 0,
+            name: (w.name as string) ?? "",
+            location: (w.location as string) ?? "",
+            titleWarehouse: title,
+            minColdStorageHours:
+              (w.minColdStorageHours as number | null | undefined) ??
+              (w.MinColdStorageHours as number | null | undefined) ??
+              null,
+            minReceiptWeight:
+              (w.minReceiptWeight as number | null | undefined) ??
+              (w.MinReceiptWeight as number | null | undefined) ??
+              null,
+          } satisfies WarehouseItem;
+        });
       },
     }),
 
@@ -71,9 +84,22 @@ export const userApi = api.injectEndpoints({
       transformResponse: (w: unknown) => {
         const item = w as Record<string, unknown>;
         const tw = item.titleWarehouse;
+        const title: "Normal" | "Cold" =
+          tw === 2 || tw === "Cold" ? "Cold" : "Normal";
+
         return {
-          ...item,
-          titleWarehouse: tw === 2 || tw === "Cold" ? "Cold" : "Normal",
+          id: (item.id as number) ?? 0,
+          name: (item.name as string) ?? "",
+          location: (item.location as string) ?? "",
+          titleWarehouse: title,
+          minColdStorageHours:
+            (item.minColdStorageHours as number | null | undefined) ??
+            (item.MinColdStorageHours as number | null | undefined) ??
+            null,
+          minReceiptWeight:
+            (item.minReceiptWeight as number | null | undefined) ??
+            (item.MinReceiptWeight as number | null | undefined) ??
+            null,
         } as WarehouseItem;
       },
     }),

@@ -49,7 +49,7 @@ const CreateProductVariant = () => {
 
   const form = useForm<ProductVariantDto>({
     resolver: zodResolver(ProductVariantSchema),
-    defaultValues: { imageUrl: "" },
+    defaultValues: { imageUrl: "", minReceiptWeight: undefined },
   });
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -226,16 +226,16 @@ const CreateProductVariant = () => {
             </div>
           </div>
 
-          {/* Section 3 — Price & ShelfLife */}
+          {/* Section 3 — Price, ShelfLife & MinReceiptWeight */}
           <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-50 flex items-center gap-3">
               <div className="h-7 w-7 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-sm">
                 <BadgeDollarSign size={13} className="text-white" />
               </div>
-              <span className="text-sm font-semibold text-slate-700">Giá & Hạn sử dụng</span>
+              <span className="text-sm font-semibold text-slate-700">Giá, Hạn sử dụng & Định mức nhập</span>
             </div>
             <div className="p-6">
-              <div className="grid grid-cols-2 gap-5">
+              <div className="grid grid-cols-3 gap-5">
                 <Field label="Giá bán (VNĐ) *" error={form.formState.errors.price?.message}>
                   <div className="relative">
                     <input
@@ -260,6 +260,23 @@ const CreateProductVariant = () => {
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400">ngày</span>
                   </div>
+                </Field>
+
+                <Field
+                  label="Định mức tối thiểu (kg) *"
+                  error={form.formState.errors.minReceiptWeight?.message}
+                >
+                  <input
+                    type="number"
+                    step="0.01"
+                    {...form.register("minReceiptWeight", {
+                      valueAsNumber: true,
+                    })}
+                    placeholder="Nhập định mức tối thiểu (kg)"
+                    className={inputCls(
+                      !!form.formState.errors.minReceiptWeight,
+                    )}
+                  />
                 </Field>
               </div>
             </div>

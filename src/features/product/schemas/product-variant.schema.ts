@@ -20,6 +20,9 @@ export const ProductVariantSchema = z.object({
     .string()
     .trim()
     .min(1, "Vui lòng nhập URL ảnh"),
+  minReceiptWeight: z
+    .number({ message: "Vui lòng nhập định mức tối thiểu (kg)" })
+    .min(0, "Định mức tối thiểu (kg) phải >= 0"),
 });
 
 export type ProductVariantDto = z.infer<typeof ProductVariantSchema>;

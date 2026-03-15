@@ -53,6 +53,11 @@ export type PurchaseOrderDetailResponse = {
   receivedWeight: number;
   remainingWeight: number;
   harvestDate: string;
+  /**
+   * Tên người duyệt dòng PO (nếu BE trả về).
+   * BE field: NameApprover.
+   */
+  approverName?: string;
 };
 
 export type PurchaseOrderResponse = {

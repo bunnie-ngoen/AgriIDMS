@@ -259,7 +259,7 @@ export default function PurchaseOrderList() {
         </div>
       </div>
 
-      {/* Modal chi tiết đơn mua */}
+      {/* Modal chi tiết đơn mua — style giống modal cập nhật nhà cung cấp */}
       {detailModalId != null && (
       <div
         className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
@@ -269,94 +269,154 @@ export default function PurchaseOrderList() {
           aria-labelledby="modal-title"
         >
           <div
-            className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-slate-100"
+            className="bg-white rounded-[18px] shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col border border-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 flex-shrink-0 bg-white">
-              <h2 id="modal-title" className="text-lg font-semibold text-slate-900">
-                Chi tiết đơn mua
-              </h2>
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white">
+              <div>
+                <h2
+                  id="modal-title"
+                  className="text-base md:text-lg font-semibold text-slate-900"
+                >
+                  Chi tiết đơn mua
+                </h2>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Xem thông tin và duyệt đơn mua hàng.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => setDetailModalId(null)}
-                className="p-2 rounded-lg text-slate-500 hover:bg-slate-100"
+                className="h-8 w-8 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100"
                 aria-label="Đóng"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            <div className="overflow-y-auto flex-1 px-5 py-4 bg-slate-50">
+            {/* Modal body */}
+            <div className="overflow-y-auto flex-1 px-6 py-5 bg-slate-50">
               {loadingOrder || !order ? (
                 <div className="flex justify-center py-12">
                   <Loader2 size={32} className="animate-spin text-slate-400" />
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                    <div>
-                      <span className="text-slate-500 block text-xs font-medium">Mã đơn</span>
-                      <p className="font-semibold text-slate-900 mt-1">{order.orderCode}</p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-xs font-medium">Nhà cung cấp</span>
-                      <p className="font-medium text-slate-900 mt-1">{order.supplierName}</p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-xs font-medium">Người tạo</span>
-                      <p className="font-medium text-slate-900 mt-1">
-                        {order.createdByName && order.createdByName.trim().length > 0
-                          ? order.createdByName
-                          : "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-xs font-medium">Trạng thái</span>
-                      <p className="font-medium mt-1">
-                        <span
-                          className={
-                            order.status === "Approved"
-                              ? "text-emerald-600"
-                              : order.status === "Pending"
-                                ? "text-amber-600"
-                                : "text-slate-600"
-                          }
-                        >
-                          {order.status}
+                  {/* Thông tin đơn */}
+                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm mb-4">
+                    <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                          Mã đơn
                         </span>
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-xs font-medium">Ngày đặt</span>
-                      <p className="font-medium text-slate-900 mt-1">
-                        {order.orderDate
-                          ? new Date(order.orderDate).toLocaleDateString("vi-VN")
-                          : "—"}
-                      </p>
+                        <p className="font-semibold text-slate-900 mt-1">
+                          {order.orderCode}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                          Nhà cung cấp
+                        </span>
+                        <p className="font-medium text-slate-900 mt-1">
+                          {order.supplierName}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                          Người tạo
+                        </span>
+                        <p className="font-medium text-slate-900 mt-1">
+                          {order.createdByName &&
+                          order.createdByName.trim().length > 0
+                            ? order.createdByName
+                            : "—"}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                          Trạng thái
+                        </span>
+                        <p className="font-medium mt-1">
+                          <span
+                            className={
+                              order.status === "Approved"
+                                ? "text-emerald-600"
+                                : order.status === "Pending"
+                                  ? "text-amber-600"
+                                  : "text-rose-600"
+                            }
+                          >
+                            {order.status}
+                          </span>
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                          Ngày đặt
+                        </span>
+                        <p className="font-medium text-slate-900 mt-1">
+                          {order.orderDate
+                            ? new Date(
+                                order.orderDate,
+                              ).toLocaleDateString("vi-VN")
+                            : "—"}
+                        </p>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                  {/* Bảng chi tiết */}
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200">
-                          <th className="text-left py-2 px-3 font-semibold text-slate-700">Sản phẩm</th>
-                          <th className="text-right py-2 px-3 font-semibold text-slate-700">KL đặt</th>
-                          <th className="text-right py-2 px-3 font-semibold text-slate-700">Đã nhận</th>
-                          <th className="text-right py-2 px-3 font-semibold text-slate-700">Đơn giá</th>
-                          <th className="text-right py-2 px-3 font-semibold text-slate-700">Thu hoạch</th>
+                          <th className="text-left py-2.5 px-3 font-semibold text-slate-700">
+                            Sản phẩm
+                          </th>
+                          <th className="text-right py-2.5 px-3 font-semibold text-slate-700">
+                            KL đặt
+                          </th>
+                          <th className="text-right py-2.5 px-3 font-semibold text-slate-700">
+                            Đã nhận
+                          </th>
+                          <th className="text-right py-2.5 px-3 font-semibold text-slate-700">
+                            Còn lại
+                          </th>
+                          <th className="text-right py-2.5 px-3 font-semibold text-slate-700">
+                            Đơn giá
+                          </th>
+                          <th className="text-right py-2.5 px-3 font-semibold text-slate-700">
+                            Thu hoạch
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
                         {order.details?.map((d) => (
-                        <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50">
-                            <td className="py-2 px-3 text-slate-800">{d.productName}</td>
-                            <td className="py-2 px-3 text-right text-slate-700">{d.orderedWeight}</td>
-                            <td className="py-2 px-3 text-right text-slate-700">{d.receivedWeight}</td>
-                            <td className="py-2 px-3 text-right text-slate-700">{d.unitPrice}</td>
-                            <td className="py-2 px-3 text-right text-slate-600">
+                          <tr
+                            key={d.id}
+                            className="border-b border-slate-100 hover:bg-slate-50"
+                          >
+                            <td className="py-2.5 px-3 text-slate-800">
+                              {d.productName}
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-slate-700">
+                              {d.orderedWeight}
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-slate-700">
+                              {d.receivedWeight}
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-slate-700">
+                              {d.remainingWeight}
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-slate-700">
+                              {d.unitPrice.toLocaleString("vi-VN")}
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-slate-600">
                               {d.harvestDate
-                                ? new Date(d.harvestDate).toLocaleDateString("vi-VN")
+                                ? new Date(
+                                    d.harvestDate,
+                                  ).toLocaleDateString("vi-VN")
                                 : "—"}
                             </td>
                           </tr>
@@ -368,16 +428,21 @@ export default function PurchaseOrderList() {
               )}
             </div>
 
+            {/* Modal footer */}
             {order && !loadingOrder && (
-              <div className="flex flex-wrap items-center justify-end gap-2 p-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
+              <div className="flex flex-wrap items-center justify-end gap-2 px-6 py-4 border-t border-slate-100 bg-slate-50 flex-shrink-0">
                 {canApprove && (
                   <button
                     type="button"
                     onClick={handleApprove}
                     disabled={isApproving}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50"
                   >
-                    {isApproving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                    {isApproving ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <CheckCircle size={16} />
+                    )}
                     Duyệt đơn
                   </button>
                 )}
@@ -395,9 +460,13 @@ export default function PurchaseOrderList() {
                         type="button"
                         onClick={() => setConfirmDelete(true)}
                         disabled={isDeleting}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 text-red-600 text-sm font-medium hover:bg-red-100"
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 text-red-600 text-sm font-medium hover:bg-red-100 disabled:opacity-50"
                       >
-                        {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                        {isDeleting ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={16} />
+                        )}
                         Xóa
                       </button>
                     ) : (
@@ -406,7 +475,7 @@ export default function PurchaseOrderList() {
                           type="button"
                           onClick={handleDelete}
                           disabled={isDeleting}
-                          className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-medium hover:bg-red-700"
+                          className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
                         >
                           {isDeleting ? "Đang xóa..." : "Chắc chắn xóa"}
                         </button>

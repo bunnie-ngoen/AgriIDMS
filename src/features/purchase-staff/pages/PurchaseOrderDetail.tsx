@@ -87,9 +87,9 @@ export default function PurchaseOrderDetail() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-5 py-6">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-4xl mx-auto space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-4">
             <button
               type="button"
@@ -110,7 +110,7 @@ export default function PurchaseOrderDetail() {
                       ? "text-emerald-600"
                       : order.status === "Pending"
                         ? "text-amber-600"
-                        : "text-slate-600"
+                        : "text-rose-600"
                   }
                 >
                   {order.status}
@@ -173,74 +173,129 @@ export default function PurchaseOrderDetail() {
         </div>
       </div>
 
-      {/* Card thông tin đơn + chi tiết */}
-      <div className="mt-2 rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
-        <div className="px-6 py-5 border-b border-slate-100 grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="text-slate-500 block text-xs font-medium">Nhà cung cấp</span>
-            <p className="font-medium text-slate-900 mt-1">{order.supplierName}</p>
-          </div>
-          <div>
-            <span className="text-slate-500 block text-xs font-medium">Trạng thái</span>
-            <p className="font-medium mt-1">
-              <span
-                className={
-                  order.status === "Approved"
-                    ? "text-emerald-600"
-                    : order.status === "Pending"
-                      ? "text-amber-600"
-                      : "text-slate-600"
-                }
-              >
-                {order.status}
+        {/* Summary card */}
+        <div className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+          <div className="px-6 py-5 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <span className="text-slate-500 block text-xs font-medium">
+                Nhà cung cấp
               </span>
-            </p>
-          </div>
-          <div>
-            <span className="text-slate-500 block text-xs font-medium">Người tạo</span>
-            <p className="font-medium text-slate-900 mt-1">
-              {order.createdByName && order.createdByName.trim().length > 0
-                ? order.createdByName
-                : "-"}
-            </p>
-          </div>
-          <div>
-            <span className="text-slate-500 block text-xs font-medium">Ngày đặt</span>
-            <p className="font-medium text-slate-900 mt-1">
-              {order.orderDate ? new Date(order.orderDate).toLocaleDateString("vi-VN") : "-"}
-            </p>
+              <p className="font-medium text-slate-900 mt-1">
+                {order.supplierName}
+              </p>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-xs font-medium">
+                Trạng thái
+              </span>
+              <p className="font-medium mt-1">
+                <span
+                  className={
+                    order.status === "Approved"
+                      ? "text-emerald-600"
+                      : order.status === "Pending"
+                        ? "text-amber-600"
+                        : "text-rose-600"
+                  }
+                >
+                  {order.status}
+                </span>
+              </p>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-xs font-medium">
+                Người tạo
+              </span>
+              <p className="font-medium text-slate-900 mt-1">
+                {order.createdByName && order.createdByName.trim().length > 0
+                  ? order.createdByName
+                  : "-"}
+              </p>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-xs font-medium">
+                Ngày đặt
+              </span>
+              <p className="font-medium text-slate-900 mt-1">
+                {order.orderDate
+                  ? new Date(order.orderDate).toLocaleDateString("vi-VN")
+                  : "-"}
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="text-left py-3 px-4 font-semibold text-slate-700">Sản phẩm</th>
-                <th className="text-right py-3 px-4 font-semibold text-slate-700">KL đặt</th>
-                <th className="text-right py-3 px-4 font-semibold text-slate-700">Đã nhận</th>
-                <th className="text-right py-3 px-4 font-semibold text-slate-700">Đơn giá</th>
-                <th className="text-right py-3 px-4 font-semibold text-slate-700">Thu hoạch</th>
-              </tr>
-            </thead>
-            <tbody>
-              {order.details?.map((d) => (
-                <tr key={d.id} className="border-b border-slate-100">
-                  <td className="py-3 px-4 text-slate-800">{d.productName}</td>
-                  <td className="py-3 px-4 text-right text-slate-700">{d.orderedWeight}</td>
-                  <td className="py-3 px-4 text-right text-slate-700">{d.receivedWeight}</td>
-                  <td className="py-3 px-4 text-right text-slate-700">{d.unitPrice}</td>
-                  <td className="py-3 px-4 text-right text-slate-600">
-                    {d.harvestDate
-                      ? new Date(d.harvestDate).toLocaleDateString("vi-VN")
-                      : "-"}
-                  </td>
+        {/* Details table */}
+        <div className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h2 className="text-sm font-semibold text-slate-800">
+              Dòng chi tiết đơn mua
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="text-left py-3 px-4 font-semibold text-slate-700">
+                    Sản phẩm
+                  </th>
+                  <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                    KL đặt
+                  </th>
+                  <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                    Đã nhận
+                  </th>
+                  <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                    Còn lại
+                  </th>
+                  <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                    Đơn giá
+                  </th>
+                  <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                    Người duyệt
+                  </th>
+                  <th className="text-right py-3 px-4 font-semibold text-slate-700">
+                    Thu hoạch
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {order.details?.map((d) => (
+                  <tr
+                    key={d.id}
+                    className="border-b border-slate-100 hover:bg-slate-50/60"
+                  >
+                    <td className="py-3 px-4 text-slate-800">
+                      {d.productName}
+                    </td>
+                    <td className="py-3 px-4 text-right text-slate-700">
+                      {d.orderedWeight}
+                    </td>
+                    <td className="py-3 px-4 text-right text-slate-700">
+                      {d.receivedWeight}
+                    </td>
+                    <td className="py-3 px-4 text-right text-slate-700">
+                      {d.remainingWeight}
+                    </td>
+                    <td className="py-3 px-4 text-right text-slate-700">
+                      {d.unitPrice.toLocaleString("vi-VN")}
+                    </td>
+                    <td className="py-3 px-4 text-right text-slate-700">
+                      {d.approverName && d.approverName.trim().length > 0
+                        ? d.approverName
+                        : "—"}
+                    </td>
+                    <td className="py-3 px-4 text-right text-slate-600">
+                      {d.harvestDate
+                        ? new Date(d.harvestDate).toLocaleDateString("vi-VN")
+                        : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
       </div>
     </div>
   );

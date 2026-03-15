@@ -1,15 +1,9 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import { useState } from "react";
 import {
   useGetGoodsReceiptByIdQuery,
   useAddGoodsReceiptDetailMutation,
   useUpdateTruckWeightMutation,
-  useQcInspectionMutation,
-  useCreateBoxesMutation,
-  useApproveGoodsReceiptMutation,
-  useManagerApproveGoodsReceiptMutation,
-  useManagerRejectGoodsReceiptMutation,
 } from "../api/goods-receipt.api";
 import { useGetPurchaseOrderByIdQuery } from "../../purchase-order/api/purchase-order.api";
 import { ArrowLeft, Loader2 } from "lucide-react";
@@ -25,17 +19,6 @@ type AddDetailForm = {
   receivedWeight: number;
 };
 
-type QCForm = {
-  usableWeight: number;
-  qcResult: "Passed" | "Failed";
-  qcNote?: string;
-};
-
-type CreateBoxesForm = {
-  lotId: number;
-  boxSize: number;
-};
-
 export default function GoodsReceiptDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -45,7 +28,6 @@ export default function GoodsReceiptDetail() {
     data: receipt,
     isLoading,
     error,
-    refetch,
   } = useGetGoodsReceiptByIdQuery(receiptId, {
     skip: !receiptId || Number.isNaN(receiptId),
   });
@@ -54,20 +36,6 @@ export default function GoodsReceiptDetail() {
     useAddGoodsReceiptDetailMutation();
   const [updateTruckWeight, { isLoading: isUpdatingTruck }] =
     useUpdateTruckWeightMutation();
-  const [qcInspection, { isLoading: isQcLoading }] =
-    useQcInspectionMutation();
-  const [createBoxes, { isLoading: isCreatingBoxes }] =
-    useCreateBoxesMutation();
-  const [approveReceipt, { isLoading: isApproving }] =
-    useApproveGoodsReceiptMutation();
-  const [managerApprove, { isLoading: isManagerApproving }] =
-    useManagerApproveGoodsReceiptMutation();
-  const [managerReject, { isLoading: isManagerRejecting }] =
-    useManagerRejectGoodsReceiptMutation();
-
-  const [selectedDetailIdForQc, setSelectedDetailIdForQc] = useState<
-    number | null
-  >(null);
 
   const poId = receipt?.purchaseOrderId ?? 0;
   const {
@@ -88,21 +56,6 @@ export default function GoodsReceiptDetail() {
     defaultValues: {
       purchaseOrderDetailId: 0,
       receivedWeight: 0,
-    },
-  });
-
-  const qcForm = useForm<QCForm>({
-    defaultValues: {
-      usableWeight: 0,
-      qcResult: "Passed",
-      qcNote: "",
-    },
-  });
-
-  const createBoxesForm = useForm<CreateBoxesForm>({
-    defaultValues: {
-      lotId: 0,
-      boxSize: 0,
     },
   });
 
@@ -130,6 +83,11 @@ export default function GoodsReceiptDetail() {
     if (status === "Rejected") return "text-red-600";
     return "text-slate-600";
   };
+
+  const canEditDetails =
+    receipt.status === "Draft" || receipt.status === "Received";
+  const canUpdateTruckWeight =
+    receipt.status === "Draft" || receipt.status === "Received";
 
   const handleSubmitTruckWeight = async (values: TruckWeightForm) => {
     const toastId = toast.loading("Đang cập nhật trọng lượng xe...");
@@ -163,17 +121,6 @@ export default function GoodsReceiptDetail() {
       return;
     }
 
-    const remaining = Number(detail.remainingWeight ?? 0);
-    const received = Number(values.receivedWeight);
-    if (remaining > 0 && received > remaining + 1e-6) {
-      toast.error(
-        `Khối lượng nhận (${received.toFixed(
-          3,
-        )}) vượt quá số còn lại của dòng đơn mua (${remaining.toFixed(3)}).`,
-      );
-      return;
-    }
-
     const toastId = toast.loading("Đang thêm chi tiết phiếu nhập...");
     try {
       await addDetail({
@@ -193,158 +140,43 @@ export default function GoodsReceiptDetail() {
     }
   };
 
-  const handleOpenQcForDetail = (detailId: number, currentUsable: number) => {
-    setSelectedDetailIdForQc(detailId);
-    qcForm.reset({
-      usableWeight: currentUsable,
-      qcResult: "Passed",
-      qcNote: "",
-    });
-  };
-
-  const handleSubmitQc = async (values: QCForm) => {
-    if (!selectedDetailIdForQc) {
-      toast.error("Vui lòng chọn dòng chi tiết cần QC.");
-      return;
-    }
-    if (!values.usableWeight || Number(values.usableWeight) < 0) {
-      toast.error("Khối lượng dùng được phải >= 0.");
-      return;
-    }
-
-    const toastId = toast.loading("Đang cập nhật QC cho dòng chi tiết...");
-    try {
-      await qcInspection({
-        detailId: selectedDetailIdForQc,
-        usableWeight: Number(values.usableWeight),
-        qcResult: values.qcResult,
-        qcNote: values.qcNote,
-        goodsReceiptId: receipt.id,
-      }).unwrap();
-      toast.success("Cập nhật QC thành công.", { id: toastId });
-      setSelectedDetailIdForQc(null);
-      await refetch();
-    } catch (err: any) {
-      const msg =
-        err?.data?.message ||
-        err?.data?.error ||
-        "Cập nhật QC thất bại.";
-      toast.error(msg, { id: toastId });
-    }
-  };
-
-  const handleApprove = async () => {
-    if (!window.confirm("Bạn chắc chắn muốn duyệt phiếu nhập này?")) return;
-    const toastId = toast.loading("Đang duyệt phiếu nhập...");
-    try {
-      await approveReceipt(receipt.id).unwrap();
-      toast.success("Duyệt phiếu nhập thành công.", { id: toastId });
-      await refetch();
-    } catch (err: any) {
-      const msg =
-        err?.data?.message ||
-        err?.data?.error ||
-        "Duyệt phiếu nhập thất bại.";
-      toast.error(msg, { id: toastId });
-    }
-  };
-
-  const handleManagerApprove = async () => {
-    if (
-      !window.confirm("Manager xác nhận DUYỆT phiếu nhập này?")
-    )
-      return;
-    const toastId = toast.loading("Manager đang duyệt phiếu nhập...");
-    try {
-      await managerApprove(receipt.id).unwrap();
-      toast.success("Manager duyệt phiếu nhập thành công.", {
-        id: toastId,
-      });
-      await refetch();
-    } catch (err: any) {
-      const msg =
-        err?.data?.message ||
-        err?.data?.error ||
-        "Manager duyệt phiếu nhập thất bại.";
-      toast.error(msg, { id: toastId });
-    }
-  };
-
-  const handleManagerReject = async () => {
-    if (
-      !window.confirm("Manager xác nhận TỪ CHỐI phiếu nhập này?")
-    )
-      return;
-    const toastId = toast.loading("Manager đang từ chối phiếu nhập...");
-    try {
-      await managerReject(receipt.id).unwrap();
-      toast.success("Manager từ chối phiếu nhập thành công.", {
-        id: toastId,
-      });
-      await refetch();
-    } catch (err: any) {
-      const msg =
-        err?.data?.message ||
-        err?.data?.error ||
-        "Manager từ chối phiếu nhập thất bại.";
-      toast.error(msg, { id: toastId });
-    }
-  };
-
-  const handleSubmitCreateBoxes = async (values: CreateBoxesForm) => {
-    if (!values.lotId || values.lotId <= 0) {
-      toast.error("Vui lòng nhập LotId hợp lệ (tạm thời nhập tay).");
-      return;
-    }
-    if (!values.boxSize || values.boxSize <= 0) {
-      toast.error("Kích thước box phải > 0.");
-      return;
-    }
-
-    const toastId = toast.loading("Đang tạo box cho lot...");
-    try {
-      await createBoxes({
-        lotId: Number(values.lotId),
-        boxSize: Number(values.boxSize),
-      }).unwrap();
-      toast.success("Tạo box thành công.", { id: toastId });
-      createBoxesForm.reset({ lotId: 0, boxSize: 0 });
-      await refetch();
-    } catch (err: any) {
-      const msg =
-        err?.data?.message ||
-        err?.data?.error ||
-        "Tạo box thất bại.";
-      toast.error(msg, { id: toastId });
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-5 py-6">
       <div className="max-w-4xl mx-auto space-y-4">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-2">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => navigate("/admin/goods-receipts")}
+              className="h-10 w-10 rounded-2xl border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:border-slate-300 shadow-sm"
+            >
+              <ArrowLeft size={16} />
+            </button>
+            <div>
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                Bước 1 · Nhập hàng vào kho · {receipt.receiptCode}
+              </h1>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {receipt.supplierName} · {receipt.warehouseName} ·{" "}
+                <span className={statusClass(receipt.status)}>
+                  {receipt.status}
+                </span>
+              </p>
+            </div>
+          </div>
           <button
             type="button"
-            onClick={() => navigate("/admin/goods-receipts")}
-            className="h-10 w-10 rounded-2xl border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:border-slate-300 shadow-sm"
+            onClick={() =>
+              navigate(`/admin/goods-receipts/${receipt.id}/qc`)
+            }
+            className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
           >
-            <ArrowLeft size={16} />
+            Mở màn QC
           </button>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-              Phiếu nhập kho · {receipt.receiptCode}
-            </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {receipt.supplierName} · {receipt.warehouseName} ·{" "}
-              <span className={statusClass(receipt.status)}>
-                {receipt.status}
-              </span>
-            </p>
-          </div>
         </div>
 
-        {/* Summary card + actions */}
+        {/* Summary card */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="px-6 py-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
@@ -385,67 +217,22 @@ export default function GoodsReceiptDetail() {
               </p>
             </div>
           </div>
-          <div className="px-6 py-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs text-slate-500">
-              Trạng thái hiện tại:{" "}
-              <span className={statusClass(receipt.status)}>
-                {receipt.status}
-              </span>
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {(receipt.status === "Draft" ||
-                receipt.status === "Received" ||
-                receipt.status === "QCCompleted" ||
-                receipt.status === "PendingManagerApproval") && (
-                <button
-                  type="button"
-                  onClick={handleApprove}
-                  disabled={isApproving}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold text-white px-3 py-1.5 disabled:opacity-60"
-                >
-                  {isApproving && (
-                    <Loader2 size={12} className="animate-spin" />
-                  )}
-                  Duyệt phiếu (Admin)
-                </button>
-              )}
-              {receipt.status === "PendingManagerApproval" && (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleManagerApprove}
-                    disabled={isManagerApproving}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-xs font-semibold text-white px-3 py-1.5 disabled:opacity-60"
-                  >
-                    {isManagerApproving && (
-                      <Loader2 size={12} className="animate-spin" />
-                    )}
-                    Manager duyệt
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleManagerReject}
-                    disabled={isManagerRejecting}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-xs font-semibold text-white px-3 py-1.5 disabled:opacity-60"
-                  >
-                    {isManagerRejecting && (
-                      <Loader2 size={12} className="animate-spin" />
-                    )}
-                    Manager từ chối
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
         </div>
 
-        {/* Truck weight + Add detail forms */}
+        {/* Bước 1: nhập hàng (trọng lượng xe + dòng chi tiết) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Truck weight */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
-            <h2 className="text-sm font-semibold text-slate-800">
-              Trọng lượng xe
-            </h2>
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="text-sm font-semibold text-slate-800">
+                Bước 1 · Trọng lượng xe
+              </h2>
+              {!canUpdateTruckWeight && (
+                <p className="text-[11px] text-slate-400">
+                  Đã khoá sau khi phiếu được duyệt.
+                </p>
+              )}
+            </div>
             <form
               onSubmit={truckForm.handleSubmit(handleSubmitTruckWeight)}
               className="space-y-3 text-sm"
@@ -453,7 +240,7 @@ export default function GoodsReceiptDetail() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Gross weight (kg)
+                    Tổng trọng lượng xe (gross weight, kg)
                   </label>
                   <input
                     type="number"
@@ -467,7 +254,7 @@ export default function GoodsReceiptDetail() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Tare weight (kg)
+                    Trọng lượng bì (tare weight, kg)
                   </label>
                   <input
                     type="number"
@@ -482,7 +269,7 @@ export default function GoodsReceiptDetail() {
               </div>
               <button
                 type="submit"
-                disabled={isUpdatingTruck}
+                disabled={isUpdatingTruck || !canUpdateTruckWeight}
                 className="w-full rounded-xl py-2.5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isUpdatingTruck ? (
@@ -499,9 +286,16 @@ export default function GoodsReceiptDetail() {
 
           {/* Add detail */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
-            <h2 className="text-sm font-semibold text-slate-800">
-              Thêm chi tiết phiếu
-            </h2>
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="text-sm font-semibold text-slate-800">
+                Bước 1 · Thêm dòng chi tiết phiếu
+              </h2>
+              {!canEditDetails && (
+                <p className="text-[11px] text-slate-400">
+                  Chỉ thêm khi phiếu đang Nháp / Đã nhập số liệu.
+                </p>
+              )}
+            </div>
             {isLoadingPo && (
               <p className="text-xs text-slate-500">
                 Đang tải đơn mua liên quan...
@@ -520,7 +314,7 @@ export default function GoodsReceiptDetail() {
               >
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Dòng đơn mua *
+                    Chọn dòng sản phẩm từ đơn mua *
                   </label>
                   <select
                     {...addDetailForm.register("purchaseOrderDetailId", {
@@ -528,7 +322,9 @@ export default function GoodsReceiptDetail() {
                     })}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
                   >
-                    <option value={0}>Chọn dòng đơn mua</option>
+                    <option value={0}>
+                      Chọn sản phẩm / dòng chi tiết trong đơn mua
+                    </option>
                     {purchaseOrder.details.map((d) => (
                       <option key={d.id} value={d.id}>
                         {d.productName} — KL đặt: {d.orderedWeight} kg, còn lại:{" "}
@@ -553,7 +349,7 @@ export default function GoodsReceiptDetail() {
                 </div>
                 <button
                   type="submit"
-                  disabled={isAdding}
+                  disabled={isAdding || !canEditDetails}
                   className="w-full rounded-xl py-2.5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {isAdding ? (
@@ -570,7 +366,7 @@ export default function GoodsReceiptDetail() {
           </div>
         </div>
 
-        {/* Details table + QC form + Boxes */}
+        {/* Bảng chi tiết (chỉ đọc) */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100">
             <h2 className="text-sm font-semibold text-slate-800">
@@ -595,9 +391,6 @@ export default function GoodsReceiptDetail() {
                   </th>
                   <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                     Kết quả QC
-                  </th>
-                  <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    Thao tác
                   </th>
                 </tr>
               </thead>
@@ -632,155 +425,12 @@ export default function GoodsReceiptDetail() {
                       <td className="px-5 py-3 text-slate-700">
                         {d.qcResult || "Chưa QC"}
                       </td>
-                      <td className="px-5 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleOpenQcForDetail(d.id, d.usableWeight)
-                          }
-                          className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200"
-                        >
-                          QC dòng
-                        </button>
-                      </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
           </div>
-
-          {/* QC form section */}
-          {selectedDetailIdForQc && (
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/60">
-              <h3 className="text-xs font-semibold text-slate-800 mb-3">
-                QC cho dòng chi tiết #{selectedDetailIdForQc}
-              </h3>
-              <form
-                onSubmit={qcForm.handleSubmit(handleSubmitQc)}
-                className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm items-end"
-              >
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    KL dùng được (kg)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    {...qcForm.register("usableWeight", {
-                      valueAsNumber: true,
-                    })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Kết quả QC
-                  </label>
-                  <select
-                    {...qcForm.register("qcResult")}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
-                  >
-                    <option value="Passed">Passed</option>
-                    <option value="Failed">Failed</option>
-                  </select>
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Ghi chú
-                  </label>
-                  <input
-                    type="text"
-                    {...qcForm.register("qcNote")}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
-                    placeholder="Ghi chú QC (tuỳ chọn)"
-                  />
-                </div>
-                <div className="flex gap-2 md:col-span-4 justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedDetailIdForQc(null)}
-                    className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100"
-                  >
-                    Huỷ
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isQcLoading}
-                    className="px-4 py-2 rounded-xl bg-slate-900 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-60 flex items-center gap-2"
-                  >
-                    {isQcLoading && (
-                      <Loader2 size={14} className="animate-spin" />
-                    )}
-                    Lưu QC
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* Create boxes section (tạm thời nhập LotId tay) */}
-          {receipt.status === "Approved" && (
-            <div className="px-6 py-4 border-t border-slate-100 bg-emerald-50/40">
-              <h3 className="text-xs font-semibold text-slate-800 mb-2">
-                Tạo box từ Lot (FE tạm thời cho nhập LotId thủ công)
-              </h3>
-              <p className="text-[11px] text-slate-500 mb-3">
-                Khi BE bổ sung API trả danh sách Lot theo phiếu nhập, phần này
-                có thể đổi sang dropdown. Hiện tại nhập LotId thủ công để gọi
-                API `GenerateBoxesAsync`.
-              </p>
-              <form
-                onSubmit={createBoxesForm.handleSubmit(
-                  handleSubmitCreateBoxes,
-                )}
-                className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm items-end"
-              >
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    LotId
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    {...createBoxesForm.register("lotId", {
-                      valueAsNumber: true,
-                    })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
-                    placeholder="Nhập LotId"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Box size (kg)
-                  </label>
-                  <input
-                    type="number"
-                    min={0.01}
-                    step="0.01"
-                    {...createBoxesForm.register("boxSize", {
-                      valueAsNumber: true,
-                    })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg.white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
-                    placeholder="VD: 5 (kg mỗi box)"
-                  />
-                </div>
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={isCreatingBoxes}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 flex items-center gap-2"
-                  >
-                    {isCreatingBoxes && (
-                      <Loader2 size={14} className="animate-spin" />
-                    )}
-                    Tạo box
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
         </div>
       </div>
     </div>
