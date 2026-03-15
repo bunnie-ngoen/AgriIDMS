@@ -99,6 +99,9 @@ const CreateGoodsReceiptPage = lazy(
 const GoodsReceiptDetailPage = lazy(
   () => import("../goods-receipt/pages/GoodsReceiptDetail")
 );
+const GoodsReceiptQCPage = lazy(
+  () => import("../goods-receipt/pages/GoodsReceiptQC")
+);
 
 export const adminRoutes = [
   {
@@ -147,6 +150,7 @@ export const adminRoutes = [
       { path: "goods-receipts", element: <GoodsReceiptListPage /> },
       { path: "goods-receipts/create", element: <CreateGoodsReceiptPage /> },
       { path: "goods-receipts/:id", element: <GoodsReceiptDetailPage /> },
+      { path: "goods-receipts/:id/qc", element: <GoodsReceiptQCPage /> },
     ],
   },
 ];

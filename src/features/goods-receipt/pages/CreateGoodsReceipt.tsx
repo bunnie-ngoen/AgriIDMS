@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -59,6 +59,33 @@ export default function CreateGoodsReceipt() {
     },
   });
 
+  const watchedSupplierId = form.watch("supplierId");
+  const watchedPurchaseOrderId = form.watch("purchaseOrderId");
+
+  // Nếu đổi nhà cung cấp thì reset lại đơn mua, tránh chọn nhầm PO của NCC khác
+  useEffect(() => {
+    if (!watchedSupplierId || !purchaseOrders?.length) {
+      if (form.getValues("purchaseOrderId") !== 0) {
+        form.setValue("purchaseOrderId", 0, {
+          shouldValidate: true,
+          shouldDirty: true,
+        });
+      }
+      return;
+    }
+
+    const currentPo = purchaseOrders.find(
+      (po) => po.id === form.getValues("purchaseOrderId"),
+    );
+
+    if (currentPo && currentPo.supplierId !== watchedSupplierId) {
+      form.setValue("purchaseOrderId", 0, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    }
+  }, [watchedSupplierId, purchaseOrders, form]);
+
   const onSubmit = async (values: FormValues) => {
     setServerMessage(null);
     const toastId = toast.loading("Đang tạo phiếu nhập kho...");
@@ -94,9 +121,10 @@ export default function CreateGoodsReceipt() {
     }
   };
 
-  const watchedSupplierId = form.watch("supplierId");
   const filteredPurchaseOrders = purchaseOrders.filter((po) => {
-    if (watchedSupplierId && po.supplierId !== watchedSupplierId) return false;
+    // Bắt buộc phải chọn nhà cung cấp trước khi nhìn thấy đơn mua
+    if (!watchedSupplierId || watchedSupplierId === 0) return false;
+    if (po.supplierId !== watchedSupplierId) return false;
     return po.status === "Approved";
   });
 
@@ -145,7 +173,9 @@ export default function CreateGoodsReceipt() {
                   <select
                     {...form.register("supplierId", { valueAsNumber: true })}
                     className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
-                    disabled={isLoadingSuppliers || isSuppliersError}
+                    disabled={
+                      isLoadingSuppliers || isSuppliersError
+                    }
                   >
                     <option value={0}>
                       {isLoadingSuppliers
@@ -161,6 +191,11 @@ export default function CreateGoodsReceipt() {
                   {form.formState.errors.supplierId && (
                     <p className="text-[11px] text-red-500 mt-1">
                       {form.formState.errors.supplierId.message}
+                    </p>
+                  )}
+                  {!watchedSupplierId && !form.formState.errors.supplierId && (
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Hãy chọn nhà cung cấp trước, sau đó mới chọn đơn mua tương ứng.
                     </p>
                   )}
                 </div>
@@ -262,18 +297,23 @@ export default function CreateGoodsReceipt() {
             </div>
             <div className="p-6 text-sm space-y-3">
               <p className="text-xs text-slate-500">
-                Chỉ hiển thị các đơn mua đã được duyệt (Approved) và, nếu đã
-                chọn, thuộc cùng nhà cung cấp.
+                Chỉ hiển thị các đơn mua đã được duyệt (Approved) của nhà cung cấp đã chọn.
+                Bạn cần chọn nhà cung cấp ở bước trên trước khi chọn đơn mua.
               </p>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Đơn mua hàng *
+                  Đơn mua hàng * (theo nhà cung cấp đã chọn)
                 </label>
                 <select
                   {...form.register("purchaseOrderId", { valueAsNumber: true })}
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
+                  disabled={!watchedSupplierId || watchedSupplierId === 0}
                 >
-                  <option value={0}>Chọn đơn mua đã duyệt</option>
+                  <option value={0}>
+                    {(!watchedSupplierId || watchedSupplierId === 0)
+                      ? "Vui lòng chọn nhà cung cấp trước"
+                      : "Chọn đơn mua đã duyệt của nhà cung cấp này"}
+                  </option>
                   {filteredPurchaseOrders.map((po) => (
                     <option key={po.id} value={po.id}>
                       {po.orderCode} — {po.supplierName} (
