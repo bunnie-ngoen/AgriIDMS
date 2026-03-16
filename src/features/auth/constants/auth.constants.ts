@@ -9,7 +9,6 @@ export const AUTH_ROLE = {
 
 export type UserRole = typeof AUTH_ROLE[keyof typeof AUTH_ROLE];
 
-// auth.constants.ts
 export const ROLE_DASHBOARD_MAP: Record<UserRole, string> = {
     [AUTH_ROLE.ADMIN]: '/admin/dashboard',
     [AUTH_ROLE.MANAGER]: '/manager/dashboard',
@@ -18,3 +17,11 @@ export const ROLE_DASHBOARD_MAP: Record<UserRole, string> = {
     [AUTH_ROLE.PURCHASING_STAFF]: '/purchase-staff/dashboard',
     [AUTH_ROLE.CUSTOMER]: '/customer/dashboard',
 };
+
+export const ROLES_WITH_DASHBOARD: UserRole[] = [
+    AUTH_ROLE.ADMIN,
+    AUTH_ROLE.MANAGER,
+    AUTH_ROLE.WAREHOUSE_STAFF,
+    AUTH_ROLE.SALES_STAFF,
+    AUTH_ROLE.PURCHASING_STAFF,
+];

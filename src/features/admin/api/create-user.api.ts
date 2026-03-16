@@ -345,8 +345,6 @@ export const userApi = api.injectEndpoints({
 export const {
   useGetDeletedUsersQuery,
   useRestoreUserMutation,
-  useUpdateUserRoleMutation,
-  useUpdateUserStatusMutation,
   useCreateUserMutation,
   useGetUsersQuery,
   useDeleteUserMutation,

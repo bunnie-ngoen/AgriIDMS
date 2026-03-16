@@ -1,11 +1,12 @@
 export const ROUTES = {
     HOME: "/",
     GIOI_THIEU: "/gioi-thieu",
+    PRODUCT_DETAIL: "/product/:id",
     LOGIN: "/login",
     REGISTER: "/register",
     UNAUTHORIZED: "/unauthorized",
     FORGET_PASSWORD : "/forget-password",
-    
+    PROFILE: "/profile",
     // Admin routes
     ADMIN_DASHBOARD: "/admin/dashboard",
     ADMIN_USERS: "/admin/users",

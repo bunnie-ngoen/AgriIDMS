@@ -1,0 +1,283 @@
+import { useParams, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Leaf, ShoppingCart, ArrowLeft, Check, AlertCircle } from "lucide-react";
+import { useGetHomeProductDetailQuery, useAddToCartMutation } from "../api/home.api";
+import type { HomeProductDetail, BoxType } from "../schemas/home.schema";
+import { ROUTES } from "../../../shared/constants/routes";
+
+// ─── Skeleton loading ────────────────────────────────────────
+
+function DetailSkeleton() {
+    return (
+        <div className="max-w-6xl mx-auto px-4 py-10 animate-pulse">
+            <div className="h-8 w-48 bg-slate-200 rounded mx-auto mb-10" />
+            <div className="grid md:grid-cols-2 gap-10">
+                <div className="aspect-square bg-slate-200 rounded-xl" />
+                <div className="space-y-4">
+                    <div className="h-7 w-3/4 bg-slate-200 rounded" />
+                    <div className="h-10 w-32 bg-slate-200 rounded mt-6" />
+                    <div className="h-4 w-full bg-slate-100 rounded mt-4" />
+                    <div className="h-4 w-1/2 bg-slate-100 rounded" />
+                    <div className="h-12 w-full bg-slate-200 rounded mt-8" />
+                    <div className="h-12 w-24 bg-slate-200 rounded mt-4" />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/** Tạo key duy nhất cho từng loại hộp (BE không trả id). */
+function boxKey(box: BoxType) {
+    return `${box.boxType}-${box.weight}`;
+}
+
+// ─── Main ─────────────────────────────────────────────────────
+
+export default function ProductDetailPage() {
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const productId = id != null ? Number(id) : NaN;
+    const skip = !Number.isFinite(productId);
+
+    const { data: product, isLoading, isError, refetch } = useGetHomeProductDetailQuery(productId, { skip });
+    const [addToCart, { isLoading: isAdding }] = useAddToCartMutation();
+
+    const [quantity, setQuantity] = useState(1);
+    const [selectedBox, setSelectedBox] = useState<BoxType | null>(null);
+    const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+    const handleAddToCart = async () => {
+        if (!product || !selectedBox) return;
+        setMessage(null);
+        try {
+            await addToCart({
+                productVariantId: product.id,
+                boxWeight: selectedBox.weight,
+                isPartial: selectedBox.boxType === "Partial",
+                quantity,
+            }).unwrap();
+            setMessage({ type: "success", text: "Đã thêm vào giỏ hàng." });
+        } catch {
+            setMessage({ type: "error", text: "Không thêm được vào giỏ. Vui lòng đăng nhập (Customer) và thử lại." });
+        }
+    };
+
+    const handleBuyNow = async () => {
+        if (!product || !selectedBox) return;
+        setMessage(null);
+        try {
+            await addToCart({
+                productVariantId: product.id,
+                boxWeight: selectedBox.weight,
+                isPartial: selectedBox.boxType === "Partial",
+                quantity,
+            }).unwrap();
+            setMessage({ type: "success", text: "Đã thêm vào giỏ. Bạn có thể vào giỏ để thanh toán." });
+        } catch {
+            setMessage({ type: "error", text: "Không thêm được vào giỏ. Vui lòng đăng nhập (Customer) và thử lại." });
+        }
+    };
+
+    const canAddToCart = product && selectedBox && selectedBox.availableCount > 0 && quantity > 0;
+
+    if (skip || isLoading) return <DetailSkeleton />;
+    if (isError) {
+        return (
+            <div className="max-w-6xl mx-auto px-4 py-16 text-center">
+                <AlertCircle className="mx-auto text-red-500 mb-4" size={48} />
+                <p className="text-slate-600 mb-4">Không tải được chi tiết sản phẩm.</p>
+                <button
+                    type="button"
+                    onClick={() => refetch()}
+                    className="text-[#1a5f2a] font-medium hover:underline"
+                >
+                    Thử lại
+                </button>
+                <div className="mt-6">
+                    <button
+                        type="button"
+                        onClick={() => navigate(ROUTES.HOME)}
+                        className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900"
+                    >
+                        <ArrowLeft size={18} />
+                        Về trang chủ
+                    </button>
+                </div>
+            </div>
+        );
+    }
+    if (!product) {
+        return (
+            <div className="max-w-6xl mx-auto px-4 py-16 text-center">
+                <p className="text-slate-600 mb-4">Không tìm thấy sản phẩm.</p>
+                <button
+                    type="button"
+                    onClick={() => navigate(ROUTES.HOME)}
+                    className="inline-flex items-center gap-2 text-[#1a5f2a] font-medium"
+                >
+                    <ArrowLeft size={18} />
+                    Về trang chủ
+                </button>
+            </div>
+        );
+    }
+
+    const imageUrl = product.imageUrl && product.imageUrl.trim() !== "" ? product.imageUrl : null;
+    const gradeLabel = product.grade === 1 ? "Loại 1" : product.grade === 2 ? "Loại 2" : product.grade === 3 ? "Loại 3" : `Hạng ${product.grade}`;
+
+    return (
+        <div className="max-w-6xl mx-auto px-4 py-10">
+            <button
+                type="button"
+                onClick={() => navigate(ROUTES.HOME)}
+                className="inline-flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-6"
+            >
+                <ArrowLeft size={18} />
+                Về trang chủ
+            </button>
+
+            <h1 className="text-2xl font-bold text-center mb-10 uppercase text-slate-900">
+                Chi tiết sản phẩm
+            </h1>
+
+            <div className="grid md:grid-cols-2 gap-10">
+                <div>
+                    <div className="aspect-square rounded-xl border border-slate-200 bg-slate-100 overflow-hidden">
+                        {imageUrl ? (
+                            <img
+                                src={imageUrl}
+                                alt={product.productName}
+                                className="w-full h-full object-cover"
+                            />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                                <Leaf className="text-slate-300" size={80} />
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div>
+                    <h2 className="text-xl font-bold text-[#1a5f2a]">
+                        {product.productName}
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                        {gradeLabel} · ID biến thể: #{product.id}
+                    </p>
+
+                    <div className="mt-6 border-t border-slate-200 pt-4">
+                        <p className="text-[#c0392b] text-2xl font-bold">
+                            {product.price.toLocaleString("vi-VN")} ₫/kg
+                        </p>
+                        <p className="mt-2 text-slate-600">
+                            Hạn sử dụng: {product.shelfLifeDays} ngày
+                        </p>
+                        <p className="mt-2 font-semibold">
+                            Tình trạng:{" "}
+                            <span className={product.availableBoxCount > 0 ? "text-[#1a5f2a]" : "text-red-600"}>
+                                {product.availableBoxCount > 0 ? "Còn hàng" : "Hết hàng"}
+                            </span>
+                        </p>
+                    </div>
+
+                    {/* Chọn loại hộp – luôn hiển thị; khớp BE BoxTypeDto: boxType, weight, availableCount, boxPrice */}
+                    <div className="mt-6">
+                        <h3 className="font-semibold text-slate-900 mb-2">Chọn loại hộp</h3>
+                        {product.boxTypes.length > 0 ? (
+                            <div className="flex flex-col gap-2">
+                                {product.boxTypes.map((box) => {
+                                    const key = boxKey(box);
+                                    const isSelected = selectedBox ? boxKey(selectedBox) === key : false;
+                                    const boxLabel = box.boxType === "Partial" ? "Hộp lẻ" : "Hộp đầy";
+                                    return (
+                                        <button
+                                            key={key}
+                                            type="button"
+                                            onClick={() => setSelectedBox(box)}
+                                            disabled={box.availableCount <= 0}
+                                            className={`text-left px-4 py-3 rounded-lg border-2 transition-colors
+                                                ${box.availableCount <= 0 ? "opacity-50 cursor-not-allowed border-slate-100" : ""}
+                                                ${isSelected
+                                                    ? "border-[#1a5f2a] bg-[#e8f5e9] text-[#1a5f2a]"
+                                                    : "border-slate-200 hover:border-[#1a5f2a]/50 text-slate-700"
+                                                }`}
+                                        >
+                                            <span className="font-medium">{boxLabel} – {box.weight} kg</span>
+                                            <span className="block text-sm mt-0.5">
+                                                Còn {box.availableCount} hộp · {box.boxPrice.toLocaleString("vi-VN")} ₫/hộp
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <p className="text-slate-500 text-sm py-2">
+                                Hiện chưa có loại hộp nào để bán cho sản phẩm này.
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Đặt hàng – bắt buộc chọn loại hộp khi có boxTypes */}
+                    <div className="mt-8">
+                        <h3 className="font-semibold text-slate-900 mb-3">Đặt hàng</h3>
+                        {product.boxTypes.length > 0 && !selectedBox && (
+                            <p className="text-amber-600 text-sm mb-2">Vui lòng chọn một loại hộp trước khi thêm vào giỏ.</p>
+                        )}
+                        <div className="flex flex-wrap items-center gap-4">
+                            <div className="flex border border-slate-300 rounded-lg overflow-hidden">
+                                <button
+                                    type="button"
+                                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium"
+                                    onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                                >
+                                    −
+                                </button>
+                                <span className="px-4 py-2 min-w-[3rem] text-center font-medium border-x border-slate-200">
+                                    {quantity}
+                                </span>
+                                <button
+                                    type="button"
+                                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium"
+                                    onClick={() => setQuantity((q) => q + 1)}
+                                >
+                                    +
+                                </button>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleAddToCart}
+                                disabled={isAdding || !canAddToCart}
+                                className="inline-flex items-center gap-2 bg-[#1a5f2a] text-white px-6 py-2.5 rounded-lg font-medium hover:bg-[#145026] disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <ShoppingCart size={18} />
+                                Thêm vào giỏ
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleBuyNow}
+                                disabled={isAdding || !canAddToCart}
+                                className="inline-flex items-center gap-2 bg-slate-800 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                Mua ngay
+                            </button>
+                        </div>
+                        {message && (
+                            <p className={`mt-3 flex items-center gap-2 text-sm ${message.type === "success" ? "text-[#1a5f2a]" : "text-red-600"}`}>
+                                {message.type === "success" ? <Check size={16} /> : <AlertCircle size={16} />}
+                                {message.text}
+                            </p>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <div className="mt-12 border-t border-slate-200 pt-8">
+                <h3 className="font-bold text-lg text-[#1a5f2a]">Mô tả sản phẩm</h3>
+                <p className="mt-4 text-slate-700 leading-relaxed">
+                    {product.productName} là sản phẩm chất lượng cao, được bảo quản theo tiêu chuẩn kho lạnh
+                    và phân phối qua hệ thống AgriIDMS.
+                </p>
+            </div>
+        </div>
+    );
+}

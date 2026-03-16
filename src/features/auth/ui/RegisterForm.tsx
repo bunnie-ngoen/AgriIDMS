@@ -18,7 +18,7 @@ const RegisterForm = () => {
     try {
       await registerCustomer(values).unwrap();
       navigate("/login");
-    } catch (e) {
+    } catch (e : any) {
       console.error("Register failed:", e);
     }
   };
