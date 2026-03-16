@@ -25,7 +25,6 @@ export default function PublicHeader() {
   const { data: user } = useGetMyProfileQuery(undefined, {
     skip: !isLoggedIn,
   });
-  console.log(user)
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);

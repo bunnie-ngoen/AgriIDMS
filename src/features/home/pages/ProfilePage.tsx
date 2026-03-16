@@ -1,9 +1,26 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  User,
+  Lock,
+  Mail,
+  Phone,
+  MapPin,
+  Calendar,
+  ChevronRight,
+  Check,
+  AlertCircle,
+  Save,
+  Shield,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+import { ROUTES } from "../../../shared/constants/routes";
 import {
   useGetMyProfileQuery,
   useUpdateProfileMutation,
   useChangePasswordMutation,
-} from "../../../features/admin/api/profile.api";
+} from "../../admin/api/profile.api";
 
 export default function ProfilePage() {
   const { data: user, isLoading } = useGetMyProfileQuery();
@@ -12,6 +29,9 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<"profile" | "security">("profile");
   const [profileStatus, setProfileStatus] = useState<"idle" | "success" | "error">("idle");
   const [passwordStatus, setPasswordStatus] = useState<"idle" | "success" | "error">("idle");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [profileForm, setProfileForm] = useState({
     fullName: "",
@@ -93,345 +113,325 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-[60vh] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-gray-500 font-medium">Đang tải...</p>
+          <div className="w-10 h-10 border-2 border-[#1a5f2a] border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-slate-500 font-medium">Đang tải...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-10 px-4">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&display=swap');
-        .profile-root { font-family: 'Be Vietnam Pro', sans-serif; }
-        .input-field {
-          width: 100%;
-          border: 1.5px solid #e5e7eb;
-          border-radius: 10px;
-          padding: 10px 14px;
-          font-size: 14px;
-          font-family: 'Be Vietnam Pro', sans-serif;
-          color: #111827;
-          background: #fff;
-          transition: border-color 0.2s, box-shadow 0.2s;
-          outline: none;
-        }
-        .input-field:focus {
-          border-color: #059669;
-          box-shadow: 0 0 0 3px rgba(5,150,105,0.1);
-        }
-        .input-field:disabled {
-          background: #f9fafb;
-          color: #6b7280;
-          cursor: not-allowed;
-        }
-        .tab-btn {
-          position: relative;
-          padding: 10px 20px;
-          font-size: 14px;
-          font-weight: 500;
-          color: #6b7280;
-          background: transparent;
-          border: none;
-          cursor: pointer;
-          transition: color 0.2s;
-          font-family: 'Be Vietnam Pro', sans-serif;
-        }
-        .tab-btn.active { color: #059669; }
-        .tab-btn.active::after {
-          content: '';
-          position: absolute;
-          bottom: 0; left: 0; right: 0;
-          height: 2px;
-          background: #059669;
-          border-radius: 2px 2px 0 0;
-        }
-        .btn-primary {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          background: #059669;
-          color: #fff;
-          border: none;
-          border-radius: 10px;
-          padding: 10px 22px;
-          font-size: 14px;
-          font-weight: 600;
-          font-family: 'Be Vietnam Pro', sans-serif;
-          cursor: pointer;
-          transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
-          box-shadow: 0 2px 8px rgba(5,150,105,0.25);
-        }
-        .btn-primary:hover { background: #047857; box-shadow: 0 4px 14px rgba(5,150,105,0.35); }
-        .btn-primary:active { transform: scale(0.98); }
-        .btn-blue {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          background: #2563eb;
-          color: #fff;
-          border: none;
-          border-radius: 10px;
-          padding: 10px 22px;
-          font-size: 14px;
-          font-weight: 600;
-          font-family: 'Be Vietnam Pro', sans-serif;
-          cursor: pointer;
-          transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
-          box-shadow: 0 2px 8px rgba(37,99,235,0.25);
-        }
-        .btn-blue:hover { background: #1d4ed8; box-shadow: 0 4px 14px rgba(37,99,235,0.35); }
-        .btn-blue:active { transform: scale(0.98); }
-        .toast-success {
-          display: flex; align-items: center; gap: 8px;
-          background: #ecfdf5; color: #065f46;
-          border: 1px solid #a7f3d0;
-          border-radius: 10px; padding: 10px 16px;
-          font-size: 13px; font-weight: 500;
-          animation: fadeInUp 0.3s ease;
-        }
-        .toast-error {
-          display: flex; align-items: center; gap: 8px;
-          background: #fef2f2; color: #991b1b;
-          border: 1px solid #fecaca;
-          border-radius: 10px; padding: 10px 16px;
-          font-size: 13px; font-weight: 500;
-          animation: fadeInUp 0.3s ease;
-        }
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(6px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .card { background: #fff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04); }
-        .avatar-ring {
-          width: 72px; height: 72px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #059669, #10b981);
-          display: flex; align-items: center; justify-content: center;
-          font-size: 24px; font-weight: 700; color: #fff;
-          flex-shrink: 0;
-          box-shadow: 0 4px 12px rgba(5,150,105,0.3);
-        }
-        .badge {
-          display: inline-flex; align-items: center; gap: 4px;
-          background: #f0fdf4; color: #059669;
-          border: 1px solid #bbf7d0;
-          border-radius: 999px;
-          padding: 3px 10px;
-          font-size: 12px; font-weight: 500;
-        }
-        .section-label {
-          font-size: 11px; font-weight: 600;
-          text-transform: uppercase; letter-spacing: 0.08em;
-          color: #9ca3af; margin-bottom: 12px;
-        }
-        .strength-bar { height: 4px; border-radius: 2px; flex: 1; background: #e5e7eb; overflow: hidden; }
-        .strength-fill { height: 100%; border-radius: 2px; transition: width 0.4s, background 0.4s; }
-      `}</style>
+    <div className="bg-gradient-to-b from-slate-50 to-white">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
 
-      <div className="profile-root max-w-3xl mx-auto space-y-6">
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-2 text-sm text-slate-500 mb-8">
+          <Link to={ROUTES.HOME} className="hover:text-[#1a5f2a] transition-colors">
+            Trang chủ
+          </Link>
+          <ChevronRight size={16} className="text-slate-300" />
+          <span className="text-slate-700 font-medium">Thông tin cá nhân</span>
+        </nav>
 
-        {/* ── HEADER CARD ── */}
-        <div className="card p-6 flex items-center gap-5">
-          <div className="avatar-ring">
-            {user?.fullName ? getInitials(user.fullName) : "?"}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-bold text-gray-900 truncate">
-                {user?.fullName || "—"}
-              </h1>
-              <span className="badge">
-                <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
-                  <circle cx="5" cy="5" r="5" />
-                </svg>
-                Hoạt động
-              </span>
+        {/* Page title */}
+        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight mb-8">
+          Tài khoản của tôi
+        </h1>
+
+        {/* Profile header card */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-8">
+          <div className="bg-gradient-to-r from-[#1a5f2a] to-[#145026] px-6 sm:px-8 py-8">
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+              <div className="h-20 w-20 rounded-full bg-white/20 backdrop-blur flex items-center justify-center text-white text-2xl font-bold flex-shrink-0 border-2 border-white/40">
+                {user?.fullName ? getInitials(user.fullName) : "?"}
+              </div>
+              <div className="text-center sm:text-left flex-1 min-w-0">
+                <h2 className="text-xl font-bold text-white truncate">
+                  {user?.fullName || "—"}
+                </h2>
+                <p className="text-white/90 text-sm mt-0.5 truncate">{user?.email}</p>
+                <span className="inline-flex items-center gap-1.5 mt-3 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-medium">
+                  <span className="h-2 w-2 rounded-full bg-emerald-300 animate-pulse" />
+                  Đang hoạt động
+                </span>
+              </div>
             </div>
-            <p className="text-sm text-gray-500 mt-0.5 truncate">{user?.email}</p>
           </div>
         </div>
 
-        {/* ── TABS ── */}
-        <div className="card overflow-hidden">
-          <div className="flex border-b border-gray-100 px-2">
-            <button className={`tab-btn ${activeTab === "profile" ? "active" : ""}`} onClick={() => setActiveTab("profile")}>
-              <span className="flex items-center gap-2">
-                <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/>
-                </svg>
-                Thông tin cá nhân
-              </span>
-            </button>
-            <button className={`tab-btn ${activeTab === "security" ? "active" : ""}`} onClick={() => setActiveTab("security")}>
-              <span className="flex items-center gap-2">
-                <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                </svg>
-                Bảo mật
-              </span>
-            </button>
-          </div>
+        {/* Tabs */}
+        <div className="flex border-b border-slate-200 mb-6 gap-1">
+          <button
+            type="button"
+            onClick={() => setActiveTab("profile")}
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-medium rounded-t-lg border-b-2 transition-colors -mb-px ${
+              activeTab === "profile"
+                ? "border-[#1a5f2a] text-[#1a5f2a] bg-white"
+                : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            <User size={18} />
+            Thông tin cá nhân
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("security")}
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-medium rounded-t-lg border-b-2 transition-colors -mb-px ${
+              activeTab === "security"
+                ? "border-[#1a5f2a] text-[#1a5f2a] bg-white"
+                : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            <Lock size={18} />
+            Bảo mật
+          </button>
+        </div>
 
-          {/* ── PROFILE TAB ── */}
+        {/* Content card */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+
+          {/* Tab: Profile */}
           {activeTab === "profile" && (
-            <form onSubmit={handleProfileSubmit} className="p-6 space-y-5">
-              <p className="section-label">Thông tin tài khoản</p>
+            <form onSubmit={handleProfileSubmit} className="p-6 sm:p-8">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-6">
+                Thông tin tài khoản
+              </p>
 
-              {/* Email (readonly) */}
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-gray-700">Email</label>
-                <div className="relative">
-                  <input value={user?.email || ""} disabled className="input-field pl-10" />
-                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 7L2 7"/>
-                  </svg>
+              <div className="space-y-5">
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1.5">
+                    <Mail size={14} className="text-slate-400" />
+                    Email
+                  </label>
+                  <input
+                    value={user?.email || ""}
+                    disabled
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 text-sm"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1.5">
+                      <User size={14} className="text-slate-400" />
+                      Họ tên
+                    </label>
+                    <input
+                      name="fullName"
+                      value={profileForm.fullName}
+                      onChange={handleProfileChange}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-900 placeholder-slate-400 focus:border-[#1a5f2a] focus:ring-2 focus:ring-[#1a5f2a]/20 outline-none transition"
+                      placeholder="Nguyễn Văn A"
+                    />
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1.5">
+                      <Phone size={14} className="text-slate-400" />
+                      Số điện thoại
+                    </label>
+                    <input
+                      name="phoneNumber"
+                      value={profileForm.phoneNumber}
+                      onChange={handleProfileChange}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-900 placeholder-slate-400 focus:border-[#1a5f2a] focus:ring-2 focus:ring-[#1a5f2a]/20 outline-none transition"
+                      placeholder="0901 234 567"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1.5">
+                    <MapPin size={14} className="text-slate-400" />
+                    Địa chỉ
+                  </label>
+                  <input
+                    name="address"
+                    value={profileForm.address}
+                    onChange={handleProfileChange}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-900 placeholder-slate-400 focus:border-[#1a5f2a] focus:ring-2 focus:ring-[#1a5f2a]/20 outline-none transition"
+                    placeholder="123 Đường ABC, Quận 1, TP.HCM"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1.5">
+                      <Calendar size={14} className="text-slate-400" />
+                      Ngày sinh
+                    </label>
+                    <input
+                      type="date"
+                      name="dob"
+                      value={profileForm.dob}
+                      onChange={handleProfileChange}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-900 focus:border-[#1a5f2a] focus:ring-2 focus:ring-[#1a5f2a]/20 outline-none transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 mb-1.5 block">Giới tính</label>
+                    <select
+                      value={profileForm.gender ? "male" : "female"}
+                      onChange={(e) =>
+                        setProfileForm((prev) => ({ ...prev, gender: e.target.value === "male" }))
+                      }
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-900 focus:border-[#1a5f2a] focus:ring-2 focus:ring-[#1a5f2a]/20 outline-none transition"
+                    >
+                      <option value="male">Nam</option>
+                      <option value="female">Nữ</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              {/* Họ tên + Điện thoại */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="block text-sm font-medium text-gray-700">Họ tên</label>
-                  <input name="fullName" value={profileForm.fullName} onChange={handleProfileChange} className="input-field" placeholder="Nguyễn Văn A" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-sm font-medium text-gray-700">Số điện thoại</label>
-                  <input name="phoneNumber" value={profileForm.phoneNumber} onChange={handleProfileChange} className="input-field" placeholder="0901 234 567" />
-                </div>
-              </div>
-
-              {/* Địa chỉ */}
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-gray-700">Địa chỉ</label>
-                <input name="address" value={profileForm.address} onChange={handleProfileChange} className="input-field" placeholder="123 Đường ABC, Quận 1, TP.HCM" />
-              </div>
-
-              {/* Ngày sinh + Giới tính */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="block text-sm font-medium text-gray-700">Ngày sinh</label>
-                  <input type="date" name="dob" value={profileForm.dob} onChange={handleProfileChange} className="input-field" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-sm font-medium text-gray-700">Giới tính</label>
-                  <select
-                    value={profileForm.gender ? "male" : "female"}
-                    onChange={(e) => setProfileForm((prev) => ({ ...prev, gender: e.target.value === "male" }))}
-                    className="input-field"
-                  >
-                    <option value="male">Nam</option>
-                    <option value="female">Nữ</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Status + Submit */}
-              <div className="flex items-center justify-between pt-2 gap-4 flex-wrap">
-                <div className="flex-1">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-8 pt-6 border-t border-slate-100">
+                <div className="min-h-[40px] flex items-center">
                   {profileStatus === "success" && (
-                    <div className="toast-success">
-                      <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+                    <p className="flex items-center gap-2 text-sm font-medium text-[#1a5f2a]">
+                      <Check size={18} />
                       Cập nhật thông tin thành công!
-                    </div>
+                    </p>
                   )}
                   {profileStatus === "error" && (
-                    <div className="toast-error">
-                      <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+                    <p className="flex items-center gap-2 text-sm font-medium text-red-600">
+                      <AlertCircle size={18} />
                       Cập nhật thất bại. Vui lòng thử lại.
-                    </div>
+                    </p>
                   )}
                 </div>
-                <button type="submit" className="btn-primary">
-                  <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white bg-[#1a5f2a] hover:bg-[#145026] shadow-md hover:shadow-lg transition-all"
+                >
+                  <Save size={18} />
                   Lưu thay đổi
                 </button>
               </div>
             </form>
           )}
 
-          {/* ── SECURITY TAB ── */}
+          {/* Tab: Security */}
           {activeTab === "security" && (
-            <form onSubmit={handlePasswordSubmit} className="p-6 space-y-5">
-              <p className="section-label">Đổi mật khẩu</p>
+            <form onSubmit={handlePasswordSubmit} className="p-6 sm:p-8">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-6 flex items-center gap-2">
+                <Shield size={14} />
+                Đổi mật khẩu
+              </p>
 
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-gray-700">Mật khẩu hiện tại</label>
-                <div className="relative">
-                  <input type="password" name="currentPassword" value={passwordForm.currentPassword} onChange={handlePasswordChange} className="input-field pl-10" placeholder="••••••••" />
-                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                  </svg>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-gray-700">Mật khẩu mới</label>
-                <div className="relative">
-                  <input type="password" name="newPassword" value={passwordForm.newPassword} onChange={handlePasswordChange} className="input-field pl-10" placeholder="••••••••" />
-                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                  </svg>
-                </div>
-                {/* Password strength */}
-                {passwordForm.newPassword.length > 0 && (
-                  <div className="mt-2 space-y-1.5">
-                    <div className="flex gap-1.5">
-                      {[1,2,3,4].map((level) => {
-                        const strength = Math.min(4, Math.floor(passwordForm.newPassword.length / 3));
-                        const colors = ["#ef4444","#f97316","#eab308","#22c55e"];
-                        return (
-                          <div key={level} className="strength-bar">
-                            <div className="strength-fill" style={{ width: strength >= level ? "100%" : "0%", background: colors[strength - 1] || "#e5e7eb" }} />
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <p className="text-xs text-gray-400">
-                      {passwordForm.newPassword.length < 6 ? "Yếu — thêm ký tự để tăng độ bảo mật" : passwordForm.newPassword.length < 9 ? "Trung bình" : passwordForm.newPassword.length < 12 ? "Mạnh" : "Rất mạnh"}
-                    </p>
+              <div className="space-y-5">
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1.5">
+                    <Lock size={14} className="text-slate-400" />
+                    Mật khẩu hiện tại
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showCurrentPassword ? "text" : "password"}
+                      name="currentPassword"
+                      value={passwordForm.currentPassword}
+                      onChange={handlePasswordChange}
+                      className="w-full px-4 py-3 pr-12 rounded-xl border border-slate-200 text-slate-900 placeholder-slate-400 focus:border-[#1a5f2a] focus:ring-2 focus:ring-[#1a5f2a]/20 outline-none transition"
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                      aria-label={showCurrentPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                    >
+                      {showCurrentPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                   </div>
-                )}
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-gray-700">Xác nhận mật khẩu mới</label>
-                <div className="relative">
-                  <input type="password" name="confirmPassword" value={passwordForm.confirmPassword} onChange={handlePasswordChange} className="input-field pl-10" placeholder="••••••••" />
-                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                  </svg>
                 </div>
-                {passwordForm.confirmPassword.length > 0 && passwordForm.newPassword !== passwordForm.confirmPassword && (
-                  <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                    <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
-                    Mật khẩu xác nhận không khớp
-                  </p>
-                )}
+
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-1.5">
+                    Mật khẩu mới
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? "text" : "password"}
+                      name="newPassword"
+                      value={passwordForm.newPassword}
+                      onChange={handlePasswordChange}
+                      className="w-full px-4 py-3 pr-12 rounded-xl border border-slate-200 text-slate-900 placeholder-slate-400 focus:border-[#1a5f2a] focus:ring-2 focus:ring-[#1a5f2a]/20 outline-none transition"
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                      aria-label={showNewPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                    >
+                      {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  {passwordForm.newPassword.length > 0 && (
+                    <p className="text-xs text-slate-500 mt-1.5">
+                      {passwordForm.newPassword.length < 6
+                        ? "Mật khẩu yếu — nên từ 8 ký tự trở lên"
+                        : passwordForm.newPassword.length < 9
+                          ? "Độ mạnh: trung bình"
+                          : "Độ mạnh: tốt"}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-slate-700 mb-1.5 block">
+                    Xác nhận mật khẩu mới
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      name="confirmPassword"
+                      value={passwordForm.confirmPassword}
+                      onChange={handlePasswordChange}
+                      className="w-full px-4 py-3 pr-12 rounded-xl border border-slate-200 text-slate-900 placeholder-slate-400 focus:border-[#1a5f2a] focus:ring-2 focus:ring-[#1a5f2a]/20 outline-none transition"
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                      aria-label={showConfirmPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                    >
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  {passwordForm.confirmPassword.length > 0 &&
+                    passwordForm.newPassword !== passwordForm.confirmPassword && (
+                      <p className="text-xs text-red-600 mt-1.5 flex items-center gap-1">
+                        <AlertCircle size={12} />
+                        Mật khẩu xác nhận không khớp
+                      </p>
+                    )}
+                </div>
               </div>
 
-              <div className="flex items-center justify-between pt-2 gap-4 flex-wrap">
-                <div className="flex-1">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-8 pt-6 border-t border-slate-100">
+                <div className="min-h-[40px] flex items-center">
                   {passwordStatus === "success" && (
-                    <div className="toast-success">
-                      <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+                    <p className="flex items-center gap-2 text-sm font-medium text-[#1a5f2a]">
+                      <Check size={18} />
                       Đổi mật khẩu thành công!
-                    </div>
+                    </p>
                   )}
                   {passwordStatus === "error" && (
-                    <div className="toast-error">
-                      <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
-                      {passwordForm.newPassword !== passwordForm.confirmPassword ? "Mật khẩu xác nhận không khớp." : "Đổi mật khẩu thất bại."}
-                    </div>
+                    <p className="flex items-center gap-2 text-sm font-medium text-red-600">
+                      <AlertCircle size={18} />
+                      {passwordForm.newPassword !== passwordForm.confirmPassword
+                        ? "Mật khẩu xác nhận không khớp."
+                        : "Đổi mật khẩu thất bại."}
+                    </p>
                   )}
                 </div>
-                <button type="submit" className="btn-blue">
-                  <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                    <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                  </svg>
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white bg-slate-700 hover:bg-slate-800 shadow-md hover:shadow-lg transition-all"
+                >
+                  <Lock size={18} />
                   Đổi mật khẩu
                 </button>
               </div>
