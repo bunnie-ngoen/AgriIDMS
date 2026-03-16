@@ -24,8 +24,8 @@ function App() {
                         <Route path={ROUTES.HOME} element={<HomePage />} />
                         <Route path={ROUTES.GIOI_THIEU} element={<GioiThieuPage />} />
                         <Route path={ROUTES.PRODUCT_DETAIL} element={<ProductDetailPage />} />
+                        <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
                     </Route>
-                    <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
 
                     {/* Auth routes — không có layout public */}
                     <Route path={ROUTES.LOGIN} element={<LoginPage />} />
