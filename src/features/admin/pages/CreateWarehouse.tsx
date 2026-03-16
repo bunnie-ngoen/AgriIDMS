@@ -16,6 +16,7 @@ import {
   type VnWard,
 } from "../../../shared/api/vn-address.api";
 import { ArrowLeft, Sparkles, Package, MapPin, Loader2, ChevronDown } from "lucide-react";
+import toast from "react-hot-toast";
 
 const Field = ({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) => (
   <div className="space-y-1.5">
@@ -144,7 +145,11 @@ const CreateWarehouse = () => {
         location,
         titleWarehouse: values.titleWarehouse,
       }).unwrap();
-      setServerMessage(res.message ?? "Tạo kho thành công");
+
+      const successMessage = res.message ?? "Tạo kho thành công";
+      setServerMessage(successMessage);
+      toast.success(successMessage);
+
       form.reset({
         name: "",
         provinceCode: 0,
@@ -153,11 +158,17 @@ const CreateWarehouse = () => {
         detailAddress: "",
         titleWarehouse: "Normal",
       });
+
+      // Tự động quay về danh sách kho sau một chút để user kịp thấy thông báo
+      setTimeout(() => {
+        navigate("/admin/warehouses");
+      }, 600);
     } catch (error: unknown) {
       const msg =
         (error as { data?: { message?: string } })?.data?.message ||
         "Tạo kho thất bại. Vui lòng kiểm tra lại thông tin.";
       setServerMessage(msg);
+      toast.error(msg);
     }
   };
 

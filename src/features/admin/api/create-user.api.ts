@@ -54,13 +54,26 @@ export const userApi = api.injectEndpoints({
       }),
       transformResponse: (response: unknown) => {
         const arr = (response as Array<Record<string, unknown>>) ?? [];
-        return arr.map((w) => ({
-          ...w,
-          titleWarehouse:
-            w.titleWarehouse === 2 || w.titleWarehouse === "Cold"
-              ? "Cold"
-              : "Normal",
-        })) as WarehouseItem[];
+        return arr.map((w) => {
+          const titleRaw = w.titleWarehouse;
+          const title: "Normal" | "Cold" =
+            titleRaw === 2 || titleRaw === "Cold" ? "Cold" : "Normal";
+
+          return {
+            id: (w.id as number) ?? 0,
+            name: (w.name as string) ?? "",
+            location: (w.location as string) ?? "",
+            titleWarehouse: title,
+            minColdStorageHours:
+              (w.minColdStorageHours as number | null | undefined) ??
+              (w.MinColdStorageHours as number | null | undefined) ??
+              null,
+            minReceiptWeight:
+              (w.minReceiptWeight as number | null | undefined) ??
+              (w.MinReceiptWeight as number | null | undefined) ??
+              null,
+          } satisfies WarehouseItem;
+        });
       },
     }),
 
@@ -71,9 +84,22 @@ export const userApi = api.injectEndpoints({
       transformResponse: (w: unknown) => {
         const item = w as Record<string, unknown>;
         const tw = item.titleWarehouse;
+        const title: "Normal" | "Cold" =
+          tw === 2 || tw === "Cold" ? "Cold" : "Normal";
+
         return {
-          ...item,
-          titleWarehouse: tw === 2 || tw === "Cold" ? "Cold" : "Normal",
+          id: (item.id as number) ?? 0,
+          name: (item.name as string) ?? "",
+          location: (item.location as string) ?? "",
+          titleWarehouse: title,
+          minColdStorageHours:
+            (item.minColdStorageHours as number | null | undefined) ??
+            (item.MinColdStorageHours as number | null | undefined) ??
+            null,
+          minReceiptWeight:
+            (item.minReceiptWeight as number | null | undefined) ??
+            (item.MinReceiptWeight as number | null | undefined) ??
+            null,
         } as WarehouseItem;
       },
     }),
@@ -105,6 +131,9 @@ export const userApi = api.injectEndpoints({
       query: (warehouseId) => ({
         url: `warehouses/${warehouseId}/zones`,
       }),
+      providesTags: (_result, _error, warehouseId) => [
+        { type: "Zone" as const, id: `WAREHOUSE-${warehouseId}` },
+      ],
     }),
 
     createZone: builder.mutation<
@@ -116,6 +145,9 @@ export const userApi = api.injectEndpoints({
         method: "POST",
         body: { name },
       }),
+      invalidatesTags: (_res, _err, { warehouseId }) => [
+        { type: "Zone" as const, id: `WAREHOUSE-${warehouseId}` },
+      ],
     }),
 
     updateZone: builder.mutation<
@@ -127,6 +159,10 @@ export const userApi = api.injectEndpoints({
         method: "PUT",
         body: { name },
       }),
+      invalidatesTags: (_res, _err, { warehouseId, id }) => [
+        { type: "Zone" as const, id: `WAREHOUSE-${warehouseId}` },
+        { type: "Rack" as const, id: `ZONE-${id}` },
+      ],
     }),
 
     deleteZone: builder.mutation<
@@ -137,6 +173,10 @@ export const userApi = api.injectEndpoints({
         url: `warehouses/${warehouseId}/zones/${id}`,
         method: "DELETE",
       }),
+      invalidatesTags: (_res, _err, { warehouseId, id }) => [
+        { type: "Zone" as const, id: `WAREHOUSE-${warehouseId}` },
+        { type: "Rack" as const, id: `ZONE-${id}` },
+      ],
     }),
 
     // ===== Racks =====
@@ -144,6 +184,9 @@ export const userApi = api.injectEndpoints({
       query: (zoneId) => ({
         url: `zones/${zoneId}/racks`,
       }),
+      providesTags: (_result, _error, zoneId) => [
+        { type: "Rack" as const, id: `ZONE-${zoneId}` },
+      ],
     }),
 
     createRack: builder.mutation<
@@ -155,6 +198,9 @@ export const userApi = api.injectEndpoints({
         method: "POST",
         body: { name },
       }),
+      invalidatesTags: (_res, _err, { zoneId }) => [
+        { type: "Rack" as const, id: `ZONE-${zoneId}` },
+      ],
     }),
 
     updateRack: builder.mutation<
@@ -166,6 +212,10 @@ export const userApi = api.injectEndpoints({
         method: "PUT",
         body: { name },
       }),
+      invalidatesTags: (_res, _err, { zoneId, id }) => [
+        { type: "Rack" as const, id: `ZONE-${zoneId}` },
+        { type: "Slot" as const, id: `RACK-${id}` },
+      ],
     }),
 
     deleteRack: builder.mutation<
@@ -176,6 +226,10 @@ export const userApi = api.injectEndpoints({
         url: `zones/${zoneId}/racks/${id}`,
         method: "DELETE",
       }),
+      invalidatesTags: (_res, _err, { zoneId, id }) => [
+        { type: "Rack" as const, id: `ZONE-${zoneId}` },
+        { type: "Slot" as const, id: `RACK-${id}` },
+      ],
     }),
 
     // ===== Slots =====
@@ -183,6 +237,9 @@ export const userApi = api.injectEndpoints({
       query: (rackId) => ({
         url: `racks/${rackId}/slots`,
       }),
+      providesTags: (_result, _error, rackId) => [
+        { type: "Slot" as const, id: `RACK-${rackId}` },
+      ],
     }),
 
     createSlot: builder.mutation<
@@ -194,6 +251,9 @@ export const userApi = api.injectEndpoints({
         method: "POST",
         body: { code, capacity },
       }),
+      invalidatesTags: (_res, _err, { rackId }) => [
+        { type: "Slot" as const, id: `RACK-${rackId}` },
+      ],
     }),
 
     updateSlot: builder.mutation<
@@ -205,6 +265,9 @@ export const userApi = api.injectEndpoints({
         method: "PUT",
         body: { code, capacity },
       }),
+      invalidatesTags: (_res, _err, { rackId }) => [
+        { type: "Slot" as const, id: `RACK-${rackId}` },
+      ],
     }),
 
     deleteSlot: builder.mutation<
@@ -215,6 +278,9 @@ export const userApi = api.injectEndpoints({
         url: `racks/${rackId}/slots/${id}`,
         method: "DELETE",
       }),
+      invalidatesTags: (_res, _err, { rackId }) => [
+        { type: "Slot" as const, id: `RACK-${rackId}` },
+      ],
     }),
 
     getUsers: builder.query<
@@ -282,8 +348,6 @@ export const {
   useCreateUserMutation,
   useGetUsersQuery,
   useDeleteUserMutation,
-  useUpdateUserStatusMutation,
-  useUpdateUserRoleMutation,
   useCreateWarehouseMutation,
   useGetWarehousesQuery,
   useGetWarehouseQuery,

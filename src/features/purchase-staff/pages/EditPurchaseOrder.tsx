@@ -7,6 +7,7 @@ import { useGetSuppliersQuery } from "../../supplier/api/supplier.api";
 import { useGetProductVariantsQuery } from "../../product/api/product-variant.api";
 import type { UpdatePurchaseOrderDetailRequest } from "../../purchase-order/types/purchase-order.type";
 import { ArrowLeft, Plus, Trash2, Loader2 } from "lucide-react";
+import toast from "react-hot-toast";
 
 type FormValues = {
   supplierId: number;
@@ -20,7 +21,7 @@ export default function EditPurchaseOrder() {
   const isAdmin = location.pathname.startsWith("/admin/purchase-orders");
   const detailLink = (n: number) =>
     isAdmin ? `/admin/purchase-orders/${n}` : `/purchase-staff/orders/${n}`;
-  const backLink = isAdmin ? "/admin/purchase-orders" : "/purchase-staff/dashboard";
+  const backLink = isAdmin ? "/admin/purchase-orders" : "/purchase-staff/orders";
 
   const poId = id ? parseInt(id, 10) : 0;
   const { data: order, isLoading: loadingOrder } = useGetPurchaseOrderByIdQuery(poId, {
@@ -65,8 +66,47 @@ export default function EditPurchaseOrder() {
   const onSubmit = async (values: FormValues) => {
     if (!poId || !order) return;
     setServerError(null);
+
+    // Validate FE
+    const localErrors: string[] = [];
+    if (!values.supplierId || values.supplierId === 0) {
+      localErrors.push("Vui lòng chọn nhà cung cấp.");
+    }
+    if (!values.details || values.details.length === 0) {
+      localErrors.push("Đơn mua phải có ít nhất 1 dòng chi tiết.");
+    }
+
+    values.details.forEach((d, idx) => {
+      const row = idx + 1;
+      if (!d.productVariantId || d.productVariantId === 0) {
+        localErrors.push(`Dòng ${row}: vui lòng chọn sản phẩm (variant).`);
+      }
+      if (!d.harvestDate) {
+        localErrors.push(`Dòng ${row}: vui lòng chọn ngày thu hoạch.`);
+      }
+      if (!d.orderedWeight || Number(d.orderedWeight) <= 0) {
+        localErrors.push(`Dòng ${row}: khối lượng đặt phải lớn hơn 0.`);
+      }
+      if (d.unitPrice != null && Number(d.unitPrice) < 0) {
+        localErrors.push(`Dòng ${row}: đơn giá không được âm.`);
+      }
+      if (
+        d.tolerancePercent != null &&
+        (Number(d.tolerancePercent) < 0 || Number(d.tolerancePercent) > 100)
+      ) {
+        localErrors.push(`Dòng ${row}: dung sai phải từ 0 đến 100%.`);
+      }
+    });
+
+    if (localErrors.length > 0) {
+      const message = localErrors.join(" ");
+      setServerError(message);
+      toast.error("Vui lòng kiểm tra lại các trường bị lỗi trong đơn mua.");
+      return;
+    }
+
     try {
-      await updatePo({
+      const res = await updatePo({
         id: poId,
         body: {
           supplierId: values.supplierId,
@@ -80,13 +120,22 @@ export default function EditPurchaseOrder() {
           })),
         },
       }).unwrap();
-      navigate(detailLink(poId));
+
+      const successMessage =
+        (res as { message?: string })?.message ?? "Cập nhật đơn mua thành công.";
+      toast.success(successMessage);
+
+      // Sau khi cập nhật thành công, quay về danh sách đơn mua
+      setTimeout(() => {
+        navigate(backLink);
+      }, 600);
     } catch (err: unknown) {
       const msg =
         (err as { data?: { message?: string } })?.data?.message ||
         (err as { data?: { error?: string } })?.data?.error ||
         "Cập nhật đơn mua thất bại.";
       setServerError(msg);
+      toast.error(msg);
     }
   };
 

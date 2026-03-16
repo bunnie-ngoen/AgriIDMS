@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   useGetPurchaseOrdersQuery,
@@ -6,6 +6,7 @@ import {
   useDeletePurchaseOrderMutation,
   useApprovePurchaseOrderMutation,
 } from "../../purchase-order/api/purchase-order.api";
+import { useGetSuppliersQuery } from "../../supplier/api/supplier.api";
 import { ArrowLeft, FilePlus, Loader2, Eye, X, Pencil, Trash2, CheckCircle } from "lucide-react";
 
 export default function PurchaseOrderList() {
@@ -19,8 +20,12 @@ export default function PurchaseOrderList() {
 
   const [detailModalId, setDetailModalId] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [supplierFilter, setSupplierFilter] = useState<number | 0>(0);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   const { data: list = [], isLoading, isError, error, refetch } = useGetPurchaseOrdersQuery();
+  const { data: suppliers = [] } = useGetSuppliersQuery();
   const { data: order, isLoading: loadingOrder } = useGetPurchaseOrderByIdQuery(detailModalId ?? 0, {
     skip: !detailModalId,
   });
@@ -50,23 +55,48 @@ export default function PurchaseOrderList() {
   const canEdit = !isAdmin && order?.status === "Pending";
   const canApprove = isAdmin && order?.status === "Pending";
 
+  const filteredList = useMemo(() => {
+    return list.filter((po) => {
+      if (supplierFilter && po.supplierId !== supplierFilter) return false;
+
+      if (fromDate || toDate) {
+        if (!po.orderDate) return false;
+        const d = new Date(po.orderDate);
+        const dOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        if (fromDate) {
+          const from = new Date(fromDate);
+          const fromOnly = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+          if (dOnly < fromOnly) return false;
+        }
+        if (toDate) {
+          const to = new Date(toDate);
+          const toOnly = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+          if (dOnly > toOnly) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [list, supplierFilter, fromDate, toDate]);
+
   return (
-    <div className="px-5">
-      <div className="bg-white rounded-[15px] p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-4 sm:px-6 py-6">
+      <div className="w-full max-w-[1600px] mx-auto">
+        {/* Header tương tự CategoryList */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div className="flex items-center gap-4">
             <button
               type="button"
               onClick={() => navigate(backLink)}
-              className="h-10 w-10 rounded-2xl border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:border-slate-300"
+              className="h-10 w-10 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center text-slate-500 hover:border-slate-300"
             >
               <ArrowLeft size={16} />
             </button>
             <div>
-              <h1 className="text-xl font-semibold text-slate-900">
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight">
                 {isAdmin ? "Duyệt đơn mua hàng" : "Danh sách đơn mua"}
               </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-slate-400 mt-0.5">
                 {isAdmin
                   ? "Purchasing Staff tạo đơn → Admin duyệt. Bấm vào đơn để xem và duyệt."
                   : "Danh sách đơn mua do bạn tạo. Bấm để xem chi tiết."}
@@ -77,12 +107,59 @@ export default function PurchaseOrderList() {
             <button
               type="button"
               onClick={() => navigate(createLink)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#7FBB35] text-white text-sm font-medium hover:bg-[#598325]"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl py-3 px-5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
             >
               <FilePlus size={18} />
               Tạo đơn mua
             </button>
           )}
+        </div>
+
+        {/* Card nội dung */}
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+        {/* Bộ lọc trên FE */}
+        <div className="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center gap-3">
+          <div className="flex-1 min-w-[180px] max-w-xs">
+            <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
+              Nhà cung cấp
+            </label>
+            <select
+              value={supplierFilter}
+              onChange={(e) => setSupplierFilter(Number(e.target.value) || 0)}
+              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
+            >
+              <option value={0}>Tất cả nhà cung cấp</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-1 flex-wrap gap-3 md:justify-end">
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
+                Từ ngày
+              </label>
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
+                Đến ngày
+              </label>
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
+              />
+            </div>
+          </div>
         </div>
 
         {isLoading ? (
@@ -105,29 +182,47 @@ export default function PurchaseOrderList() {
               Thử lại
             </button>
           </div>
-        ) : list.length === 0 ? (
-          <p className="text-slate-500 text-sm py-8 text-center">Chưa có đơn mua nào.</p>
+        ) : filteredList.length === 0 ? (
+          <p className="text-slate-500 text-sm py-8 text-center">Không có đơn mua nào phù hợp với bộ lọc.</p>
         ) : (
-          <div className="overflow-x-auto border border-slate-200 rounded-xl">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Mã đơn</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Nhà cung cấp</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Trạng thái</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Ngày đặt</th>
-                  <th className="px-4 py-3 text-right font-semibold text-slate-700">Thao tác</th>
+                <tr className="bg-slate-50/80 border-b border-slate-100">
+                  <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    Mã đơn
+                  </th>
+                  <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    Nhà cung cấp
+                  </th>
+                  <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    Người tạo
+                  </th>
+                  <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    Trạng thái
+                  </th>
+                  <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    Ngày đặt
+                  </th>
+                  <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    Thao tác
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {list.map((po) => (
+                {filteredList.map((po) => (
                   <tr
                     key={po.id}
-                    className="border-b border-slate-100 hover:bg-slate-50"
+                    className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors"
                   >
-                    <td className="px-4 py-3 font-medium text-slate-800">{po.orderCode}</td>
-                    <td className="px-4 py-3 text-slate-700">{po.supplierName}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-5 py-3.5 font-medium text-slate-900">{po.orderCode}</td>
+                    <td className="px-5 py-3.5 text-slate-700">{po.supplierName}</td>
+                    <td className="px-5 py-3.5 text-slate-700">
+                      {po.createdByName && po.createdByName.trim().length > 0
+                        ? po.createdByName
+                        : "—"}
+                    </td>
+                    <td className="px-5 py-3.5">
                       <span
                         className={
                           po.status === "Approved"
@@ -140,16 +235,16 @@ export default function PurchaseOrderList() {
                         {po.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-600">
+                      <td className="px-5 py-3.5 text-slate-600 max-w-[140px]">
                       {po.orderDate
                         ? new Date(po.orderDate).toLocaleDateString("vi-VN")
                         : "—"}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-5 py-3.5 text-right">
                       <button
                         type="button"
                         onClick={() => setDetailModalId(po.id)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-medium hover:bg-slate-50"
+                        className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                       >
                         <Eye size={14} />
                         Xem
@@ -161,96 +256,167 @@ export default function PurchaseOrderList() {
             </table>
           </div>
         )}
+        </div>
       </div>
 
-      {/* Modal chi tiết đơn mua */}
+      {/* Modal chi tiết đơn mua — style giống modal cập nhật nhà cung cấp */}
       {detailModalId != null && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
           onClick={() => !loadingOrder && setDetailModalId(null)}
           role="dialog"
           aria-modal="true"
           aria-labelledby="modal-title"
         >
           <div
-            className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
+            className="bg-white rounded-[18px] shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col border border-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between p-4 border-b border-slate-200 flex-shrink-0">
-              <h2 id="modal-title" className="text-lg font-semibold text-slate-900">
-                Chi tiết đơn mua
-              </h2>
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white">
+              <div>
+                <h2
+                  id="modal-title"
+                  className="text-base md:text-lg font-semibold text-slate-900"
+                >
+                  Chi tiết đơn mua
+                </h2>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Xem thông tin và duyệt đơn mua hàng.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => setDetailModalId(null)}
-                className="p-2 rounded-lg text-slate-500 hover:bg-slate-100"
+                className="h-8 w-8 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100"
                 aria-label="Đóng"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            <div className="overflow-y-auto flex-1 p-4">
+            {/* Modal body */}
+            <div className="overflow-y-auto flex-1 px-6 py-5 bg-slate-50">
               {loadingOrder || !order ? (
                 <div className="flex justify-center py-12">
                   <Loader2 size={32} className="animate-spin text-slate-400" />
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 gap-4 text-sm mb-4 pb-4 border-b border-slate-100">
-                    <div>
-                      <span className="text-slate-500 block">Mã đơn</span>
-                      <p className="font-medium text-slate-800">{order.orderCode}</p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block">Nhà cung cấp</span>
-                      <p className="font-medium text-slate-800">{order.supplierName}</p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block">Trạng thái</span>
-                      <p className="font-medium">
-                        <span
-                          className={
-                            order.status === "Approved"
-                              ? "text-emerald-600"
-                              : order.status === "Pending"
-                                ? "text-amber-600"
-                                : "text-slate-600"
-                          }
-                        >
-                          {order.status}
+                  {/* Thông tin đơn */}
+                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm mb-4">
+                    <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                          Mã đơn
                         </span>
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block">Ngày đặt</span>
-                      <p className="font-medium text-slate-800">
-                        {order.orderDate ? new Date(order.orderDate).toLocaleDateString("vi-VN") : "—"}
-                      </p>
+                        <p className="font-semibold text-slate-900 mt-1">
+                          {order.orderCode}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                          Nhà cung cấp
+                        </span>
+                        <p className="font-medium text-slate-900 mt-1">
+                          {order.supplierName}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                          Người tạo
+                        </span>
+                        <p className="font-medium text-slate-900 mt-1">
+                          {order.createdByName &&
+                          order.createdByName.trim().length > 0
+                            ? order.createdByName
+                            : "—"}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                          Trạng thái
+                        </span>
+                        <p className="font-medium mt-1">
+                          <span
+                            className={
+                              order.status === "Approved"
+                                ? "text-emerald-600"
+                                : order.status === "Pending"
+                                  ? "text-amber-600"
+                                  : "text-rose-600"
+                            }
+                          >
+                            {order.status}
+                          </span>
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                          Ngày đặt
+                        </span>
+                        <p className="font-medium text-slate-900 mt-1">
+                          {order.orderDate
+                            ? new Date(
+                                order.orderDate,
+                              ).toLocaleDateString("vi-VN")
+                            : "—"}
+                        </p>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="overflow-x-auto">
+                  {/* Bảng chi tiết */}
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200">
-                          <th className="text-left py-2 px-3 font-semibold text-slate-700">Sản phẩm</th>
-                          <th className="text-right py-2 px-3 font-semibold text-slate-700">KL đặt</th>
-                          <th className="text-right py-2 px-3 font-semibold text-slate-700">Đã nhận</th>
-                          <th className="text-right py-2 px-3 font-semibold text-slate-700">Đơn giá</th>
-                          <th className="text-right py-2 px-3 font-semibold text-slate-700">Thu hoạch</th>
+                          <th className="text-left py-2.5 px-3 font-semibold text-slate-700">
+                            Sản phẩm
+                          </th>
+                          <th className="text-right py-2.5 px-3 font-semibold text-slate-700">
+                            KL đặt
+                          </th>
+                          <th className="text-right py-2.5 px-3 font-semibold text-slate-700">
+                            Đã nhận
+                          </th>
+                          <th className="text-right py-2.5 px-3 font-semibold text-slate-700">
+                            Còn lại
+                          </th>
+                          <th className="text-right py-2.5 px-3 font-semibold text-slate-700">
+                            Đơn giá
+                          </th>
+                          <th className="text-right py-2.5 px-3 font-semibold text-slate-700">
+                            Thu hoạch
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
                         {order.details?.map((d) => (
-                          <tr key={d.id} className="border-b border-slate-100">
-                            <td className="py-2 px-3 text-slate-800">{d.productName}</td>
-                            <td className="py-2 px-3 text-right text-slate-700">{d.orderedWeight}</td>
-                            <td className="py-2 px-3 text-right text-slate-700">{d.receivedWeight}</td>
-                            <td className="py-2 px-3 text-right text-slate-700">{d.unitPrice}</td>
-                            <td className="py-2 px-3 text-right text-slate-600">
+                          <tr
+                            key={d.id}
+                            className="border-b border-slate-100 hover:bg-slate-50"
+                          >
+                            <td className="py-2.5 px-3 text-slate-800">
+                              {d.productName}
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-slate-700">
+                              {d.orderedWeight}
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-slate-700">
+                              {d.receivedWeight}
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-slate-700">
+                              {d.remainingWeight}
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-slate-700">
+                              {d.unitPrice.toLocaleString("vi-VN")}
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-slate-600">
                               {d.harvestDate
-                                ? new Date(d.harvestDate).toLocaleDateString("vi-VN")
+                                ? new Date(
+                                    d.harvestDate,
+                                  ).toLocaleDateString("vi-VN")
                                 : "—"}
                             </td>
                           </tr>
@@ -262,16 +428,21 @@ export default function PurchaseOrderList() {
               )}
             </div>
 
+            {/* Modal footer */}
             {order && !loadingOrder && (
-              <div className="flex flex-wrap items-center justify-end gap-2 p-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
+              <div className="flex flex-wrap items-center justify-end gap-2 px-6 py-4 border-t border-slate-100 bg-slate-50 flex-shrink-0">
                 {canApprove && (
                   <button
                     type="button"
                     onClick={handleApprove}
                     disabled={isApproving}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50"
                   >
-                    {isApproving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                    {isApproving ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <CheckCircle size={16} />
+                    )}
                     Duyệt đơn
                   </button>
                 )}
@@ -289,9 +460,13 @@ export default function PurchaseOrderList() {
                         type="button"
                         onClick={() => setConfirmDelete(true)}
                         disabled={isDeleting}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 text-red-600 text-sm font-medium hover:bg-red-100"
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 text-red-600 text-sm font-medium hover:bg-red-100 disabled:opacity-50"
                       >
-                        {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                        {isDeleting ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={16} />
+                        )}
                         Xóa
                       </button>
                     ) : (
@@ -300,7 +475,7 @@ export default function PurchaseOrderList() {
                           type="button"
                           onClick={handleDelete}
                           disabled={isDeleting}
-                          className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-medium hover:bg-red-700"
+                          className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50"
                         >
                           {isDeleting ? "Đang xóa..." : "Chắc chắn xóa"}
                         </button>

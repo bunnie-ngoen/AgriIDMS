@@ -149,6 +149,8 @@ const ProductVariantList = () => {
                 <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Grade</th>
                 <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Giá</th>
                 <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Hạn SD</th>
+                <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Định mức tối thiểu (kg)</th>
+                <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Box khả dụng</th>
                 <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Trạng thái</th>
                 <th className="px-5 py-3.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Thao tác</th>
               </tr>
@@ -197,6 +199,20 @@ const ProductVariantList = () => {
                     </td>
                     <td className="px-5 py-3.5">
                       <p className="text-xs text-slate-600">{variant.shelfLifeDays.toLocaleString()} ngày</p>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <p className="text-xs text-slate-600">
+                        {typeof variant.minReceiptWeight === "number"
+                          ? `${variant.minReceiptWeight} kg`
+                          : "—"}
+                      </p>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <p className="text-xs text-slate-600">
+                        {typeof variant.availableBoxCount === "number"
+                          ? variant.availableBoxCount.toLocaleString()
+                          : "0"}
+                      </p>
                     </td>
                     <td className="px-5 py-3.5">
                       <button

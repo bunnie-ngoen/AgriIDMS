@@ -6,6 +6,11 @@ export type PurchaseOrderListItem = {
   supplierName: string;
   status: string;
   orderDate: string;
+  /**
+   * Tên người tạo đơn (nếu BE trả về trong list).
+   * Ví dụ: createdByName / CreatedByName / CreatedBy.
+   */
+  createdByName?: string;
 };
 
 /** Match BE CreatePurchaseOrderRequest / CreatePurchaseOrderDetailRequest */
@@ -48,6 +53,11 @@ export type PurchaseOrderDetailResponse = {
   receivedWeight: number;
   remainingWeight: number;
   harvestDate: string;
+  /**
+   * Tên người duyệt dòng PO (nếu BE trả về).
+   * BE field: NameApprover.
+   */
+  approverName?: string;
 };
 
 export type PurchaseOrderResponse = {
@@ -57,5 +67,10 @@ export type PurchaseOrderResponse = {
   supplierName: string;
   status: string;
   orderDate: string;
+  /**
+   * Tên người tạo đơn (nếu BE trả về).
+   * Thường là các field như createdByName / CreatedByName / CreatedBy.
+   */
+  createdByName?: string;
   details: PurchaseOrderDetailResponse[];
 };
