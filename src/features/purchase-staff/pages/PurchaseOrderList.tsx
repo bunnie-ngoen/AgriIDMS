@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   useGetPurchaseOrdersQuery,
@@ -23,6 +23,9 @@ export default function PurchaseOrderList() {
   const [supplierFilter, setSupplierFilter] = useState<number | 0>(0);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const [dateError, setDateError] = useState<string | null>(null);
 
   const { data: list = [], isLoading, isError, error, refetch } = useGetPurchaseOrdersQuery();
   const { data: suppliers = [] } = useGetSuppliersQuery();
@@ -55,29 +58,81 @@ export default function PurchaseOrderList() {
   const canEdit = !isAdmin && order?.status === "Pending";
   const canApprove = isAdmin && order?.status === "Pending";
 
+  // Tính toán và validate khoảng ngày lọc
+  const dateValidation = useMemo(() => {
+    const todayOnly = new Date();
+    const today = new Date(
+      todayOnly.getFullYear(),
+      todayOnly.getMonth(),
+      todayOnly.getDate(),
+    );
+
+    const hasFrom = !!fromDate;
+    const hasTo = !!toDate;
+
+    const fromOnly = hasFrom
+      ? (() => {
+          const d = new Date(fromDate);
+          return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        })()
+      : null;
+    const toOnly = hasTo
+      ? (() => {
+          const d = new Date(toDate);
+          return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        })()
+      : null;
+
+    let invalid = false;
+    if (fromOnly && toOnly && fromOnly > toOnly) invalid = true;
+    if (fromOnly && fromOnly > today) invalid = true;
+
+    return { invalid, fromOnly, toOnly };
+  }, [fromDate, toDate]);
+
+  // Cập nhật thông báo lỗi cho khoảng ngày
+  useEffect(() => {
+    if (dateValidation.invalid) {
+      setDateError(
+        "Ngày từ phải nhỏ hơn hoặc bằng ngày đến, và không được lớn hơn ngày hiện tại.",
+      );
+    } else {
+      setDateError(null);
+    }
+  }, [dateValidation]);
+
   const filteredList = useMemo(() => {
     return list.filter((po) => {
       if (supplierFilter && po.supplierId !== supplierFilter) return false;
 
-      if (fromDate || toDate) {
+      // Nếu ngày lọc hợp lệ thì áp dụng filter theo ngày
+      if (!dateValidation.invalid && (fromDate || toDate)) {
         if (!po.orderDate) return false;
         const d = new Date(po.orderDate);
         const dOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-        if (fromDate) {
-          const from = new Date(fromDate);
-          const fromOnly = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-          if (dOnly < fromOnly) return false;
+        if (fromDate && dateValidation.fromOnly && dOnly < dateValidation.fromOnly) {
+          return false;
         }
-        if (toDate) {
-          const to = new Date(toDate);
-          const toOnly = new Date(to.getFullYear(), to.getMonth(), to.getDate());
-          if (dOnly > toOnly) return false;
+        if (toDate && dateValidation.toOnly && dOnly > dateValidation.toOnly) {
+          return false;
         }
       }
 
       return true;
     });
-  }, [list, supplierFilter, fromDate, toDate]);
+  }, [list, supplierFilter, fromDate, toDate, dateValidation]);
+
+  // Reset về trang 1 khi filter thay đổi
+  useEffect(() => {
+    setPage(1);
+  }, [supplierFilter, fromDate, toDate]);
+
+  const totalItems = filteredList.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const startIndex = (safePage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalItems);
+  const pagedList = filteredList.slice(startIndex, endIndex);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-4 sm:px-6 py-6">
@@ -159,6 +214,11 @@ export default function PurchaseOrderList() {
                 className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
               />
             </div>
+            {dateError && (
+              <p className="w-full text-[11px] text-red-500 md:text-right">
+                {dateError}
+              </p>
+            )}
           </div>
         </div>
 
@@ -210,7 +270,7 @@ export default function PurchaseOrderList() {
                 </tr>
               </thead>
               <tbody>
-                {filteredList.map((po) => (
+                {pagedList.map((po) => (
                   <tr
                     key={po.id}
                     className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors"
@@ -254,6 +314,42 @@ export default function PurchaseOrderList() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {!isLoading && !isError && filteredList.length > 0 && (
+          <div className="px-6 py-4 border-t border-slate-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <p className="text-xs text-slate-500">
+              Hiển thị <span className="font-semibold text-slate-700">{startIndex + 1}</span>–
+              <span className="font-semibold text-slate-700">{endIndex}</span> /{" "}
+              <span className="font-semibold text-slate-700">{totalItems}</span> đơn mua
+            </p>
+
+            <div className="flex flex-wrap items-center gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={safePage <= 1}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50"
+              >
+                Trang trước
+              </button>
+
+              <span className="text-xs text-slate-500 px-1">
+                Trang <span className="font-semibold text-slate-700">{safePage}</span> /{" "}
+                <span className="font-semibold text-slate-700">{totalPages}</span>
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={safePage >= totalPages}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50"
+              >
+                Trang sau
+              </button>
+            </div>
           </div>
         )}
         </div>

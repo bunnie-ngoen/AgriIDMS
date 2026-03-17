@@ -2,11 +2,15 @@ import { api } from "../../../shared/api";
 import type {
   GoodsReceiptSummary,
   GoodsReceiptResponse,
+  LotSummary,
+  BoxByQrResponse,
+  SlotByQrResponse,
   CreateGoodsReceiptRequest,
   AddGoodsReceiptDetailRequest,
   UpdateTruckWeightRequest,
   QCInspectionRequest,
   CreateBoxesRequest,
+  AssignBoxToSlotRequest,
 } from "../types/goods-receipt.type";
 
 type RawObject = Record<string, unknown>;
@@ -118,6 +122,99 @@ export const goodsReceiptApi = api.injectEndpoints({
       ],
     }),
 
+    getLotsByGoodsReceiptId: builder.query<LotSummary[], number>({
+      query: (receiptId) => ({ url: `Lots/by-goods-receipt/${receiptId}` }),
+      transformResponse: (raw: unknown): LotSummary[] => {
+        const arr = Array.isArray(raw) ? raw : [];
+        return arr.map((item) => {
+          const row = (item ?? {}) as RawObject;
+          const received = row.receivedDate ?? row.ReceivedDate;
+          const expiry = row.expiryDate ?? row.ExpiryDate;
+
+          return {
+            id: (row.id as number) ?? (row.Id as number) ?? 0,
+            lotCode:
+              (row.lotCode as string) ?? (row.LotCode as string) ?? "",
+            totalQuantity:
+              (row.totalQuantity as number) ??
+              (row.TotalQuantity as number) ??
+              0,
+            remainingQuantity:
+              (row.remainingQuantity as number) ??
+              (row.RemainingQuantity as number) ??
+              0,
+            receivedDate:
+              received != null
+                ? typeof received === "string"
+                  ? received
+                  : new Date(received as string | number).toISOString()
+                : "",
+            expiryDate:
+              expiry != null
+                ? typeof expiry === "string"
+                  ? expiry
+                  : new Date(expiry as string | number).toISOString()
+                : "",
+          };
+        });
+      },
+    }),
+
+    getBoxByQr: builder.query<BoxByQrResponse, string>({
+      query: (qrCode) => ({ url: `Boxes/by-qr/${encodeURIComponent(qrCode)}` }),
+      transformResponse: (raw: unknown): BoxByQrResponse => {
+        const row = (raw ?? {}) as RawObject;
+        const placed = row.placedInColdAt ?? row.PlacedInColdAt;
+
+        return {
+          id: (row.id as number) ?? (row.Id as number) ?? 0,
+          boxCode: (row.boxCode as string) ?? (row.BoxCode as string) ?? "",
+          qrCode:
+            (row.qrCode as string | null | undefined) ??
+            (row.QRCode as string | null | undefined) ??
+            null,
+          weight: (row.weight as number) ?? (row.Weight as number) ?? 0,
+          status: (row.status as string) ?? (row.Status as string) ?? "",
+          slotId:
+            (row.slotId as number | null | undefined) ??
+            (row.SlotId as number | null | undefined) ??
+            null,
+          warehouseId:
+            (row.warehouseId as number | null | undefined) ??
+            (row.WarehouseId as number | null | undefined) ??
+            null,
+          lotId: (row.lotId as number) ?? (row.LotId as number) ?? 0,
+          placedInColdAt:
+            placed != null
+              ? typeof placed === "string"
+                ? placed
+                : new Date(placed as string | number).toISOString()
+              : null,
+        };
+      },
+    }),
+
+    getSlotByQr: builder.query<SlotByQrResponse, string>({
+      query: (qrCode) => ({ url: `slots/by-qr/${encodeURIComponent(qrCode)}` }),
+      transformResponse: (raw: unknown): SlotByQrResponse => {
+        const row = (raw ?? {}) as RawObject;
+        return {
+          id: (row.id as number) ?? (row.Id as number) ?? 0,
+          code: (row.code as string) ?? (row.Code as string) ?? "",
+          qrCode:
+            (row.qrCode as string | null | undefined) ??
+            (row.QrCode as string | null | undefined) ??
+            null,
+          capacity: (row.capacity as number) ?? (row.Capacity as number) ?? 0,
+          currentCapacity:
+            (row.currentCapacity as number) ??
+            (row.CurrentCapacity as number) ??
+            0,
+          rackId: (row.rackId as number) ?? (row.RackId as number) ?? 0,
+        };
+      },
+    }),
+
     createGoodsReceipt: builder.mutation<
       { message: string; receiptId: number },
       CreateGoodsReceiptRequest
@@ -217,6 +314,17 @@ export const goodsReceiptApi = api.injectEndpoints({
         { type: "GoodsReceipt" as const, id: "LIST" },
       ],
     }),
+
+    assignBoxToSlot: builder.mutation<
+      { message: string },
+      AssignBoxToSlotRequest
+    >({
+      query: (body) => ({
+        url: "Boxes/assign-slot",
+        method: "POST",
+        body,
+      }),
+    }),
   }),
 });
 
@@ -231,5 +339,9 @@ export const {
   useApproveGoodsReceiptMutation,
   useManagerApproveGoodsReceiptMutation,
   useManagerRejectGoodsReceiptMutation,
+  useGetLotsByGoodsReceiptIdQuery,
+  useLazyGetBoxByQrQuery,
+  useLazyGetSlotByQrQuery,
+  useAssignBoxToSlotMutation,
 } = goodsReceiptApi;
 

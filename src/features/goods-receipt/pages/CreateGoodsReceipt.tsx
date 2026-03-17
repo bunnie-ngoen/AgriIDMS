@@ -10,27 +10,41 @@ import { useGetWarehousesQuery } from "../../admin/api/create-user.api";
 import { useGetPurchaseOrdersQuery } from "../../purchase-order/api/purchase-order.api";
 import { useCreateGoodsReceiptMutation } from "../api/goods-receipt.api";
 
-const Schema = z.object({
-  supplierId: z.number().min(1, "Vui lòng chọn nhà cung cấp."),
-  warehouseId: z.number().min(1, "Vui lòng chọn kho."),
-  vehicleNumber: z
-    .string()
-    .trim()
-    .min(1, "Biển số xe không được để trống.")
-    .max(50),
-  driverName: z
-    .string()
-    .trim()
-    .min(1, "Tên tài xế không được để trống.")
-    .max(100),
-  transportCompany: z
-    .string()
-    .trim()
-    .max(100, "Tên công ty vận chuyển tối đa 100 ký tự.")
-    .optional()
-    .or(z.literal("")),
-  purchaseOrderId: z.number().min(1, "Vui lòng chọn đơn mua."),
-});
+const Schema = z
+  .object({
+    supplierId: z.number().min(1, "Vui lòng chọn nhà cung cấp."),
+    warehouseId: z.number().min(1, "Vui lòng chọn kho."),
+    vehicleNumber: z
+      .string()
+      .trim()
+      .min(1, "Biển số xe không được để trống.")
+      .max(50),
+    driverName: z
+      .string()
+      .trim()
+      .min(1, "Tên tài xế không được để trống.")
+      .max(100),
+    transportCompany: z
+      .string()
+      .trim()
+      .max(100, "Tên công ty vận chuyển tối đa 100 ký tự.")
+      .optional()
+      .or(z.literal("")),
+    grossWeight: z
+      .number({ message: "Vui lòng nhập tổng trọng lượng xe." })
+      .min(0.01, "Tổng trọng lượng xe phải > 0."),
+    tareWeight: z
+      .number({ message: "Vui lòng nhập trọng lượng bì." })
+      .min(0.01, "Trọng lượng bì phải > 0."),
+    purchaseOrderId: z.number().min(1, "Vui lòng chọn đơn mua."),
+  })
+  .refine(
+    (data) => data.grossWeight > data.tareWeight,
+    {
+      message: "Tổng trọng lượng xe phải lớn hơn trọng lượng bì.",
+      path: ["grossWeight"],
+    },
+  );
 
 type FormValues = z.infer<typeof Schema>;
 
@@ -55,6 +69,8 @@ export default function CreateGoodsReceipt() {
       vehicleNumber: "",
       driverName: "",
       transportCompany: "",
+      grossWeight: 0,
+      tareWeight: 0,
       purchaseOrderId: 0,
     },
   });
@@ -62,29 +78,33 @@ export default function CreateGoodsReceipt() {
   const watchedSupplierId = form.watch("supplierId");
   const watchedPurchaseOrderId = form.watch("purchaseOrderId");
 
-  // Nếu đổi nhà cung cấp thì reset lại đơn mua, tránh chọn nhầm PO của NCC khác
+  const selectedPo = purchaseOrders.find((po) => po.id === watchedPurchaseOrderId);
+  const selectedSupplierName =
+    selectedPo?.supplierName ||
+    suppliers.find((s) => s.id === watchedSupplierId)?.name ||
+    "";
+
+  // Nếu chọn đơn mua thì tự điền nhà cung cấp theo đơn mua (tránh lệch với BE)
   useEffect(() => {
-    if (!watchedSupplierId || !purchaseOrders?.length) {
-      if (form.getValues("purchaseOrderId") !== 0) {
-        form.setValue("purchaseOrderId", 0, {
+    if (!watchedPurchaseOrderId || !purchaseOrders?.length) {
+      if (form.getValues("supplierId") !== 0) {
+        form.setValue("supplierId", 0, {
           shouldValidate: true,
           shouldDirty: true,
         });
       }
       return;
     }
+    const matchedPo = purchaseOrders.find((po) => po.id === watchedPurchaseOrderId);
+    if (!matchedPo) return;
 
-    const currentPo = purchaseOrders.find(
-      (po) => po.id === form.getValues("purchaseOrderId"),
-    );
-
-    if (currentPo && currentPo.supplierId !== watchedSupplierId) {
-      form.setValue("purchaseOrderId", 0, {
+    if (form.getValues("supplierId") !== matchedPo.supplierId) {
+      form.setValue("supplierId", matchedPo.supplierId, {
         shouldValidate: true,
         shouldDirty: true,
       });
     }
-  }, [watchedSupplierId, purchaseOrders, form]);
+  }, [watchedPurchaseOrderId, purchaseOrders, form]);
 
   const onSubmit = async (values: FormValues) => {
     setServerMessage(null);
@@ -96,6 +116,8 @@ export default function CreateGoodsReceipt() {
         vehicleNumber: values.vehicleNumber.trim(),
         driverName: values.driverName.trim(),
         transportCompany: values.transportCompany?.trim() || undefined,
+        grossWeight: values.grossWeight,
+        tareWeight: values.tareWeight,
         purchaseOrderId: values.purchaseOrderId,
       }).unwrap();
 
@@ -122,10 +144,8 @@ export default function CreateGoodsReceipt() {
   };
 
   const filteredPurchaseOrders = purchaseOrders.filter((po) => {
-    // Bắt buộc phải chọn nhà cung cấp trước khi nhìn thấy đơn mua
-    if (!watchedSupplierId || watchedSupplierId === 0) return false;
-    if (po.supplierId !== watchedSupplierId) return false;
-    return po.status === "Approved";
+    if (po.status !== "Approved") return false;
+    return true;
   });
 
   return (
@@ -170,34 +190,33 @@ export default function CreateGoodsReceipt() {
                   <label className="block text-xs font-medium text-slate-600 mb-1">
                     Nhà cung cấp *
                   </label>
-                  <select
-                    {...form.register("supplierId", { valueAsNumber: true })}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
-                    disabled={
-                      isLoadingSuppliers || isSuppliersError
-                    }
-                  >
-                    <option value={0}>
-                      {isLoadingSuppliers
+                  <input
+                    value={
+                      isLoadingSuppliers
                         ? "Đang tải nhà cung cấp..."
-                        : "Chọn nhà cung cấp"}
-                    </option>
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                        : selectedSupplierName || ""
+                    }
+                    readOnly
+                    placeholder="Chọn đơn mua để tự điền nhà cung cấp"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 text-slate-700 focus:outline-none"
+                  />
                   {form.formState.errors.supplierId && (
                     <p className="text-[11px] text-red-500 mt-1">
                       {form.formState.errors.supplierId.message}
                     </p>
                   )}
-                  {!watchedSupplierId && !form.formState.errors.supplierId && (
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      Hãy chọn nhà cung cấp trước, sau đó mới chọn đơn mua tương ứng.
-                    </p>
-                  )}
+                  {watchedPurchaseOrderId > 0 &&
+                    !form.formState.errors.supplierId && (
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        Nhà cung cấp được tự động lấy theo đơn mua đã chọn.
+                      </p>
+                    )}
+                  {watchedPurchaseOrderId <= 0 &&
+                    !form.formState.errors.supplierId && (
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        Vui lòng chọn đơn mua ở bên dưới để hệ thống tự điền nhà cung cấp.
+                      </p>
+                    )}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">
@@ -229,6 +248,45 @@ export default function CreateGoodsReceipt() {
                       Không tải được danh sách kho.{" "}
                       {(warehousesError as { status?: number })?.status === 401 &&
                         "Vui lòng đăng nhập lại với tài khoản Admin/Manager."}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    Tổng trọng lượng xe (gross weight, kg) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={0.01}
+                    {...form.register("grossWeight", { valueAsNumber: true })}
+                    placeholder="VD: 15000 (kg cả xe và hàng)"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
+                  />
+                  {form.formState.errors.grossWeight && (
+                    <p className="text-[11px] text-red-500 mt-1">
+                      {form.formState.errors.grossWeight.message}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    Trọng lượng bì (tare weight, kg) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={0.01}
+                    {...form.register("tareWeight", { valueAsNumber: true })}
+                    placeholder="VD: 10000 (kg chỉ xe, không có hàng)"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
+                  />
+                  {form.formState.errors.tareWeight && (
+                    <p className="text-[11px] text-red-500 mt-1">
+                      {form.formState.errors.tareWeight.message}
                     </p>
                   )}
                 </div>
@@ -297,22 +355,19 @@ export default function CreateGoodsReceipt() {
             </div>
             <div className="p-6 text-sm space-y-3">
               <p className="text-xs text-slate-500">
-                Chỉ hiển thị các đơn mua đã được duyệt (Approved) của nhà cung cấp đã chọn.
-                Bạn cần chọn nhà cung cấp ở bước trên trước khi chọn đơn mua.
+                Chỉ hiển thị các đơn mua đã được duyệt (Approved). Khi chọn đơn mua,
+                hệ thống sẽ tự điền nhà cung cấp tương ứng.
               </p>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Đơn mua hàng * (theo nhà cung cấp đã chọn)
+                  Đơn mua hàng *
                 </label>
                 <select
                   {...form.register("purchaseOrderId", { valueAsNumber: true })}
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
-                  disabled={!watchedSupplierId || watchedSupplierId === 0}
                 >
                   <option value={0}>
-                    {(!watchedSupplierId || watchedSupplierId === 0)
-                      ? "Vui lòng chọn nhà cung cấp trước"
-                      : "Chọn đơn mua đã duyệt của nhà cung cấp này"}
+                    Chọn đơn mua đã duyệt
                   </option>
                   {filteredPurchaseOrders.map((po) => (
                     <option key={po.id} value={po.id}>

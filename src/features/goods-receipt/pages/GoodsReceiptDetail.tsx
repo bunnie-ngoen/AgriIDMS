@@ -3,16 +3,10 @@ import { useForm } from "react-hook-form";
 import {
   useGetGoodsReceiptByIdQuery,
   useAddGoodsReceiptDetailMutation,
-  useUpdateTruckWeightMutation,
 } from "../api/goods-receipt.api";
 import { useGetPurchaseOrderByIdQuery } from "../../purchase-order/api/purchase-order.api";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
-
-type TruckWeightForm = {
-  grossWeight: number;
-  tareWeight: number;
-};
 
 type AddDetailForm = {
   purchaseOrderDetailId: number;
@@ -34,8 +28,6 @@ export default function GoodsReceiptDetail() {
 
   const [addDetail, { isLoading: isAdding }] =
     useAddGoodsReceiptDetailMutation();
-  const [updateTruckWeight, { isLoading: isUpdatingTruck }] =
-    useUpdateTruckWeightMutation();
 
   const poId = receipt?.purchaseOrderId ?? 0;
   const {
@@ -43,13 +35,6 @@ export default function GoodsReceiptDetail() {
     isLoading: isLoadingPo,
   } = useGetPurchaseOrderByIdQuery(poId, {
     skip: !poId,
-  });
-
-  const truckForm = useForm<TruckWeightForm>({
-    defaultValues: {
-      grossWeight: 0,
-      tareWeight: 0,
-    },
   });
 
   const addDetailForm = useForm<AddDetailForm>({
@@ -86,26 +71,6 @@ export default function GoodsReceiptDetail() {
 
   const canEditDetails =
     receipt.status === "Draft" || receipt.status === "Received";
-  const canUpdateTruckWeight =
-    receipt.status === "Draft" || receipt.status === "Received";
-
-  const handleSubmitTruckWeight = async (values: TruckWeightForm) => {
-    const toastId = toast.loading("Đang cập nhật trọng lượng xe...");
-    try {
-      await updateTruckWeight({
-        goodsReceiptId: receipt.id,
-        grossWeight: Number(values.grossWeight),
-        tareWeight: Number(values.tareWeight),
-      }).unwrap();
-      toast.success("Cập nhật trọng lượng xe thành công.", { id: toastId });
-    } catch (err: any) {
-      const msg =
-        err?.data?.message ||
-        err?.data?.error ||
-        "Cập nhật trọng lượng xe thất bại.";
-      toast.error(msg, { id: toastId });
-    }
-  };
 
   const handleSubmitAddDetail = async (values: AddDetailForm) => {
     if (!purchaseOrder) return;
@@ -219,151 +184,84 @@ export default function GoodsReceiptDetail() {
           </div>
         </div>
 
-        {/* Bước 1: nhập hàng (trọng lượng xe + dòng chi tiết) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Truck weight */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
-            <div className="flex items-baseline justify-between gap-2">
-              <h2 className="text-sm font-semibold text-slate-800">
-                Bước 1 · Trọng lượng xe
-              </h2>
-              {!canUpdateTruckWeight && (
-                <p className="text-[11px] text-slate-400">
-                  Đã khoá sau khi phiếu được duyệt.
-                </p>
-              )}
-            </div>
+        {/* Bước 1: thêm dòng chi tiết phiếu nhập */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="text-sm font-semibold text-slate-800">
+              Bước 1 · Thêm dòng chi tiết phiếu
+            </h2>
+            {!canEditDetails && (
+              <p className="text-[11px] text-slate-400">
+                Chỉ thêm khi phiếu đang Nháp / Đã nhập số liệu.
+              </p>
+            )}
+          </div>
+          {isLoadingPo && (
+            <p className="text-xs text-slate-500">
+              Đang tải đơn mua liên quan...
+            </p>
+          )}
+          {!poId && (
+            <p className="text-xs text-slate-500">
+              Phiếu nhập này chưa gắn với đơn mua nào, không thể thêm chi tiết.
+            </p>
+          )}
+          {poId && purchaseOrder && (
             <form
-              onSubmit={truckForm.handleSubmit(handleSubmitTruckWeight)}
+              onSubmit={addDetailForm.handleSubmit(handleSubmitAddDetail)}
               className="space-y-3 text-sm"
             >
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Tổng trọng lượng xe (gross weight, kg)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    {...truckForm.register("grossWeight", {
-                      valueAsNumber: true,
-                    })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Trọng lượng bì (tare weight, kg)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    {...truckForm.register("tareWeight", {
-                      valueAsNumber: true,
-                    })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Chọn dòng sản phẩm từ đơn mua *
+                </label>
+                <select
+                  {...addDetailForm.register("purchaseOrderDetailId", {
+                    valueAsNumber: true,
+                  })}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
+                >
+                  <option value={0}>
+                    Chọn sản phẩm / dòng chi tiết trong đơn mua
+                  </option>
+                  {purchaseOrder.details.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.productName} — KL đặt: {d.orderedWeight} kg, còn lại:{" "}
+                      {d.remainingWeight} kg
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">
+                  Khối lượng nhận (kg) *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min={0.01}
+                  {...addDetailForm.register("receivedWeight", {
+                    valueAsNumber: true,
+                  })}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
+                />
               </div>
               <button
                 type="submit"
-                disabled={isUpdatingTruck || !canUpdateTruckWeight}
+                disabled={isAdding || !canEditDetails}
                 className="w-full rounded-xl py-2.5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {isUpdatingTruck ? (
+                {isAdding ? (
                   <>
                     <Loader2 size={15} className="animate-spin" />
-                    Đang cập nhật...
+                    Đang thêm chi tiết...
                   </>
                 ) : (
-                  "Lưu trọng lượng xe"
+                  "Thêm chi tiết"
                 )}
               </button>
             </form>
-          </div>
-
-          {/* Add detail */}
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
-            <div className="flex items-baseline justify-between gap-2">
-              <h2 className="text-sm font-semibold text-slate-800">
-                Bước 1 · Thêm dòng chi tiết phiếu
-              </h2>
-              {!canEditDetails && (
-                <p className="text-[11px] text-slate-400">
-                  Chỉ thêm khi phiếu đang Nháp / Đã nhập số liệu.
-                </p>
-              )}
-            </div>
-            {isLoadingPo && (
-              <p className="text-xs text-slate-500">
-                Đang tải đơn mua liên quan...
-              </p>
-            )}
-            {!poId && (
-              <p className="text-xs text-slate-500">
-                Phiếu nhập này chưa gắn với đơn mua nào, không thể thêm chi
-                tiết.
-              </p>
-            )}
-            {poId && purchaseOrder && (
-              <form
-                onSubmit={addDetailForm.handleSubmit(handleSubmitAddDetail)}
-                className="space-y-3 text-sm"
-              >
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Chọn dòng sản phẩm từ đơn mua *
-                  </label>
-                  <select
-                    {...addDetailForm.register("purchaseOrderDetailId", {
-                      valueAsNumber: true,
-                    })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
-                  >
-                    <option value={0}>
-                      Chọn sản phẩm / dòng chi tiết trong đơn mua
-                    </option>
-                    {purchaseOrder.details.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.productName} — KL đặt: {d.orderedWeight} kg, còn lại:{" "}
-                        {d.remainingWeight} kg
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Khối lượng nhận (kg) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min={0.01}
-                    {...addDetailForm.register("receivedWeight", {
-                      valueAsNumber: true,
-                    })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={isAdding || !canEditDetails}
-                  className="w-full rounded-xl py-2.5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {isAdding ? (
-                    <>
-                      <Loader2 size={15} className="animate-spin" />
-                      Đang thêm chi tiết...
-                    </>
-                  ) : (
-                    "Thêm chi tiết"
-                  )}
-                </button>
-              </form>
-            )}
-          </div>
+          )}
         </div>
 
         {/* Bảng chi tiết (chỉ đọc) */}
