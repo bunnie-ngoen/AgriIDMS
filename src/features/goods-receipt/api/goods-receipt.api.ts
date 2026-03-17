@@ -2,6 +2,7 @@ import { api } from "../../../shared/api";
 import type {
   GoodsReceiptSummary,
   GoodsReceiptResponse,
+  GoodsReceiptForApprovalResponse,
   LotSummary,
   BoxByQrResponse,
   SlotByQrResponse,
@@ -74,6 +75,14 @@ const mapDetail = (row: RawObject) => ({
   rejectWeight:
     (row.rejectWeight as number) ?? (row.RejectWeight as number) ?? 0,
   qcResult: (row.qcResult as string) ?? (row.QCResult as string) ?? "",
+  unitPrice:
+    (row.unitPrice as number | null | undefined) ??
+    (row.UnitPrice as number | null | undefined) ??
+    null,
+  lineTotal:
+    (row.lineTotal as number | null | undefined) ??
+    (row.LineTotal as number | null | undefined) ??
+    null,
 });
 
 export const goodsReceiptApi = api.injectEndpoints({
@@ -114,6 +123,32 @@ export const goodsReceiptApi = api.injectEndpoints({
 
         return {
           ...mapSummary(obj),
+          details: detailsRaw.map((d) => mapDetail((d ?? {}) as RawObject)),
+        };
+      },
+      providesTags: (_res, _err, id) => [
+        { type: "GoodsReceipt" as const, id },
+      ],
+    }),
+
+    getGoodsReceiptForApprovalById: builder.query<
+      GoodsReceiptForApprovalResponse,
+      number
+    >({
+      query: (id) => ({ url: `GoodsReceipts/${id}/for-approval` }),
+      transformResponse: (raw: unknown): GoodsReceiptForApprovalResponse => {
+        const obj = (raw ?? {}) as RawObject;
+        const detailsRaw =
+          (obj.details as unknown[]) ??
+          (obj.Details as unknown[]) ??
+          [];
+
+        return {
+          ...mapSummary(obj),
+          totalAmount:
+            (obj.totalAmount as number | null | undefined) ??
+            (obj.TotalAmount as number | null | undefined) ??
+            null,
           details: detailsRaw.map((d) => mapDetail((d ?? {}) as RawObject)),
         };
       },
@@ -315,6 +350,21 @@ export const goodsReceiptApi = api.injectEndpoints({
       ],
     }),
 
+    updateGoodsReceiptWarehouse: builder.mutation<
+      { message: string },
+      { receiptId: number; warehouseId: number }
+    >({
+      query: ({ receiptId, warehouseId }) => ({
+        url: `GoodsReceipts/${receiptId}/warehouse`,
+        method: "PATCH",
+        body: { warehouseId },
+      }),
+      invalidatesTags: (_res, _err, arg) => [
+        { type: "GoodsReceipt" as const, id: arg.receiptId },
+        { type: "GoodsReceipt" as const, id: "LIST" },
+      ],
+    }),
+
     assignBoxToSlot: builder.mutation<
       { message: string },
       AssignBoxToSlotRequest
@@ -331,6 +381,7 @@ export const goodsReceiptApi = api.injectEndpoints({
 export const {
   useGetGoodsReceiptsQuery,
   useGetGoodsReceiptByIdQuery,
+  useGetGoodsReceiptForApprovalByIdQuery,
   useCreateGoodsReceiptMutation,
   useAddGoodsReceiptDetailMutation,
   useUpdateTruckWeightMutation,
@@ -339,6 +390,7 @@ export const {
   useApproveGoodsReceiptMutation,
   useManagerApproveGoodsReceiptMutation,
   useManagerRejectGoodsReceiptMutation,
+  useUpdateGoodsReceiptWarehouseMutation,
   useGetLotsByGoodsReceiptIdQuery,
   useLazyGetBoxByQrQuery,
   useLazyGetSlotByQrQuery,

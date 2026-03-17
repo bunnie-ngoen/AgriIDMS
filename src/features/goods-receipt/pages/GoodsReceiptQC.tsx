@@ -2,16 +2,20 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import {
   useGetGoodsReceiptByIdQuery,
+  useGetGoodsReceiptForApprovalByIdQuery,
   useQcInspectionMutation,
   useApproveGoodsReceiptMutation,
   useManagerApproveGoodsReceiptMutation,
   useManagerRejectGoodsReceiptMutation,
   useCreateBoxesMutation,
   useGetLotsByGoodsReceiptIdQuery,
+  useUpdateGoodsReceiptWarehouseMutation,
 } from "../api/goods-receipt.api";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
+import { useGetWarehousesQuery } from "../../admin/api/create-user.api";
 
 type QCForm = {
   usableWeight: number;
@@ -28,6 +32,7 @@ export default function GoodsReceiptQC() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const receiptId = id ? Number(id) : 0;
+  const { isAdmin, isManager } = useRoleGuard();
 
   const {
     data: receipt,
@@ -55,10 +60,17 @@ export default function GoodsReceiptQC() {
     useManagerRejectGoodsReceiptMutation();
   const [createBoxes, { isLoading: isCreatingBoxes }] =
     useCreateBoxesMutation();
+  const [updateReceiptWarehouse, { isLoading: isUpdatingWarehouse }] =
+    useUpdateGoodsReceiptWarehouseMutation();
+
+  const { data: warehouses = [] } = useGetWarehousesQuery();
 
   const [selectedDetailIdForQc, setSelectedDetailIdForQc] = useState<
     number | null
   >(null);
+
+  const [isWarehouseModalOpen, setIsWarehouseModalOpen] = useState(false);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<number>(0);
 
   const qcForm = useForm<QCForm>({
     defaultValues: {
@@ -119,6 +131,23 @@ export default function GoodsReceiptQC() {
     receipt.status === "Received" ||
     receipt.status === "QCCompleted";
   const canManagerAction = receipt.status === "PendingManagerApproval";
+  const canViewPrice = isAdmin() || isManager();
+  const moneyFmt = useMemo(
+    () => new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }),
+    [],
+  );
+
+  const {
+    data: receiptForApproval,
+    refetch: refetchForApproval,
+  } = useGetGoodsReceiptForApprovalByIdQuery(receiptId, {
+    skip: !canViewPrice || !receiptId || Number.isNaN(receiptId),
+  });
+
+  const detailsForTable =
+    canViewPrice && receiptForApproval?.details?.length
+      ? receiptForApproval.details
+      : receipt.details;
 
   const handleOpenQcForDetail = (detailId: number, currentUsable: number) => {
     setSelectedDetailIdForQc(detailId);
@@ -170,6 +199,7 @@ export default function GoodsReceiptQC() {
       toast.success("Cập nhật QC thành công.", { id: toastId });
       setSelectedDetailIdForQc(null);
       await refetch();
+      if (canViewPrice) await refetchForApproval();
     } catch (err: any) {
       const msg =
         err?.data?.message ||
@@ -186,11 +216,45 @@ export default function GoodsReceiptQC() {
       await approveReceipt(receipt.id).unwrap();
       toast.success("Duyệt phiếu nhập thành công.", { id: toastId });
       await refetch();
+      if (canViewPrice) await refetchForApproval();
     } catch (err: any) {
       const msg =
         err?.data?.message ||
         err?.data?.error ||
         "Duyệt phiếu nhập thất bại.";
+      toast.error(msg, { id: toastId });
+
+      // Nếu lỗi do kho không đủ dung lượng, mở popup cho chọn lại kho
+      if (
+        typeof msg === "string" &&
+        (msg.includes("Không đủ dung lượng") || msg.includes("kg trống"))
+      ) {
+        setSelectedWarehouseId(receipt.warehouseId || 0);
+        setIsWarehouseModalOpen(true);
+      }
+    }
+  };
+
+  const handleConfirmChangeWarehouse = async () => {
+    if (!selectedWarehouseId || selectedWarehouseId <= 0) {
+      toast.error("Vui lòng chọn kho hợp lệ.");
+      return;
+    }
+    const toastId = toast.loading("Đang cập nhật kho cho phiếu nhập...");
+    try {
+      await updateReceiptWarehouse({
+        receiptId: receipt.id,
+        warehouseId: selectedWarehouseId,
+      }).unwrap();
+      toast.success("Đã cập nhật kho cho phiếu nhập.", { id: toastId });
+      setIsWarehouseModalOpen(false);
+      await refetch();
+      if (canViewPrice) await refetchForApproval();
+    } catch (err: any) {
+      const msg =
+        err?.data?.message ||
+        err?.data?.error ||
+        "Cập nhật kho thất bại.";
       toast.error(msg, { id: toastId });
     }
   };
@@ -202,6 +266,7 @@ export default function GoodsReceiptQC() {
       await managerApprove(receipt.id).unwrap();
       toast.success("Manager duyệt phiếu nhập thành công.", { id: toastId });
       await refetch();
+      if (canViewPrice) await refetchForApproval();
     } catch (err: any) {
       const msg =
         err?.data?.message ||
@@ -220,6 +285,7 @@ export default function GoodsReceiptQC() {
         id: toastId,
       });
       await refetch();
+      if (canViewPrice) await refetchForApproval();
     } catch (err: any) {
       const msg =
         err?.data?.message ||
@@ -400,6 +466,16 @@ export default function GoodsReceiptQC() {
                   <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                     Sản phẩm
                   </th>
+                  {canViewPrice && (
+                    <>
+                      <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                        Đơn giá
+                      </th>
+                      <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                        Thành tiền
+                      </th>
+                    </>
+                  )}
                   <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                     KL nhận
                   </th>
@@ -418,17 +494,17 @@ export default function GoodsReceiptQC() {
                 </tr>
               </thead>
               <tbody>
-                {receipt.details.length === 0 ? (
+                {detailsForTable.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={canViewPrice ? 8 : 6}
                       className="px-5 py-6 text-center text-slate-500 text-sm"
                     >
                       Chưa có dòng chi tiết nào.
                     </td>
                   </tr>
                 ) : (
-                  receipt.details.map((d) => (
+                  detailsForTable.map((d) => (
                     <tr
                       key={d.id}
                       className="border-t border-slate-100 hover:bg-slate-50/50"
@@ -436,6 +512,20 @@ export default function GoodsReceiptQC() {
                       <td className="px-5 py-3 text-slate-800">
                         {d.productName}
                       </td>
+                      {canViewPrice && (
+                        <>
+                          <td className="px-5 py-3 text-right text-slate-700 tabular-nums">
+                            {d.unitPrice != null
+                              ? `${moneyFmt.format(Number(d.unitPrice))} ₫`
+                              : "—"}
+                          </td>
+                          <td className="px-5 py-3 text-right text-slate-700 tabular-nums">
+                            {d.lineTotal != null
+                              ? `${moneyFmt.format(Number(d.lineTotal))} ₫`
+                              : "—"}
+                          </td>
+                        </>
+                      )}
                       <td className="px-5 py-3 text-right text-slate-700">
                         {d.receivedWeight}
                       </td>
@@ -620,6 +710,65 @@ export default function GoodsReceiptQC() {
             </div>
           )}
         </div>
+
+        {/* Popup đổi kho khi kho hiện tại không đủ dung lượng */}
+        {isWarehouseModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+            <div className="w-full max-w-lg rounded-3xl bg-white shadow-xl border border-slate-100 overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100">
+                <h3 className="text-sm font-semibold text-slate-900">
+                  Kho hiện tại không đủ dung lượng
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Vui lòng chọn kho khác để tiếp tục duyệt phiếu nhập.
+                </p>
+              </div>
+              <div className="px-6 py-4 space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    Chọn kho mới
+                  </label>
+                  <select
+                    value={selectedWarehouseId || ""}
+                    onChange={(e) => setSelectedWarehouseId(Number(e.target.value))}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
+                  >
+                    <option value="">Chọn kho</option>
+                    {warehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        #{w.id} · {w.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Lưu ý: BE sẽ kiểm tra lại dung lượng kho mới khi duyệt.
+                  </p>
+                </div>
+              </div>
+              <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2 bg-slate-50/60">
+                <button
+                  type="button"
+                  onClick={() => setIsWarehouseModalOpen(false)}
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100"
+                  disabled={isUpdatingWarehouse}
+                >
+                  Đóng
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmChangeWarehouse}
+                  disabled={isUpdatingWarehouse}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 inline-flex items-center gap-2"
+                >
+                  {isUpdatingWarehouse && (
+                    <Loader2 size={14} className="animate-spin" />
+                  )}
+                  Cập nhật kho
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
