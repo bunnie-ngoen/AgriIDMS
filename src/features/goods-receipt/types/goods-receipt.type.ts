@@ -23,10 +23,16 @@ export type GoodsReceiptDetailLine = {
   usableWeight: number;
   rejectWeight: number;
   qcResult: string;
+  unitPrice?: number | null;
+  lineTotal?: number | null;
 };
 
 export type GoodsReceiptResponse = GoodsReceiptSummary & {
   details: GoodsReceiptDetailLine[];
+};
+
+export type GoodsReceiptForApprovalResponse = GoodsReceiptResponse & {
+  totalAmount?: number | null;
 };
 
 export type LotSummary = {
