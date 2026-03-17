@@ -29,12 +29,44 @@ export type GoodsReceiptResponse = GoodsReceiptSummary & {
   details: GoodsReceiptDetailLine[];
 };
 
+export type LotSummary = {
+  id: number;
+  lotCode: string;
+  totalQuantity: number;
+  remainingQuantity: number;
+  receivedDate: string;
+  expiryDate: string;
+};
+
+export type BoxByQrResponse = {
+  id: number;
+  boxCode: string;
+  qrCode: string | null;
+  weight: number;
+  status: string;
+  slotId: number | null;
+  warehouseId: number | null;
+  lotId: number;
+  placedInColdAt: string | null;
+};
+
+export type SlotByQrResponse = {
+  id: number;
+  code: string;
+  qrCode: string | null;
+  capacity: number;
+  currentCapacity: number;
+  rackId: number;
+};
+
 export type CreateGoodsReceiptRequest = {
   supplierId: number;
   warehouseId: number;
   vehicleNumber: string;
   driverName: string;
   transportCompany?: string | null;
+  grossWeight: number;
+  tareWeight: number;
   purchaseOrderId: number;
 };
 
@@ -66,5 +98,10 @@ export type QCInspectionRequest = {
 export type CreateBoxesRequest = {
   lotId: number;
   boxSize: number;
+};
+
+export type AssignBoxToSlotRequest = {
+  boxId: number;
+  slotId: number;
 };
 

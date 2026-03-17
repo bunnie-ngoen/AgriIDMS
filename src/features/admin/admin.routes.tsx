@@ -103,6 +103,11 @@ const GoodsReceiptQCPage = lazy(
   () => import("../goods-receipt/pages/GoodsReceiptQC")
 );
 
+// Warehouse putaway (xếp box vào slot)
+const PutBoxIntoSlotPage = lazy(
+  () => import("../warehouse/pages/PutBoxIntoSlot")
+);
+
 export const adminRoutes = [
   {
     path: "/admin",
@@ -151,6 +156,9 @@ export const adminRoutes = [
       { path: "goods-receipts/create", element: <CreateGoodsReceiptPage /> },
       { path: "goods-receipts/:id", element: <GoodsReceiptDetailPage /> },
       { path: "goods-receipts/:id/qc", element: <GoodsReceiptQCPage /> },
+
+      // Kho: xếp box vào slot
+      { path: "putaway", element: <PutBoxIntoSlotPage /> },
     ],
   },
 ];

@@ -87,6 +87,16 @@ export default function EditPurchaseOrder() {
       if (!d.orderedWeight || Number(d.orderedWeight) <= 0) {
         localErrors.push(`Dòng ${row}: khối lượng đặt phải lớn hơn 0.`);
       }
+      const matchedVariant = variants.find((v) => v.id === d.productVariantId);
+      const minLine =
+        typeof matchedVariant?.minReceiptWeight === "number"
+          ? matchedVariant.minReceiptWeight
+          : null;
+      if (minLine != null && Number(d.orderedWeight) < minLine) {
+        localErrors.push(
+          `Khối lượng đặt (kg) phải >= định mức tối thiểu (${minLine} kg) của sản phẩm.`,
+        );
+      }
       if (d.unitPrice != null && Number(d.unitPrice) < 0) {
         localErrors.push(`Dòng ${row}: đơn giá không được âm.`);
       }

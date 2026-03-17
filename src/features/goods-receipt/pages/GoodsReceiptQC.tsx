@@ -7,10 +7,11 @@ import {
   useManagerApproveGoodsReceiptMutation,
   useManagerRejectGoodsReceiptMutation,
   useCreateBoxesMutation,
+  useGetLotsByGoodsReceiptIdQuery,
 } from "../api/goods-receipt.api";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type QCForm = {
   usableWeight: number;
@@ -34,6 +35,14 @@ export default function GoodsReceiptQC() {
     error,
     refetch,
   } = useGetGoodsReceiptByIdQuery(receiptId, {
+    skip: !receiptId || Number.isNaN(receiptId),
+  });
+
+  const {
+    data: lots = [],
+    isLoading: isLoadingLots,
+    error: lotsError,
+  } = useGetLotsByGoodsReceiptIdQuery(receiptId, {
     skip: !receiptId || Number.isNaN(receiptId),
   });
 
@@ -65,6 +74,15 @@ export default function GoodsReceiptQC() {
       boxSize: 0,
     },
   });
+
+  useEffect(() => {
+    if (lots && lots.length > 0) {
+      const currentLotId = createBoxesForm.getValues("lotId");
+      if (!currentLotId || currentLotId <= 0) {
+        createBoxesForm.setValue("lotId", lots[0].id);
+      }
+    }
+  }, [lots, createBoxesForm]);
 
   if (Number.isNaN(receiptId) || receiptId < 1) {
     navigate("/admin/goods-receipts");
@@ -212,8 +230,15 @@ export default function GoodsReceiptQC() {
   };
 
   const handleSubmitCreateBoxes = async (values: CreateBoxesForm) => {
+    if (!lots || lots.length === 0) {
+      toast.error(
+        "Phiếu nhập này chưa có Lot nào. Vui lòng tạo Lot trước khi tạo box.",
+      );
+      return;
+    }
+
     if (!values.lotId || values.lotId <= 0) {
-      toast.error("Vui lòng nhập LotId hợp lệ (tạm thời nhập tay).");
+      toast.error("Vui lòng chọn Lot hợp lệ.");
       return;
     }
     if (!values.boxSize || values.boxSize <= 0) {
@@ -229,7 +254,10 @@ export default function GoodsReceiptQC() {
       }).unwrap();
       toast.success("Tạo box thành công.", { id: toastId });
       createBoxesForm.reset({ lotId: 0, boxSize: 0 });
-      await refetch();
+      // Sau khi tạo box thành công, quay về danh sách phiếu nhập
+      setTimeout(() => {
+        navigate("/admin/goods-receipts");
+      }, 600);
     } catch (err: any) {
       const msg =
         err?.data?.message ||
@@ -518,8 +546,18 @@ export default function GoodsReceiptQC() {
           {receipt.status === "Approved" && (
             <div className="px-6 py-4 border-t border-slate-100 bg-emerald-50/40">
               <h3 className="text-xs font-semibold text-slate-800 mb-2">
-                Tạo box từ Lot (tạm thời nhập LotId thủ công)
+                Tạo box từ Lot
               </h3>
+              {lotsError && (
+                <p className="text-xs text-rose-600 mb-2">
+                  Không tải được danh sách Lot cho phiếu nhập này.
+                </p>
+              )}
+              {lots.length === 0 && !isLoadingLots && !lotsError && (
+                <p className="text-xs text-slate-500 mb-2">
+                  Chưa có Lot nào được tạo cho phiếu nhập này.
+                </p>
+              )}
               <form
                 onSubmit={createBoxesForm.handleSubmit(
                   handleSubmitCreateBoxes,
@@ -528,17 +566,26 @@ export default function GoodsReceiptQC() {
               >
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">
-                    LotId
+                    Chọn Lot
                   </label>
-                  <input
-                    type="number"
-                    min={1}
+                  <select
                     {...createBoxesForm.register("lotId", {
                       valueAsNumber: true,
                     })}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
-                    placeholder="Nhập LotId"
-                  />
+                    disabled={isLoadingLots || lots.length === 0}
+                  >
+                    {isLoadingLots && (
+                      <option value="">Đang tải danh sách Lot...</option>
+                    )}
+                    {!isLoadingLots &&
+                      lots.map((lot) => (
+                        <option key={lot.id} value={lot.id}>
+                          #{lot.id} · {lot.lotCode} · còn{" "}
+                          {lot.remainingQuantity} kg
+                        </option>
+                      ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">
@@ -558,7 +605,9 @@ export default function GoodsReceiptQC() {
                 <div className="flex justify-end">
                   <button
                     type="submit"
-                    disabled={isCreatingBoxes}
+                    disabled={
+                      isCreatingBoxes || isLoadingLots || lots.length === 0
+                    }
                     className="px-4 py-2 rounded-xl bg-emerald-600 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 flex items-center gap-2"
                   >
                     {isCreatingBoxes && (
