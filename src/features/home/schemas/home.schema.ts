@@ -10,7 +10,7 @@ export const homeProductSchema = z.object({
     productName: z.string(),
     grade: z.number(), // 1 = Grade1, 2 = Grade2, 3 = Grade3
     price: z.number(),
-    imageUrl: z.union([z.string().url(), z.literal("")]).optional().nullable(),
+    imageUrl: z.string().optional().nullable(),
 });
 
 export const homeProductListSchema = z.array(homeProductSchema);
