@@ -30,10 +30,10 @@ function normalizeDetailResponse(raw: unknown): unknown {
 export const homeApi = api.injectEndpoints({
     endpoints: (builder) => ({
 
-        // LIST PRODUCTS
+        // BE: GET api/Home/product-variants
         getHomeProducts: builder.query<HomeProduct[], void>({
             query: () => ({
-                url: "/Home/product-variants",
+                url: "Home/product-variants",
                 method: "GET",
             }),
             transformResponse: (raw: unknown) => {
@@ -48,15 +48,13 @@ export const homeApi = api.injectEndpoints({
             },
         }),
 
-        // PRODUCT DETAIL
+        // BE: GET api/Home/{id}
         getHomeProductDetail: builder.query<HomeProductDetail, number>({
             query: (id) => ({
-                url: "/Home",
+                url: `Home/${id}`,
                 method: "GET",
-                params: { id },
             }),
             transformResponse: (raw: unknown) => {
-                // Chuẩn hóa PascalCase từ BE sang camelCase để schema parse đúng
                 const normalized = normalizeDetailResponse(raw);
                 const parsed = homeProductDetailSchema.safeParse(normalized);
 
@@ -69,10 +67,10 @@ export const homeApi = api.injectEndpoints({
             },
         }),
 
-        // ADD TO CART
+        // BE: POST api/Carts/items
         addToCart: builder.mutation<void, AddToCartRequest>({
             query: (body) => ({
-                url: "/Carts/items",
+                url: "Carts/items",
                 method: "POST",
                 body,
             }),
