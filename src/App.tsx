@@ -33,13 +33,13 @@ function App() {
                     <Route path={ROUTES.FORGET_PASSWORD} element={<ForgotPasswordPage />} />
                     <Route path={ROUTES.UNAUTHORIZED} element={<UnauthorizedPage />} />
 
-                    {/* Admin routes */}
+                    {/* Admin routes (tạm dùng chung cho Admin + Manager) */}
                     {adminRoutes.map((route) => (
                         <Route
                             key={route.path}
                             path={route.path}
                             element={
-                                <ProtectedRoute allowedRoles={[AUTH_ROLE.ADMIN]}>
+                                <ProtectedRoute allowedRoles={[AUTH_ROLE.ADMIN, AUTH_ROLE.MANAGER]}>
                                     {route.element}
                                 </ProtectedRoute>
                             }

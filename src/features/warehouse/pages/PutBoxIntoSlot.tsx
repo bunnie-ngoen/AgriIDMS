@@ -93,7 +93,9 @@ export default function PutBoxIntoSlot() {
     } catch (err: any) {
       const msg =
         err?.data?.message ||
+        err?.data?.Message ||
         err?.data?.error ||
+        err?.data?.Error ||
         "Không tìm thấy box theo QR.";
       toast.error(msg);
     }
@@ -112,7 +114,9 @@ export default function PutBoxIntoSlot() {
     } catch (err: any) {
       const msg =
         err?.data?.message ||
+        err?.data?.Message ||
         err?.data?.error ||
+        err?.data?.Error ||
         "Không tìm thấy slot theo QR.";
       toast.error(msg);
     }
@@ -151,7 +155,9 @@ export default function PutBoxIntoSlot() {
     } catch (err: any) {
       const msg =
         err?.data?.message ||
+        err?.data?.Message ||
         err?.data?.error ||
+        err?.data?.Error ||
         "Xếp box vào slot thất bại.";
       toast.error(msg, { id: toastId });
     }

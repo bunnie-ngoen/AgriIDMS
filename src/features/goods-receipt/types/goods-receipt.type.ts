@@ -66,14 +66,16 @@ export type SlotByQrResponse = {
 };
 
 export type CreateGoodsReceiptRequest = {
-  supplierId: number;
   warehouseId: number;
   vehicleNumber: string;
   driverName: string;
   transportCompany?: string | null;
-  grossWeight: number;
-  tareWeight: number;
   purchaseOrderId: number;
+  details?: {
+    purchaseOrderDetailId: number;
+    productVariantId: number;
+    receivedWeight: number;
+  }[];
 };
 
 export type AddGoodsReceiptDetailRequest = {
@@ -92,13 +94,6 @@ export type UpdateTruckWeightRequest = {
 export type QCInspectionRequest = {
   detailId: number;
   usableWeight: number;
-  qcResult: string;
-  qcNote?: string | null;
-  /**
-   * FE-only: id phiếu nhập để RTK Query có thể invalidatesTags chính xác.
-   * BE sẽ bỏ qua field này nếu không định nghĩa trong DTO.
-   */
-  goodsReceiptId?: number;
 };
 
 export type CreateBoxesRequest = {
