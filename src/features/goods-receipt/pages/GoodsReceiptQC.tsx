@@ -5,8 +5,9 @@ import {
   useGetGoodsReceiptForApprovalByIdQuery,
   useQcInspectionMutation,
   useApproveGoodsReceiptMutation,
-  useManagerApproveGoodsReceiptMutation,
-  useManagerRejectGoodsReceiptMutation,
+  useManagerAllowQcMutation,
+  useManagerReviewMinWeightMutation,
+  useManagerReviewToleranceMutation,
   useCreateBoxesMutation,
   useGetLotsByGoodsReceiptIdQuery,
   useUpdateGoodsReceiptWarehouseMutation,
@@ -19,8 +20,6 @@ import { useGetWarehousesQuery } from "../../admin/api/create-user.api";
 
 type QCForm = {
   usableWeight: number;
-  qcResult: "Passed" | "Failed";
-  qcNote?: string;
 };
 
 type CreateBoxesForm = {
@@ -47,6 +46,7 @@ export default function GoodsReceiptQC() {
     data: lots = [],
     isLoading: isLoadingLots,
     error: lotsError,
+    refetch: refetchLots,
   } = useGetLotsByGoodsReceiptIdQuery(receiptId, {
     skip: !receiptId || Number.isNaN(receiptId),
   });
@@ -54,10 +54,12 @@ export default function GoodsReceiptQC() {
   const [qcInspection, { isLoading: isQcLoading }] = useQcInspectionMutation();
   const [approveReceipt, { isLoading: isApproving }] =
     useApproveGoodsReceiptMutation();
-  const [managerApprove, { isLoading: isManagerApproving }] =
-    useManagerApproveGoodsReceiptMutation();
-  const [managerReject, { isLoading: isManagerRejecting }] =
-    useManagerRejectGoodsReceiptMutation();
+  const [managerAllowQc, { isLoading: isManagerAllowingQc }] =
+    useManagerAllowQcMutation();
+  const [managerReviewMin, { isLoading: isManagerReviewingMin }] =
+    useManagerReviewMinWeightMutation();
+  const [managerReviewTolerance, { isLoading: isManagerReviewingTolerance }] =
+    useManagerReviewToleranceMutation();
   const [createBoxes, { isLoading: isCreatingBoxes }] =
     useCreateBoxesMutation();
   const [updateReceiptWarehouse, { isLoading: isUpdatingWarehouse }] =
@@ -75,8 +77,6 @@ export default function GoodsReceiptQC() {
   const qcForm = useForm<QCForm>({
     defaultValues: {
       usableWeight: 0,
-      qcResult: "Passed",
-      qcNote: "",
     },
   });
 
@@ -87,14 +87,20 @@ export default function GoodsReceiptQC() {
     },
   });
 
+  const lotsSorted = useMemo(() => {
+    if (!lots) return [];
+    return [...lots].sort((a, b) => b.id - a.id);
+  }, [lots]);
+
   useEffect(() => {
-    if (lots && lots.length > 0) {
-      const currentLotId = createBoxesForm.getValues("lotId");
-      if (!currentLotId || currentLotId <= 0) {
-        createBoxesForm.setValue("lotId", lots[0].id);
-      }
+    if (!lotsSorted || lotsSorted.length === 0) return;
+    const currentLotId = createBoxesForm.getValues("lotId");
+    const stillExists = lotsSorted.some((l) => l.id === currentLotId);
+    if (!currentLotId || currentLotId <= 0 || !stillExists) {
+      // auto chọn Lot mới nhất (id lớn nhất)
+      createBoxesForm.setValue("lotId", lotsSorted[0].id);
     }
-  }, [lots, createBoxesForm]);
+  }, [lotsSorted, createBoxesForm]);
 
   if (Number.isNaN(receiptId) || receiptId < 1) {
     navigate("/admin/goods-receipts");
@@ -115,22 +121,22 @@ export default function GoodsReceiptQC() {
 
   const statusClass = (status: string) => {
     if (status === "Approved") return "text-emerald-600";
-    if (status === "PendingManagerApproval" || status === "Pending")
+    if (
+      status === "PendingManagerApproval" ||
+      status === "PendingManagerApprovalQc" ||
+      status === "Pending"
+    )
       return "text-amber-600";
     if (status === "Rejected") return "text-red-600";
     return "text-slate-600";
   };
 
   const canQC =
-    receipt.status === "Draft" ||
-    receipt.status === "Received" ||
-    receipt.status === "QCCompleted" ||
-    receipt.status === "PendingManagerApproval";
+    receipt.status === "Draft" || receipt.status === "Received";
   const canApprove =
-    receipt.status === "Draft" ||
-    receipt.status === "Received" ||
-    receipt.status === "QCCompleted";
-  const canManagerAction = receipt.status === "PendingManagerApproval";
+    receipt.status === "QCCompleted" || receipt.status === "PendingManagerApproval";
+  const canManagerToleranceAction = receipt.status === "PendingManagerApproval";
+  const canManagerMinWeightAction = receipt.status === "PendingManagerApprovalQc";
   const canViewPrice = isAdmin() || isManager();
   const moneyFmt = useMemo(
     () => new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }),
@@ -153,8 +159,6 @@ export default function GoodsReceiptQC() {
     setSelectedDetailIdForQc(detailId);
     qcForm.reset({
       usableWeight: currentUsable,
-      qcResult: "Passed",
-      qcNote: "",
     });
   };
 
@@ -180,21 +184,11 @@ export default function GoodsReceiptQC() {
       );
       return;
     }
-    if (values.qcResult === "Failed" && usable !== 0) {
-      toast.error(
-        "Khi QC không đạt (Failed), khối lượng dùng được phải bằng 0.",
-      );
-      return;
-    }
-
     const toastId = toast.loading("Đang cập nhật QC cho dòng chi tiết...");
     try {
       await qcInspection({
         detailId: selectedDetailIdForQc,
         usableWeight: usable,
-        qcResult: values.qcResult,
-        qcNote: values.qcNote,
-        goodsReceiptId: receipt.id,
       }).unwrap();
       toast.success("Cập nhật QC thành công.", { id: toastId });
       setSelectedDetailIdForQc(null);
@@ -216,6 +210,7 @@ export default function GoodsReceiptQC() {
       await approveReceipt(receipt.id).unwrap();
       toast.success("Duyệt phiếu nhập thành công.", { id: toastId });
       await refetch();
+      await refetchLots();
       if (canViewPrice) await refetchForApproval();
     } catch (err: any) {
       const msg =
@@ -259,29 +254,54 @@ export default function GoodsReceiptQC() {
     }
   };
 
-  const handleManagerApprove = async () => {
-    if (!window.confirm("Manager xác nhận DUYỆT phiếu nhập này?")) return;
-    const toastId = toast.loading("Manager đang duyệt phiếu nhập...");
+  const handleManagerReviewTolerance = async (approve: boolean) => {
+    if (
+      !window.confirm(
+        approve
+          ? "Manager xác nhận DUYỆT phiếu nhập vượt dung sai?"
+          : "Manager xác nhận TỪ CHỐI phiếu nhập vượt dung sai?"
+      )
+    )
+      return;
+
+    const toastId = toast.loading(
+      approve ? "Manager đang duyệt..." : "Manager đang từ chối..."
+    );
     try {
-      await managerApprove(receipt.id).unwrap();
-      toast.success("Manager duyệt phiếu nhập thành công.", { id: toastId });
+      await managerReviewTolerance({ receiptId: receipt.id, approve }).unwrap();
+      toast.success(
+        approve ? "Manager duyệt thành công." : "Manager từ chối thành công.",
+        { id: toastId }
+      );
       await refetch();
       if (canViewPrice) await refetchForApproval();
     } catch (err: any) {
       const msg =
         err?.data?.message ||
+        err?.data?.Message ||
         err?.data?.error ||
-        "Manager duyệt phiếu nhập thất bại.";
+        err?.data?.Error ||
+        "Manager xử lý thất bại.";
       toast.error(msg, { id: toastId });
     }
   };
 
-  const handleManagerReject = async () => {
-    if (!window.confirm("Manager xác nhận TỪ CHỐI phiếu nhập này?")) return;
-    const toastId = toast.loading("Manager đang từ chối phiếu nhập...");
+  const handleManagerReviewMinWeight = async (approve: boolean) => {
+    if (
+      !window.confirm(
+        approve
+          ? "Manager cho phép tiếp tục QC/Approve (ngoại lệ định mức tối thiểu)?"
+          : "Manager xác nhận TỪ CHỐI phiếu do dưới định mức tối thiểu?"
+      )
+    )
+      return;
+
+    const toastId = toast.loading(
+      approve ? "Manager đang xử lý..." : "Manager đang từ chối..."
+    );
     try {
-      await managerReject(receipt.id).unwrap();
-      toast.success("Manager từ chối phiếu nhập thành công.", {
+      await managerReviewMin({ receiptId: receipt.id, approve }).unwrap();
+      toast.success("Đã xử lý phiếu theo quyết định Manager.", {
         id: toastId,
       });
       await refetch();
@@ -289,8 +309,29 @@ export default function GoodsReceiptQC() {
     } catch (err: any) {
       const msg =
         err?.data?.message ||
+        err?.data?.Message ||
         err?.data?.error ||
-        "Manager từ chối phiếu nhập thất bại.";
+        err?.data?.Error ||
+        "Manager xử lý thất bại.";
+      toast.error(msg, { id: toastId });
+    }
+  };
+
+  const handleManagerAllowQc = async () => {
+    if (!window.confirm("Manager cho phép quay lại bước QC?")) return;
+    const toastId = toast.loading("Đang cập nhật trạng thái để QC tiếp...");
+    try {
+      await managerAllowQc(receipt.id).unwrap();
+      toast.success("Đã cho phép tiếp tục QC.", { id: toastId });
+      await refetch();
+      if (canViewPrice) await refetchForApproval();
+    } catch (err: any) {
+      const msg =
+        err?.data?.message ||
+        err?.data?.Message ||
+        err?.data?.error ||
+        err?.data?.Error ||
+        "Không thể cho phép QC tiếp.";
       toast.error(msg, { id: toastId });
     }
   };
@@ -327,7 +368,12 @@ export default function GoodsReceiptQC() {
     } catch (err: any) {
       const msg =
         err?.data?.message ||
+        err?.data?.Message ||
         err?.data?.error ||
+        err?.data?.Error ||
+        err?.data?.detail ||
+        err?.data?.Detail ||
+        (typeof err?.data === "string" ? err.data : null) ||
         "Tạo box thất bại.";
       toast.error(msg, { id: toastId });
     }
@@ -414,31 +460,73 @@ export default function GoodsReceiptQC() {
                     Duyệt phiếu (Admin)
                   </button>
                 )}
-                {canManagerAction && (
+                {canManagerToleranceAction && (
                   <>
                     <button
                       type="button"
-                      onClick={handleManagerApprove}
-                      disabled={isManagerApproving}
+                      onClick={() => handleManagerReviewTolerance(true)}
+                      disabled={isManagerReviewingTolerance}
                       className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-xs font-semibold text-white px-3 py-1.5 disabled:opacity-60"
                     >
-                      {isManagerApproving && (
+                      {isManagerReviewingTolerance && (
                         <Loader2 size={12} className="animate-spin" />
                       )}
-                      Manager duyệt
+                      Manager duyệt (dung sai)
                     </button>
                     <button
                       type="button"
-                      onClick={handleManagerReject}
-                      disabled={isManagerRejecting}
+                      onClick={() => handleManagerReviewTolerance(false)}
+                      disabled={isManagerReviewingTolerance}
                       className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-xs font-semibold text-white px-3 py-1.5 disabled:opacity-60"
                     >
-                      {isManagerRejecting && (
+                      {isManagerReviewingTolerance && (
                         <Loader2 size={12} className="animate-spin" />
                       )}
                       Manager từ chối
                     </button>
                   </>
+                )}
+
+                {canManagerMinWeightAction && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleManagerReviewMinWeight(true)}
+                      disabled={isManagerReviewingMin}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-xs font-semibold text-white px-3 py-1.5 disabled:opacity-60"
+                    >
+                      {isManagerReviewingMin && (
+                        <Loader2 size={12} className="animate-spin" />
+                      )}
+                      Cho phép QC tiếp
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleManagerReviewMinWeight(false)}
+                      disabled={isManagerReviewingMin}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-xs font-semibold text-white px-3 py-1.5 disabled:opacity-60"
+                    >
+                      {isManagerReviewingMin && (
+                        <Loader2 size={12} className="animate-spin" />
+                      )}
+                      Từ chối
+                    </button>
+                  </>
+                )}
+
+                {/* Trường hợp đặc biệt: cho phép quay lại QC khi đang PendingManagerApproval */}
+                {canManagerToleranceAction && (
+                  <button
+                    type="button"
+                    onClick={handleManagerAllowQc}
+                    disabled={isManagerAllowingQc}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 px-3 py-1.5 hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    {isManagerAllowingQc && (
+                      <Loader2 size={12} className="animate-spin" />
+                    )}
+                    Cho phép QC lại
+                  </button>
                 )}
               </div>
             </div>
@@ -586,29 +674,6 @@ export default function GoodsReceiptQC() {
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Kết quả QC
-                  </label>
-                  <select
-                    {...qcForm.register("qcResult")}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
-                  >
-                    <option value="Passed">Passed</option>
-                    <option value="Failed">Failed</option>
-                  </select>
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Ghi chú
-                  </label>
-                  <input
-                    type="text"
-                    {...qcForm.register("qcNote")}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
-                    placeholder="Ghi chú QC (tuỳ chọn)"
-                  />
-                </div>
                 <div className="flex gap-2 md:col-span-4 justify-end">
                   <button
                     type="button"
@@ -669,7 +734,7 @@ export default function GoodsReceiptQC() {
                       <option value="">Đang tải danh sách Lot...</option>
                     )}
                     {!isLoadingLots &&
-                      lots.map((lot) => (
+                      lotsSorted.map((lot) => (
                         <option key={lot.id} value={lot.id}>
                           #{lot.id} · {lot.lotCode} · còn{" "}
                           {lot.remainingQuantity} kg

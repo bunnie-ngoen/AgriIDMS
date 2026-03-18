@@ -1,18 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Loader2, Truck, FileText } from "lucide-react";
 import toast from "react-hot-toast";
-import { useGetSuppliersQuery } from "../../supplier/api/supplier.api";
 import { useGetWarehousesQuery } from "../../admin/api/create-user.api";
 import { useGetPurchaseOrdersQuery } from "../../purchase-order/api/purchase-order.api";
 import { useCreateGoodsReceiptMutation } from "../api/goods-receipt.api";
 
 const Schema = z
   .object({
-    supplierId: z.number().min(1, "Vui lòng chọn nhà cung cấp."),
     warehouseId: z.number().min(1, "Vui lòng chọn kho."),
     vehicleNumber: z
       .string()
@@ -30,27 +28,13 @@ const Schema = z
       .max(100, "Tên công ty vận chuyển tối đa 100 ký tự.")
       .optional()
       .or(z.literal("")),
-    grossWeight: z
-      .number({ message: "Vui lòng nhập tổng trọng lượng xe." })
-      .min(0.01, "Tổng trọng lượng xe phải > 0."),
-    tareWeight: z
-      .number({ message: "Vui lòng nhập trọng lượng bì." })
-      .min(0.01, "Trọng lượng bì phải > 0."),
     purchaseOrderId: z.number().min(1, "Vui lòng chọn đơn mua."),
-  })
-  .refine(
-    (data) => data.grossWeight > data.tareWeight,
-    {
-      message: "Tổng trọng lượng xe phải lớn hơn trọng lượng bì.",
-      path: ["grossWeight"],
-    },
-  );
+  });
 
 type FormValues = z.infer<typeof Schema>;
 
 export default function CreateGoodsReceipt() {
   const navigate = useNavigate();
-  const { data: suppliers = [], isLoading: isLoadingSuppliers, isError: isSuppliersError } = useGetSuppliersQuery();
   const {
     data: warehouses = [],
     isLoading: isLoadingWarehouses,
@@ -64,61 +48,31 @@ export default function CreateGoodsReceipt() {
   const form = useForm<FormValues>({
     resolver: zodResolver(Schema),
     defaultValues: {
-      supplierId: 0,
       warehouseId: 0,
       vehicleNumber: "",
       driverName: "",
       transportCompany: "",
-      grossWeight: 0,
-      tareWeight: 0,
       purchaseOrderId: 0,
     },
   });
 
-  const watchedSupplierId = form.watch("supplierId");
   const watchedPurchaseOrderId = form.watch("purchaseOrderId");
 
   const selectedPo = purchaseOrders.find((po) => po.id === watchedPurchaseOrderId);
   const selectedSupplierName =
-    selectedPo?.supplierName ||
-    suppliers.find((s) => s.id === watchedSupplierId)?.name ||
-    "";
-
-  // Nếu chọn đơn mua thì tự điền nhà cung cấp theo đơn mua (tránh lệch với BE)
-  useEffect(() => {
-    if (!watchedPurchaseOrderId || !purchaseOrders?.length) {
-      if (form.getValues("supplierId") !== 0) {
-        form.setValue("supplierId", 0, {
-          shouldValidate: true,
-          shouldDirty: true,
-        });
-      }
-      return;
-    }
-    const matchedPo = purchaseOrders.find((po) => po.id === watchedPurchaseOrderId);
-    if (!matchedPo) return;
-
-    if (form.getValues("supplierId") !== matchedPo.supplierId) {
-      form.setValue("supplierId", matchedPo.supplierId, {
-        shouldValidate: true,
-        shouldDirty: true,
-      });
-    }
-  }, [watchedPurchaseOrderId, purchaseOrders, form]);
+    selectedPo?.supplierName || "";
 
   const onSubmit = async (values: FormValues) => {
     setServerMessage(null);
     const toastId = toast.loading("Đang tạo phiếu nhập kho...");
     try {
       const result = await createReceipt({
-        supplierId: values.supplierId,
         warehouseId: values.warehouseId,
         vehicleNumber: values.vehicleNumber.trim(),
         driverName: values.driverName.trim(),
         transportCompany: values.transportCompany?.trim() || undefined,
-        grossWeight: values.grossWeight,
-        tareWeight: values.tareWeight,
         purchaseOrderId: values.purchaseOrderId,
+        details: [],
       }).unwrap();
 
       const successMsg = "Tạo phiếu nhập thành công. Đang chuyển sang màn chi tiết để thêm dòng.";
@@ -192,27 +146,20 @@ export default function CreateGoodsReceipt() {
                   </label>
                   <input
                     value={
-                      isLoadingSuppliers
-                        ? "Đang tải nhà cung cấp..."
-                        : selectedSupplierName || ""
+                      selectedSupplierName || ""
                     }
                     readOnly
                     placeholder="Chọn đơn mua để tự điền nhà cung cấp"
                     className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 text-slate-700 focus:outline-none"
                   />
-                  {form.formState.errors.supplierId && (
-                    <p className="text-[11px] text-red-500 mt-1">
-                      {form.formState.errors.supplierId.message}
-                    </p>
-                  )}
                   {watchedPurchaseOrderId > 0 &&
-                    !form.formState.errors.supplierId && (
+                    (
                       <p className="text-[11px] text-slate-400 mt-1">
                         Nhà cung cấp được tự động lấy theo đơn mua đã chọn.
                       </p>
                     )}
                   {watchedPurchaseOrderId <= 0 &&
-                    !form.formState.errors.supplierId && (
+                    (
                       <p className="text-[11px] text-slate-400 mt-1">
                         Vui lòng chọn đơn mua ở bên dưới để hệ thống tự điền nhà cung cấp.
                       </p>
@@ -248,45 +195,6 @@ export default function CreateGoodsReceipt() {
                       Không tải được danh sách kho.{" "}
                       {(warehousesError as { status?: number })?.status === 401 &&
                         "Vui lòng đăng nhập lại với tài khoản Admin/Manager."}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Tổng trọng lượng xe (gross weight, kg) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min={0.01}
-                    {...form.register("grossWeight", { valueAsNumber: true })}
-                    placeholder="VD: 15000 (kg cả xe và hàng)"
-                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
-                  />
-                  {form.formState.errors.grossWeight && (
-                    <p className="text-[11px] text-red-500 mt-1">
-                      {form.formState.errors.grossWeight.message}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Trọng lượng bì (tare weight, kg) *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min={0.01}
-                    {...form.register("tareWeight", { valueAsNumber: true })}
-                    placeholder="VD: 10000 (kg chỉ xe, không có hàng)"
-                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
-                  />
-                  {form.formState.errors.tareWeight && (
-                    <p className="text-[11px] text-red-500 mt-1">
-                      {form.formState.errors.tareWeight.message}
                     </p>
                   )}
                 </div>

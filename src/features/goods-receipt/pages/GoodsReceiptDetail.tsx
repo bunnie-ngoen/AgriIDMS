@@ -99,7 +99,9 @@ export default function GoodsReceiptDetail() {
     } catch (err: any) {
       const msg =
         err?.data?.message ||
+        err?.data?.Message ||
         err?.data?.error ||
+        err?.data?.Error ||
         "Thêm chi tiết phiếu nhập thất bại.";
       toast.error(msg, { id: toastId });
     }

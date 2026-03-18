@@ -259,6 +259,18 @@ export const goodsReceiptApi = api.injectEndpoints({
         method: "POST",
         body,
       }),
+      transformResponse: (raw: unknown): { message: string; receiptId: number } => {
+        if (raw && typeof raw === "object") {
+          const obj = raw as RawObject;
+          return {
+            message:
+              (obj.message as string) ?? (obj.Message as string) ?? "OK",
+            receiptId:
+              (obj.receiptId as number) ?? (obj.ReceiptId as number) ?? 0,
+          };
+        }
+        return { message: "OK", receiptId: 0 };
+      },
       invalidatesTags: [{ type: "GoodsReceipt" as const, id: "LIST" }],
     }),
 
@@ -267,7 +279,7 @@ export const goodsReceiptApi = api.injectEndpoints({
       AddGoodsReceiptDetailRequest
     >({
       query: (body) => ({
-        url: "GoodsReceipts/detail",
+        url: "goods-receipt-details",
         method: "POST",
         body,
       }),
@@ -294,16 +306,13 @@ export const goodsReceiptApi = api.injectEndpoints({
       query: (body) => ({
         url: "GoodsReceipts/qc",
         method: "POST",
-        body,
+        body: {
+          detailId: body.detailId,
+          usableWeight: body.usableWeight,
+        },
       }),
       invalidatesTags: (_res, _err, arg) => {
         const tags = [{ type: "GoodsReceipt" as const, id: "LIST" as const }];
-        if (arg.goodsReceiptId) {
-          tags.push({
-            type: "GoodsReceipt" as const,
-            id: arg.goodsReceiptId,
-          });
-        }
         return tags;
       },
     }),
@@ -350,6 +359,47 @@ export const goodsReceiptApi = api.injectEndpoints({
       ],
     }),
 
+    managerAllowQc: builder.mutation<{ message: string }, number>({
+      query: (receiptId) => ({
+        url: `GoodsReceipts/${receiptId}/manager-allow-qc`,
+        method: "POST",
+      }),
+      invalidatesTags: (_res, _err, receiptId) => [
+        { type: "GoodsReceipt" as const, id: receiptId },
+        { type: "GoodsReceipt" as const, id: "LIST" },
+      ],
+    }),
+
+    managerReviewMinWeight: builder.mutation<
+      { message: string },
+      { receiptId: number; approve: boolean }
+    >({
+      query: ({ receiptId, approve }) => ({
+        url: `GoodsReceipts/${receiptId}/manager-review-min`,
+        method: "POST",
+        body: { approve },
+      }),
+      invalidatesTags: (_res, _err, arg) => [
+        { type: "GoodsReceipt" as const, id: arg.receiptId },
+        { type: "GoodsReceipt" as const, id: "LIST" },
+      ],
+    }),
+
+    managerReviewTolerance: builder.mutation<
+      { message: string },
+      { receiptId: number; approve: boolean }
+    >({
+      query: ({ receiptId, approve }) => ({
+        url: `GoodsReceipts/${receiptId}/manager-review-tolerance`,
+        method: "POST",
+        body: { approve },
+      }),
+      invalidatesTags: (_res, _err, arg) => [
+        { type: "GoodsReceipt" as const, id: arg.receiptId },
+        { type: "GoodsReceipt" as const, id: "LIST" },
+      ],
+    }),
+
     updateGoodsReceiptWarehouse: builder.mutation<
       { message: string },
       { receiptId: number; warehouseId: number }
@@ -374,6 +424,18 @@ export const goodsReceiptApi = api.injectEndpoints({
         method: "POST",
         body,
       }),
+      transformResponse: (raw: unknown): { message: string } => {
+        if (raw && typeof raw === "object") {
+          const obj = raw as RawObject;
+          return {
+            message:
+              (obj.message as string) ??
+              (obj.Message as string) ??
+              "Đã gán box vào slot thành công",
+          };
+        }
+        return { message: "Đã gán box vào slot thành công" };
+      },
     }),
   }),
 });
@@ -390,6 +452,9 @@ export const {
   useApproveGoodsReceiptMutation,
   useManagerApproveGoodsReceiptMutation,
   useManagerRejectGoodsReceiptMutation,
+  useManagerAllowQcMutation,
+  useManagerReviewMinWeightMutation,
+  useManagerReviewToleranceMutation,
   useUpdateGoodsReceiptWarehouseMutation,
   useGetLotsByGoodsReceiptIdQuery,
   useLazyGetBoxByQrQuery,
