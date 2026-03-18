@@ -348,6 +348,8 @@ export const {
   useCreateUserMutation,
   useGetUsersQuery,
   useDeleteUserMutation,
+  useUpdateUserStatusMutation,
+  useUpdateUserRoleMutation,
   useCreateWarehouseMutation,
   useGetWarehousesQuery,
   useGetWarehouseQuery,

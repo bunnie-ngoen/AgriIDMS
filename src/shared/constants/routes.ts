@@ -7,6 +7,9 @@ export const ROUTES = {
     UNAUTHORIZED: "/unauthorized",
     FORGET_PASSWORD : "/forget-password",
     PROFILE: "/profile",
+    CART: "/cart",
+    ORDER_SUCCESS: "/order/success",
+    MY_ORDERS: "/my-orders",
     // Admin routes
     ADMIN_DASHBOARD: "/admin/dashboard",
     ADMIN_USERS: "/admin/users",

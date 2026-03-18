@@ -108,6 +108,17 @@ const PutBoxIntoSlotPage = lazy(
   () => import("../warehouse/pages/PutBoxIntoSlot")
 );
 
+// Xuất kho (Export)
+const ExportListPage = lazy(
+  () => import("../export/pages/ExportListPage")
+);
+const CreateExportReceiptPage = lazy(
+  () => import("../export/pages/CreateExportReceiptPage")
+);
+const ExportDetailPage = lazy(
+  () => import("../export/pages/ExportDetailPage")
+);
+
 export const adminRoutes = [
   {
     path: "/admin",
@@ -159,6 +170,11 @@ export const adminRoutes = [
 
       // Kho: xếp box vào slot
       { path: "putaway", element: <PutBoxIntoSlotPage /> },
+
+      // Xuất kho (phiếu xuất)
+      { path: "exports", element: <ExportListPage /> },
+      { path: "exports/create", element: <CreateExportReceiptPage /> },
+      { path: "exports/:id", element: <ExportDetailPage /> },
     ],
   },
 ];

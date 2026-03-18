@@ -14,6 +14,7 @@ import {
   UserX,
   FileText,
   PackageSearch,
+  PackageCheck,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
@@ -86,6 +87,14 @@ const mainMenu: MenuItem[] = [
     children: [
       { name: "Danh sách phiếu nhập", path: "goods-receipts", icon: List },
       { name: "Tạo phiếu nhập", path: "goods-receipts/create", icon: CirclePlus },
+    ],
+  },
+  {
+    name: "Xuất kho",
+    icon: PackageCheck,
+    children: [
+      { name: "Phiếu xuất", path: "exports", icon: List },
+      { name: "Tạo phiếu xuất", path: "exports/create", icon: CirclePlus },
     ],
   },
   {

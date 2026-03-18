@@ -9,6 +9,8 @@ import {
   ChevronDown,
   LogOut,
   User,
+  ShoppingCart,
+  Package,
 } from "lucide-react";
 
 import { ROUTES } from "../../constants/routes";
@@ -16,6 +18,7 @@ import { usePublicLayout } from "../../hooks/usePublicLayout";
 import { useAppDispatch } from "../../../app/hook";
 import { logout } from "../../../features/auth/slices/auth.slice";
 import { useGetMyProfileQuery } from "../../../features/admin/api/profile.api";
+import { useGetCartQuery } from "../../../features/home/api/home.api";
 
 export default function PublicHeader() {
   const { isLoggedIn, hasDashboard, dashboardPath } = usePublicLayout();
@@ -25,6 +28,8 @@ export default function PublicHeader() {
   const { data: user } = useGetMyProfileQuery(undefined, {
     skip: !isLoggedIn,
   });
+  const { data: cart } = useGetCartQuery(undefined, { skip: !isLoggedIn });
+  const cartCount = cart?.items?.reduce((sum, i) => sum + i.quantity, 0) ?? 0;
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -127,6 +132,19 @@ export default function PublicHeader() {
             <Search size={20} className="text-[#1a5f2a]" />
           </a>
 
+          <Link
+            to={ROUTES.CART}
+            className="relative p-2 text-slate-600 hover:text-[#1a5f2a] rounded-lg hover:bg-slate-50"
+            aria-label="Giỏ hàng"
+          >
+            <ShoppingCart size={20} className="text-[#1a5f2a]" />
+            {cartCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-xs font-bold text-white bg-[#1a5f2a] rounded-full">
+                {cartCount > 99 ? "99+" : cartCount}
+              </span>
+            )}
+          </Link>
+
           {!isLoggedIn ? (
             <>
               <Link
@@ -213,6 +231,14 @@ export default function PublicHeader() {
                     >
                       <User size={16} />
                       Thông tin cá nhân
+                    </Link>
+                    <Link
+                      to={ROUTES.MY_ORDERS}
+                      onClick={() => setDropdownOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 hover:text-[#1a5f2a]"
+                    >
+                      <Package size={16} />
+                      Đơn hàng của tôi
                     </Link>
                   </div>
 

@@ -281,7 +281,12 @@ export const goodsReceiptApi = api.injectEndpoints({
       query: (body) => ({
         url: "goods-receipt-details",
         method: "POST",
-        body,
+        body: {
+          GoodsReceiptId: body.goodsReceiptId,
+          PurchaseOrderDetailId: body.purchaseOrderDetailId,
+          ProductVariantId: body.productVariantId,
+          ReceivedWeight: body.receivedWeight,
+        },
       }),
       invalidatesTags: (_res, _err, arg) => [
         { type: "GoodsReceipt" as const, id: arg.goodsReceiptId },

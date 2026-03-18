@@ -14,6 +14,9 @@ import RegisterPage from './features/auth/pages/RegisterPage';
 import ForgotPasswordPage from './features/auth/pages/ForgotPasswordPage';
 import ProfilePage from './features/home/pages/ProfilePage';
 import ProductDetailPage from './features/home/pages/ProductDetailPage';
+import CartPage from './features/home/pages/CartPage';
+import OrderSuccessPage from './features/home/pages/OrderSuccessPage';
+import MyOrdersPage from './features/home/pages/MyOrdersPage';
 function App() {
     return (
         <BrowserRouter>
@@ -25,6 +28,9 @@ function App() {
                         <Route path={ROUTES.GIOI_THIEU} element={<GioiThieuPage />} />
                         <Route path={ROUTES.PRODUCT_DETAIL} element={<ProductDetailPage />} />
                         <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
+                        <Route path={ROUTES.CART} element={<CartPage />} />
+                        <Route path={ROUTES.ORDER_SUCCESS} element={<OrderSuccessPage />} />
+                        <Route path={ROUTES.MY_ORDERS} element={<MyOrdersPage />} />
                     </Route>
 
                     {/* Auth routes — không có layout public */}
