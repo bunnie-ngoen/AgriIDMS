@@ -14,6 +14,8 @@ export default function GoodsReceiptList() {
 
   const [supplierFilter, setSupplierFilter] = useState<number | 0>(0);
   const [warehouseFilter, setWarehouseFilter] = useState<number | 0>(0);
+  const [pageIndex, setPageIndex] = useState(1);
+  const pageSize = 10;
 
   const filtered = useMemo(
     () =>
@@ -24,6 +26,20 @@ export default function GoodsReceiptList() {
       }),
     [receipts, supplierFilter, warehouseFilter],
   );
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePageIndex = Math.min(Math.max(1, pageIndex), totalPages);
+
+  const paged = useMemo(() => {
+    const start = (safePageIndex - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, safePageIndex]);
+
+  // reset về trang 1 khi đổi filter / data
+  useMemo(() => {
+    setPageIndex(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supplierFilter, warehouseFilter, receipts.length]);
 
   const statusClass = (status: string) => {
     if (status === "Approved") return "text-emerald-600";
@@ -157,7 +173,7 @@ export default function GoodsReceiptList() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((r) => (
+                  {paged.map((r) => (
                     <tr
                       key={r.id}
                       className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors"
@@ -237,6 +253,62 @@ export default function GoodsReceiptList() {
                   ))}
                 </tbody>
               </table>
+
+              {/* Pagination */}
+              <div className="px-6 py-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <p className="text-xs text-slate-500">
+                  Hiển thị{" "}
+                  <span className="font-semibold text-slate-700">
+                    {Math.min((safePageIndex - 1) * pageSize + 1, filtered.length)}
+                  </span>{" "}
+                  –{" "}
+                  <span className="font-semibold text-slate-700">
+                    {Math.min(safePageIndex * pageSize, filtered.length)}
+                  </span>{" "}
+                  / {filtered.length} phiếu
+                </p>
+                <div className="flex items-center gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setPageIndex(1)}
+                    disabled={safePageIndex <= 1}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-50 hover:bg-slate-50"
+                  >
+                    Đầu
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPageIndex((p) => Math.max(1, p - 1))}
+                    disabled={safePageIndex <= 1}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-50 hover:bg-slate-50"
+                  >
+                    Trước
+                  </button>
+                  <span className="text-xs text-slate-600 px-2">
+                    Trang{" "}
+                    <span className="font-semibold text-slate-800">
+                      {safePageIndex}
+                    </span>{" "}
+                    / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPageIndex((p) => Math.min(totalPages, p + 1))}
+                    disabled={safePageIndex >= totalPages}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-50 hover:bg-slate-50"
+                  >
+                    Sau
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPageIndex(totalPages)}
+                    disabled={safePageIndex >= totalPages}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 disabled:opacity-50 hover:bg-slate-50"
+                  >
+                    Cuối
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

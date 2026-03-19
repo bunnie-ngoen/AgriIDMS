@@ -289,6 +289,7 @@ export const userApi = api.injectEndpoints({
         url: `slots/${slotId}/contents`,
       }),
       providesTags: (_res, _err, slotId) => [
+        { type: "SlotContents" as const, id: "LIST" },
         { type: "SlotContents" as const, id: slotId },
       ],
     }),

@@ -452,6 +452,8 @@ export const goodsReceiptApi = api.injectEndpoints({
         // cập nhật sơ đồ kho (currentCapacity của slot trong rack)
         { type: "Slot" as const },
         // cập nhật popup chi tiết slot (danh sách box trong slot)
+        // (xếp lại slot có thể làm thay đổi slot cũ + slot mới, nên invalidates LIST cho chắc)
+        { type: "SlotContents" as const, id: "LIST" },
         { type: "SlotContents" as const, id: arg.slotId },
       ],
     }),
@@ -479,6 +481,7 @@ export const goodsReceiptApi = api.injectEndpoints({
       },
       invalidatesTags: (_res, _err, arg) => [
         { type: "Slot" as const },
+        { type: "SlotContents" as const, id: "LIST" },
         { type: "SlotContents" as const, id: arg.toSlotId },
       ],
     }),
