@@ -15,6 +15,7 @@ import type {
   ZoneItem,
   RackItem,
   SlotItem,
+  SlotContents,
 } from "../types/warehouse.type";
 
 export const userApi = api.injectEndpoints({
@@ -283,6 +284,15 @@ export const userApi = api.injectEndpoints({
       ],
     }),
 
+    getSlotContents: builder.query<SlotContents, number>({
+      query: (slotId) => ({
+        url: `slots/${slotId}/contents`,
+      }),
+      providesTags: (_res, _err, slotId) => [
+        { type: "SlotContents" as const, id: slotId },
+      ],
+    }),
+
     getUsers: builder.query<
       PaginationResult<UserListItem>,
       { pageIndex?: number; pageSize?: number; search?: string } | void
@@ -365,4 +375,5 @@ export const {
   useCreateSlotMutation,
   useUpdateSlotMutation,
   useDeleteSlotMutation,
+  useGetSlotContentsQuery,
 } = userApi;

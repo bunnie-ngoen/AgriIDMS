@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Loader2, QrCode, Package, MapPin } from "lucide-react";
 import toast from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   useLazyGetBoxByQrQuery,
   useLazyGetSlotByQrQuery,
   useAssignBoxToSlotMutation,
+  useTransferBoxToSlotMutation,
 } from "../../goods-receipt/api/goods-receipt.api";
 import {
   useGetWarehousesQuery,
@@ -16,6 +17,7 @@ import {
 
 export default function PutBoxIntoSlot() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [boxQrInput, setBoxQrInput] = useState("");
   const [manualBoxIdInput, setManualBoxIdInput] = useState("");
@@ -27,11 +29,14 @@ export default function PutBoxIntoSlot() {
   const [selectedSlotId, setSelectedSlotId] = useState<number>(0);
 
   const boxInputRef = useRef<HTMLInputElement | null>(null);
+  const slotInputRef = useRef<HTMLInputElement | null>(null);
 
   const [triggerBoxByQr, boxByQr] = useLazyGetBoxByQrQuery();
   const [triggerSlotByQr, slotByQr] = useLazyGetSlotByQrQuery();
   const [assignBoxToSlot, { isLoading: isAssigning }] =
     useAssignBoxToSlotMutation();
+  const [transferBoxToSlot, { isLoading: isTransferring }] =
+    useTransferBoxToSlotMutation();
 
   const { data: warehouses = [], isLoading: isLoadingWarehouses } =
     useGetWarehousesQuery();
@@ -51,6 +56,33 @@ export default function PutBoxIntoSlot() {
 
   const box = boxByQr.data;
   const slot = slotByQr.data;
+
+  // Nếu đi từ sơ đồ kho qua (bấm "Chuyển"), tự fill QR/BoxId
+  useEffect(() => {
+    const prefillQr = (searchParams.get("boxQr") || "").trim();
+    const prefillBoxId = (searchParams.get("boxId") || "").trim();
+
+    if (prefillQr) {
+      setBoxQrInput(prefillQr);
+      triggerBoxByQr(prefillQr)
+        .unwrap()
+        .then(() => {
+          // Sau khi load box, ưu tiên focus sang ô QR slot để chọn slot mới
+          setTimeout(() => slotInputRef.current?.focus(), 50);
+        })
+        .catch(() => {
+          // ignore toast ở đây để user tự xử lý
+        });
+      return;
+    }
+
+    if (prefillBoxId) {
+      setManualBoxIdInput(prefillBoxId);
+      // Không auto load vì hiện tại FE chỉ có API by-qr
+      setTimeout(() => slotInputRef.current?.focus(), 50);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (box?.warehouseId && box.warehouseId > 0) {
@@ -80,6 +112,7 @@ export default function PutBoxIntoSlot() {
   const slotCapacity = selectedSlot?.capacity ?? slot?.capacity ?? 0;
   const slotCurrent = selectedSlot?.currentCapacity ?? slot?.currentCapacity ?? 0;
   const slotRemaining = Math.max(0, slotCapacity - slotCurrent);
+  const lockWarehouse = Boolean(box?.warehouseId && box.warehouseId > 0);
 
   const handleLoadBox = async () => {
     const qr = boxQrInput.trim();
@@ -137,10 +170,22 @@ export default function PutBoxIntoSlot() {
 
     const toastId = toast.loading("Đang xếp box vào slot...");
     try {
-      const res = await assignBoxToSlot({
-        boxId: effectiveBoxId,
-        slotId: selectedSlotId,
-      }).unwrap();
+      const isTransfer =
+        box?.id &&
+        box.id === effectiveBoxId &&
+        box.slotId != null &&
+        box.slotId > 0 &&
+        box.slotId !== selectedSlotId;
+
+      const res = isTransfer
+        ? await transferBoxToSlot({
+            boxId: effectiveBoxId,
+            toSlotId: selectedSlotId,
+          }).unwrap()
+        : await assignBoxToSlot({
+            boxId: effectiveBoxId,
+            slotId: selectedSlotId,
+          }).unwrap();
       toast.success(res?.message || "Xếp box vào slot thành công.", {
         id: toastId,
       });
@@ -165,6 +210,7 @@ export default function PutBoxIntoSlot() {
 
   const disableAssign =
     isAssigning ||
+    isTransferring ||
     (!box?.id && !Number(manualBoxIdInput || 0)) ||
     selectedSlotId <= 0 ||
     isLoadingWarehouses;
@@ -355,6 +401,7 @@ export default function PutBoxIntoSlot() {
                         handleLoadSlot();
                       }
                     }}
+                    ref={slotInputRef}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
                     placeholder="Quét QR dán trên slot"
                   />
@@ -391,7 +438,7 @@ export default function PutBoxIntoSlot() {
                       setSelectedSlotId(0);
                     }}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
-                    disabled={isLoadingWarehouses}
+                    disabled={isLoadingWarehouses || lockWarehouse}
                   >
                     <option value="">
                       {isLoadingWarehouses ? "Đang tải kho..." : "Chọn kho"}
@@ -402,6 +449,11 @@ export default function PutBoxIntoSlot() {
                       </option>
                     ))}
                   </select>
+                  {lockWarehouse && (
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Kho được tự động lấy theo box, không thể đổi kho khi chuyển slot.
+                    </p>
+                  )}
                 </div>
 
                 <div>

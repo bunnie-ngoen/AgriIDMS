@@ -36,3 +36,30 @@ export interface SlotItem {
   rackId: number;
 }
 
+export interface SlotBoxItem {
+  id: number;
+  boxCode: string;
+  qrCode: string | null;
+  weight: number;
+  status: string;
+  lotId: number;
+  lotCode: string;
+  receivedDate: string;
+  expiryDate: string;
+}
+
+export interface SlotContents {
+  slotId: number;
+  slotCode: string;
+  slotQrCode: string | null;
+  capacity: number;
+  currentCapacity: number;
+  remainingCapacity: number;
+  productVariantId: number | null;
+  productName: string | null;
+  variantName: string | null;
+  boxCount: number;
+  totalBoxWeight: number;
+  boxes: SlotBoxItem[];
+}
+

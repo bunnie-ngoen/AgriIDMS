@@ -1,22 +1,19 @@
+import { useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useForm } from "react-hook-form";
 import {
   useGetGoodsReceiptByIdQuery,
-  useAddGoodsReceiptDetailMutation,
+  useGetGoodsReceiptForApprovalByIdQuery,
 } from "../api/goods-receipt.api";
-import { useGetPurchaseOrderByIdQuery } from "../../purchase-order/api/purchase-order.api";
 import { ArrowLeft, Loader2 } from "lucide-react";
-import toast from "react-hot-toast";
-
-type AddDetailForm = {
-  purchaseOrderDetailId: number;
-  receivedWeight: number;
-};
+import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 export default function GoodsReceiptDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const receiptId = id ? Number(id) : 0;
+
+  const { isAdmin, isManager } = useRoleGuard();
+  const canViewPrice = isAdmin() || isManager();
 
   const {
     data: receipt,
@@ -26,23 +23,21 @@ export default function GoodsReceiptDetail() {
     skip: !receiptId || Number.isNaN(receiptId),
   });
 
-  const [addDetail, { isLoading: isAdding }] =
-    useAddGoodsReceiptDetailMutation();
-
-  const poId = receipt?.purchaseOrderId ?? 0;
   const {
-    data: purchaseOrder,
-    isLoading: isLoadingPo,
-  } = useGetPurchaseOrderByIdQuery(poId, {
-    skip: !poId,
+    data: receiptForApproval,
+  } = useGetGoodsReceiptForApprovalByIdQuery(receiptId, {
+    skip: !canViewPrice || !receiptId || Number.isNaN(receiptId),
   });
 
-  const addDetailForm = useForm<AddDetailForm>({
-    defaultValues: {
-      purchaseOrderDetailId: 0,
-      receivedWeight: 0,
-    },
-  });
+  const detailsForTable =
+    canViewPrice && receiptForApproval?.details?.length
+      ? receiptForApproval.details
+      : receipt?.details ?? [];
+
+  const moneyFmt = useMemo(
+    () => new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }),
+    [],
+  );
 
   if (Number.isNaN(receiptId) || receiptId < 1) {
     navigate("/admin/goods-receipts");
@@ -69,44 +64,6 @@ export default function GoodsReceiptDetail() {
     return "text-slate-600";
   };
 
-  const canEditDetails =
-    receipt.status === "Draft" || receipt.status === "Received";
-
-  const handleSubmitAddDetail = async (values: AddDetailForm) => {
-    if (!purchaseOrder) return;
-    const detail = purchaseOrder.details.find(
-      (d) => d.id === values.purchaseOrderDetailId,
-    );
-    if (!detail) {
-      toast.error("Vui lòng chọn dòng đơn mua hợp lệ.");
-      return;
-    }
-    if (!values.receivedWeight || Number(values.receivedWeight) <= 0) {
-      toast.error("Khối lượng nhận phải lớn hơn 0.");
-      return;
-    }
-
-    const toastId = toast.loading("Đang thêm chi tiết phiếu nhập...");
-    try {
-      await addDetail({
-        goodsReceiptId: receipt.id,
-        purchaseOrderDetailId: detail.id,
-        productVariantId: detail.productVariantId,
-        receivedWeight: Number(values.receivedWeight),
-      }).unwrap();
-      toast.success("Thêm chi tiết phiếu nhập thành công.", { id: toastId });
-      addDetailForm.reset({ purchaseOrderDetailId: 0, receivedWeight: 0 });
-    } catch (err: any) {
-      const msg =
-        err?.data?.message ||
-        err?.data?.Message ||
-        err?.data?.error ||
-        err?.data?.Error ||
-        "Thêm chi tiết phiếu nhập thất bại.";
-      toast.error(msg, { id: toastId });
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-5 py-6">
       <div className="max-w-4xl mx-auto space-y-4">
@@ -122,7 +79,7 @@ export default function GoodsReceiptDetail() {
             </button>
             <div>
               <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-                Bước 1 · Nhập hàng vào kho · {receipt.receiptCode}
+                Chi tiết phiếu nhập · {receipt.receiptCode}
               </h1>
               <p className="text-xs text-slate-400 mt-0.5">
                 {receipt.supplierName} · {receipt.warehouseName} ·{" "}
@@ -145,13 +102,13 @@ export default function GoodsReceiptDetail() {
 
         {/* Summary card */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
             <div>
               <span className="text-slate-500 block text-xs font-medium">
                 Nhà cung cấp
               </span>
               <p className="font-medium text-slate-900 mt-1">
-                {receipt.supplierName}
+                {receipt.supplierName || "—"}
               </p>
             </div>
             <div>
@@ -159,111 +116,28 @@ export default function GoodsReceiptDetail() {
                 Kho
               </span>
               <p className="font-medium text-slate-900 mt-1">
-                {receipt.warehouseName}
+                {receipt.warehouseName || "—"}
               </p>
             </div>
             <div>
               <span className="text-slate-500 block text-xs font-medium">
-                Ngày nhận
+                Người tạo phiếu
               </span>
               <p className="font-medium text-slate-900 mt-1">
-                {receipt.receivedDate
-                  ? new Date(receipt.receivedDate).toLocaleDateString("vi-VN")
-                  : "—"}
+                {receipt.createdByName || "—"}
               </p>
             </div>
             <div>
               <span className="text-slate-500 block text-xs font-medium">
-                KL nhận / dùng được
+                Trạng thái
               </span>
               <p className="font-medium text-slate-900 mt-1">
-                {receipt.totalReceivedWeight} kg /{" "}
-                <span className="font-semibold">
-                  {receipt.totalUsableWeight} kg
+                <span className={statusClass(receipt.status)}>
+                  {receipt.status}
                 </span>
               </p>
             </div>
           </div>
-        </div>
-
-        {/* Bước 1: thêm dòng chi tiết phiếu nhập */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
-          <div className="flex items-baseline justify-between gap-2">
-            <h2 className="text-sm font-semibold text-slate-800">
-              Bước 1 · Thêm dòng chi tiết phiếu
-            </h2>
-            {!canEditDetails && (
-              <p className="text-[11px] text-slate-400">
-                Chỉ thêm khi phiếu đang Nháp / Đã nhập số liệu.
-              </p>
-            )}
-          </div>
-          {isLoadingPo && (
-            <p className="text-xs text-slate-500">
-              Đang tải đơn mua liên quan...
-            </p>
-          )}
-          {!poId && (
-            <p className="text-xs text-slate-500">
-              Phiếu nhập này chưa gắn với đơn mua nào, không thể thêm chi tiết.
-            </p>
-          )}
-          {poId && purchaseOrder && (
-            <form
-              onSubmit={addDetailForm.handleSubmit(handleSubmitAddDetail)}
-              className="space-y-3 text-sm"
-            >
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Chọn dòng sản phẩm từ đơn mua *
-                </label>
-                <select
-                  {...addDetailForm.register("purchaseOrderDetailId", {
-                    valueAsNumber: true,
-                  })}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
-                >
-                  <option value={0}>
-                    Chọn sản phẩm / dòng chi tiết trong đơn mua
-                  </option>
-                  {purchaseOrder.details.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.productName} — KL đặt: {d.orderedWeight} kg, còn lại:{" "}
-                      {d.remainingWeight} kg
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Khối lượng nhận (kg) *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min={0.01}
-                  {...addDetailForm.register("receivedWeight", {
-                    valueAsNumber: true,
-                  })}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={isAdding || !canEditDetails}
-                className="w-full rounded-xl py-2.5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isAdding ? (
-                  <>
-                    <Loader2 size={15} className="animate-spin" />
-                    Đang thêm chi tiết...
-                  </>
-                ) : (
-                  "Thêm chi tiết"
-                )}
-              </button>
-            </form>
-          )}
         </div>
 
         {/* Bảng chi tiết (chỉ đọc) */}
@@ -280,6 +154,16 @@ export default function GoodsReceiptDetail() {
                   <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                     Sản phẩm
                   </th>
+                  {canViewPrice && (
+                    <>
+                      <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                        Đơn giá
+                      </th>
+                      <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                        Thành tiền
+                      </th>
+                    </>
+                  )}
                   <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                     KL nhận
                   </th>
@@ -295,17 +179,17 @@ export default function GoodsReceiptDetail() {
                 </tr>
               </thead>
               <tbody>
-                {receipt.details.length === 0 ? (
+                {detailsForTable.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={canViewPrice ? 7 : 5}
                       className="px-5 py-6 text-center text-slate-500 text-sm"
                     >
-                      Chưa có dòng chi tiết nào. Hãy thêm chi tiết phía trên.
+                      Phiếu hiện chưa có dòng chi tiết nào.
                     </td>
                   </tr>
                 ) : (
-                  receipt.details.map((d) => (
+                  detailsForTable.map((d) => (
                     <tr
                       key={d.id}
                       className="border-t border-slate-100 hover:bg-slate-50/50"
@@ -313,6 +197,31 @@ export default function GoodsReceiptDetail() {
                       <td className="px-5 py-3 text-slate-800">
                         {d.productName}
                       </td>
+                      {canViewPrice && (
+                        <>
+                          <td className="px-5 py-3 text-right text-slate-700 tabular-nums">
+                            {d.unitPrice != null ? (
+                              <>
+                                {moneyFmt.format(Number(d.unitPrice))} ₫
+                              </>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          <td className="px-5 py-3 text-right text-slate-700 tabular-nums">
+                            {d.unitPrice != null ? (
+                              <>
+                                {moneyFmt.format(
+                                  Number(d.unitPrice) * Number(d.receivedWeight),
+                                )}{" "}
+                                ₫
+                              </>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                        </>
+                      )}
                       <td className="px-5 py-3 text-right text-slate-700">
                         {d.receivedWeight}
                       </td>

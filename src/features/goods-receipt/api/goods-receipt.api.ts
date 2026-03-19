@@ -12,12 +12,23 @@ import type {
   QCInspectionRequest,
   CreateBoxesRequest,
   AssignBoxToSlotRequest,
+  TransferBoxToSlotRequest,
 } from "../types/goods-receipt.type";
 
 type RawObject = Record<string, unknown>;
 
 const mapSummary = (row: RawObject): GoodsReceiptSummary => {
   const receivedDate = row.receivedDate ?? row.ReceivedDate;
+  const createdByName =
+    (row.createdByName as string) ??
+    (row.CreatedByName as string) ??
+    (row.createdBy as string) ??
+    (row.CreatedBy as string) ??
+    (row.creatorName as string) ??
+    (row.CreatorName as string) ??
+    (row.nameCreater as string) ??
+    (row.NameCreater as string) ??
+    "";
 
   return {
     id: (row.id as number) ?? (row.Id as number) ?? 0,
@@ -41,6 +52,7 @@ const mapSummary = (row: RawObject): GoodsReceiptSummary => {
       (row.warehouseName as string) ??
       (row.WarehouseName as string) ??
       "",
+    createdByName: createdByName || undefined,
     receivedDate:
       receivedDate != null
         ? typeof receivedDate === "string"
@@ -436,6 +448,39 @@ export const goodsReceiptApi = api.injectEndpoints({
         }
         return { message: "Đã gán box vào slot thành công" };
       },
+      invalidatesTags: (_res, _err, arg) => [
+        // cập nhật sơ đồ kho (currentCapacity của slot trong rack)
+        { type: "Slot" as const },
+        // cập nhật popup chi tiết slot (danh sách box trong slot)
+        { type: "SlotContents" as const, id: arg.slotId },
+      ],
+    }),
+
+    transferBoxToSlot: builder.mutation<
+      { message: string },
+      TransferBoxToSlotRequest
+    >({
+      query: (body) => ({
+        url: "Boxes/transfer-slot",
+        method: "POST",
+        body,
+      }),
+      transformResponse: (raw: unknown): { message: string } => {
+        if (raw && typeof raw === "object") {
+          const obj = raw as RawObject;
+          return {
+            message:
+              (obj.message as string) ??
+              (obj.Message as string) ??
+              "Đã chuyển box sang slot mới",
+          };
+        }
+        return { message: "Đã chuyển box sang slot mới" };
+      },
+      invalidatesTags: (_res, _err, arg) => [
+        { type: "Slot" as const },
+        { type: "SlotContents" as const, id: arg.toSlotId },
+      ],
     }),
   }),
 });
@@ -460,5 +505,6 @@ export const {
   useLazyGetBoxByQrQuery,
   useLazyGetSlotByQrQuery,
   useAssignBoxToSlotMutation,
+  useTransferBoxToSlotMutation,
 } = goodsReceiptApi;
 
