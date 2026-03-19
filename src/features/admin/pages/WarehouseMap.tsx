@@ -1,23 +1,40 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   useGetWarehouseQuery,
   useGetZonesQuery,
   useGetRacksQuery,
   useGetSlotsQuery,
+  useGetSlotContentsQuery,
 } from "../api/create-user.api";
-import type { SlotItem } from "../types/warehouse.type";
+import type { SlotBoxItem, SlotItem } from "../types/warehouse.type";
 
 /** Panel chi tiết slot: thông tin + slot chứa gì (hiện tại chỉ có capacity, có thể bổ sung API sản phẩm sau) */
 const SlotDetailPanel = ({
   slot,
   onClose,
+  onTransferBox,
   className = "",
 }: {
   slot: SlotItem;
   onClose: () => void;
+  onTransferBox: (box: SlotBoxItem) => void;
   className?: string;
 }) => {
+  const { data: contents, isLoading: isLoadingContents } =
+    useGetSlotContentsQuery(slot.id);
+  const [selectedBox, setSelectedBox] = useState<SlotBoxItem | null>(null);
+  const [isBoxesModalOpen, setIsBoxesModalOpen] = useState(false);
+
+  const copyText = async (text: string) => {
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // ignore (clipboard API may be blocked)
+    }
+  };
+
   const ratio =
     slot.capacity > 0
       ? Math.min(1, (slot.currentCapacity || 0) / slot.capacity) * 100
@@ -27,6 +44,200 @@ const SlotDetailPanel = ({
       className={`rounded-lg border border-slate-200 bg-white p-3 shadow-lg text-left ${className}`}
       onClick={(e) => e.stopPropagation()}
     >
+      {selectedBox && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50"
+          onClick={() => setSelectedBox(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white border border-slate-200 shadow-xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-slate-900">
+                  Chi tiết box
+                </p>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  Slot {slot.code}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedBox(null)}
+                className="text-slate-400 hover:text-slate-600 text-lg leading-none"
+                aria-label="Đóng"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="px-5 py-4 text-[11px] space-y-3">
+              <div className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+                {selectedBox.qrCode && (
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-slate-500">QR</p>
+                      <p className="font-mono text-[11px] text-slate-900 break-all">
+                        {selectedBox.qrCode}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => copyText(selectedBox.qrCode || "")}
+                      className="shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <dl className="grid grid-cols-2 gap-2">
+                <div className="rounded-xl border border-slate-100 px-3 py-2">
+                  <dt className="text-[10px] text-slate-500">Khối lượng</dt>
+                  <dd className="font-semibold text-slate-900 tabular-nums">
+                    {selectedBox.weight} kg
+                  </dd>
+                </div>
+                <div className="rounded-xl border border-slate-100 px-3 py-2">
+                  <dt className="text-[10px] text-slate-500">Trạng thái</dt>
+                  <dd className="font-semibold text-slate-900">
+                    {selectedBox.status || "—"}
+                  </dd>
+                </div>
+                <div className="rounded-xl border border-slate-100 px-3 py-2 col-span-2">
+                  <dt className="text-[10px] text-slate-500">Lot</dt>
+                  <dd className="font-semibold text-slate-900">
+                    {selectedBox.lotCode} (#{selectedBox.lotId})
+                  </dd>
+                </div>
+                <div className="rounded-xl border border-slate-100 px-3 py-2">
+                  <dt className="text-[10px] text-slate-500">Ngày nhận</dt>
+                  <dd className="font-semibold text-slate-900">
+                    {selectedBox.receivedDate
+                      ? new Date(selectedBox.receivedDate).toLocaleDateString(
+                          "vi-VN",
+                        )
+                      : "—"}
+                  </dd>
+                </div>
+                <div className="rounded-xl border border-slate-100 px-3 py-2">
+                  <dt className="text-[10px] text-slate-500">HSD</dt>
+                  <dd className="font-semibold text-slate-900">
+                    {selectedBox.expiryDate
+                      ? new Date(selectedBox.expiryDate).toLocaleDateString(
+                          "vi-VN",
+                        )
+                      : "—"}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isBoxesModalOpen && contents && contents.boxCount > 0 && (
+        <div
+          className="fixed inset-0 z-[55] flex items-center justify-center p-4 bg-black/50"
+          onClick={() => setIsBoxesModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-slate-900">
+                  Danh sách box trong slot {slot.code}
+                </p>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  {contents.productName || "Sản phẩm"}
+                  {contents.variantName ? ` · ${contents.variantName}` : ""} —{" "}
+                  {contents.boxCount} box · {contents.totalBoxWeight} kg
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBoxesModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 text-lg leading-none"
+                aria-label="Đóng"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="px-5 py-4">
+              <div className="max-h-[65vh] overflow-auto rounded-xl border border-slate-100 bg-slate-50">
+                <table className="w-full text-[11px]">
+                  <thead className="sticky top-0 bg-slate-50">
+                    <tr className="text-slate-500 border-b border-slate-200">
+                      <th className="text-left font-semibold px-3 py-2">Box</th>
+                      <th className="text-right font-semibold px-3 py-2">
+                        Thao tác
+                      </th>
+                      <th className="text-right font-semibold px-3 py-2">Kg</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-slate-700">
+                    {contents.boxes.map((b) => (
+                      <tr
+                        key={b.id}
+                        className="border-t border-slate-100 hover:bg-white cursor-pointer"
+                        onClick={() => {
+                          setSelectedBox(b);
+                        }}
+                        title="Bấm xem chi tiết box"
+                      >
+                        <td className="px-3 py-2 pr-2">
+                          <div className="font-mono text-[10px] truncate max-w-[320px]">
+                            {b.boxCode}
+                          </div>
+                          <div className="text-[10px] text-slate-500 truncate max-w-[320px]">
+                            Lot: {b.lotCode} · HSD:{" "}
+                            {b.expiryDate
+                              ? new Date(b.expiryDate).toLocaleDateString(
+                                  "vi-VN",
+                                )
+                              : "—"}
+                          </div>
+                        </td>
+                        <td
+                          className="px-3 py-2 text-right"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onTransferBox(b);
+                          }}
+                        >
+                          <button
+                            type="button"
+                            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-50"
+                            title="Chuyển box sang slot khác"
+                          >
+                            Chuyển
+                          </button>
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {b.weight}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-2 text-[10px] text-amber-600">
+                Quy định: 1 slot chỉ được chứa 1 loại sản phẩm.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-2">
         <span
           id="slot-modal-title"
@@ -69,10 +280,38 @@ const SlotDetailPanel = ({
         <p className="text-[10px] font-medium text-slate-600 mb-0.5">
           Slot đang chứa
         </p>
-        <p className="text-[11px] text-slate-700">
-          {slot.currentCapacity} kg / {slot.capacity} kg ({ratio.toFixed(0)}%)
-          theo tải. Chi tiết sản phẩm trong slot sẽ hiển thị khi có dữ liệu.
-        </p>
+        {isLoadingContents ? (
+          <p className="text-[11px] text-slate-500">Đang tải chi tiết...</p>
+        ) : !contents || contents.boxCount === 0 ? (
+          <p className="text-[11px] text-slate-700">
+            Trống ({slot.currentCapacity} / {slot.capacity} kg ·{" "}
+            {ratio.toFixed(0)}% tải)
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            <p className="text-[11px] text-slate-700">
+              <span className="font-semibold">
+                {contents.productName || "Sản phẩm"}
+              </span>
+              {contents.variantName ? ` · ${contents.variantName}` : ""} —{" "}
+              {contents.boxCount} box · {contents.totalBoxWeight} kg
+            </p>
+            <p className="text-[10px] text-slate-500">
+              {contents.currentCapacity} / {contents.capacity} kg · còn{" "}
+              {contents.remainingCapacity} kg trống
+            </p>
+            <button
+              type="button"
+              onClick={() => setIsBoxesModalOpen(true)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Xem danh sách box ({contents.boxCount})
+            </button>
+            <p className="text-[10px] text-amber-600">
+              Quy định: 1 slot chỉ được chứa 1 loại sản phẩm.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -206,6 +445,7 @@ const ZoneOverview = ({ zoneId, name, onSlotClick }: ZoneOverviewProps) => {
 const WarehouseMap = () => {
   const { id } = useParams<{ id: string }>();
   const warehouseId = Number(id);
+  const navigate = useNavigate();
 
   const { data: warehouse, isLoading: isWarehouseLoading } =
     useGetWarehouseQuery(warehouseId, {
@@ -298,6 +538,16 @@ const WarehouseMap = () => {
             <SlotDetailPanel
               slot={detailSlot}
               onClose={() => setDetailSlot(null)}
+              onTransferBox={(box) => {
+                // Ưu tiên QR để bên putaway tự load và tự fill kho theo box
+                const qr = box.qrCode || "";
+                if (!qr) {
+                  // Không có QR thì vẫn chuyển qua putaway và fill BoxId
+                  navigate(`/admin/putaway?boxId=${box.id}`);
+                  return;
+                }
+                navigate(`/admin/putaway?boxQr=${encodeURIComponent(qr)}`);
+              }}
             />
           </div>
         </div>

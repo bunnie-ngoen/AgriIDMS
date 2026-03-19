@@ -10,6 +10,7 @@ export type GoodsReceiptSummary = {
   supplierName: string;
   warehouseId: number;
   warehouseName: string;
+  createdByName?: string | null;
   receivedDate: string;
   totalReceivedWeight: number;
   totalUsableWeight: number;
@@ -104,5 +105,10 @@ export type CreateBoxesRequest = {
 export type AssignBoxToSlotRequest = {
   boxId: number;
   slotId: number;
+};
+
+export type TransferBoxToSlotRequest = {
+  boxId: number;
+  toSlotId: number;
 };
 
