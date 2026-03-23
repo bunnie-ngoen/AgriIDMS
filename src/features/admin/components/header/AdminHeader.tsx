@@ -1,4 +1,5 @@
-import { useLocation,Link } from "react-router-dom";
+import { useLocation, Link } from "react-router-dom";
+import AdminHeaderQrMiniScan from "./AdminHeaderQrMiniScan";
 
 const AdminHeader = () => {
     const location = useLocation(); //lấy thông tin của url hiện tại 
@@ -6,7 +7,6 @@ const AdminHeader = () => {
   const pathnames = location.pathname
     .split("/")  //["", "admin", "user-management", "create"]
     .filter((x) => x); // bỏ chuỗi rỗng
-    console.log(pathnames[pathnames.length-1])
     return (
         <div className="flex justify-between p-5">
             <div>
@@ -40,9 +40,8 @@ const AdminHeader = () => {
                     </h1>
                 </div>
             </div>
-            <div>
-                <input type="text" className="border border-gray-200 p-2 rounded-lg bg-white focus:outline-none 
-             focus:ring-1 focus:ring-emerald-950 w-[250px]" placeholder="Type here" />
+            <div className="flex items-center">
+              <AdminHeaderQrMiniScan />
             </div>
         </div>
     )

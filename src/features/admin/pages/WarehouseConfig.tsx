@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import toast from "react-hot-toast";
+import { useUpdateSlotQrImageMutation } from "../../goods-receipt/api/goods-receipt.api";
+import { uploadQrPayloadToCloudinary } from "../../../shared/lib/qrImageCloudinary";
 import {
   useGetWarehousesQuery,
   useGetZonesQuery,
@@ -44,6 +46,12 @@ const WarehouseConfig = () => {
     skip: !selectedRackId,
   });
 
+  /** Chỉ hiện nút đồng bộ khi rack có slot và còn slot chưa có ảnh QR. */
+  const showSyncSlotQrButton = useMemo(() => {
+    if (!selectedRackId || !slots?.length) return false;
+    return slots.some((s) => !s.qrImageUrl?.trim());
+  }, [selectedRackId, slots]);
+
   const [createZone] = useCreateZoneMutation();
   const [updateZone] = useUpdateZoneMutation();
   const [deleteZone] = useDeleteZoneMutation();
@@ -55,6 +63,7 @@ const WarehouseConfig = () => {
   const [createSlot] = useCreateSlotMutation();
   const [updateSlot] = useUpdateSlotMutation();
   const [deleteSlot] = useDeleteSlotMutation();
+  const [updateSlotQrImage] = useUpdateSlotQrImageMutation();
 
   // UI state for pretty forms
   const [zoneFormMode, setZoneFormMode] = useState<FormMode>("idle");
@@ -91,6 +100,49 @@ const WarehouseConfig = () => {
     setSlotFormMode("idle");
     setSlotForm({ code: "", capacity: "100" });
     setEditingSlot(null);
+  };
+
+  /** Payload QR = `SLOT-{id}` (khớp backend). */
+  const uploadSlotQrForId = async (
+    slotId: number,
+    qrPayload: string,
+    rackId?: number | null,
+  ) => {
+    const url = await uploadQrPayloadToCloudinary(qrPayload, {
+      folder: "products/slots",
+    });
+    await updateSlotQrImage({
+      slotId,
+      qrImageUrl: url,
+      rackId: rackId ?? undefined,
+    }).unwrap();
+  };
+
+  const handleSyncMissingSlotQrImages = async () => {
+    if (!selectedRackId || !slots?.length) {
+      toast.error("Chọn rack có slot.");
+      return;
+    }
+    const need = slots.filter((s) => !s.qrImageUrl?.trim());
+    if (need.length === 0) {
+      toast.success("Tất cả slot trong rack đã có ảnh QR.");
+      return;
+    }
+    const t = toast.loading(
+      `Đang tạo & lưu ảnh QR cho ${need.length} slot...`,
+    );
+    try {
+      for (const s of need) {
+        const payload = (s.qrCode?.trim() || `SLOT-${s.id}`) as string;
+        await uploadSlotQrForId(s.id, payload, selectedRackId);
+      }
+      toast.success("Đã lưu ảnh QR cho các slot.", { id: t });
+    } catch {
+      toast.error(
+        "Đồng bộ ảnh QR thất bại. Kiểm tra Cloudinary (VITE_CLOUDINARY_*).",
+        { id: t },
+      );
+    }
   };
 
   const handleSubmitZone = async (e: React.FormEvent) => {
@@ -194,12 +246,23 @@ const WarehouseConfig = () => {
     );
     try {
       if (slotFormMode === "create") {
-        await createSlot({
+        const created = await createSlot({
           rackId: selectedRackId,
           code,
           capacity,
         }).unwrap();
         toast.success("Tạo slot thành công.", { id: toastId });
+        resetSlotForm();
+        const qrToast = toast.loading("Đang tạo ảnh QR slot...");
+        try {
+          await uploadSlotQrForId(created.id, `SLOT-${created.id}`);
+          toast.success("Đã lưu ảnh QR slot.", { id: qrToast });
+        } catch {
+          toast.error(
+            "Tạo slot xong nhưng lưu ảnh QR thất bại. Kiểm tra Cloudinary hoặc bấm \"Đồng bộ ảnh QR\".",
+            { id: qrToast },
+          );
+        }
       } else if (slotFormMode === "edit" && editingSlot) {
         await updateSlot({
           rackId: editingSlot.rackId,
@@ -208,8 +271,26 @@ const WarehouseConfig = () => {
           capacity,
         }).unwrap();
         toast.success("Cập nhật slot thành công.", { id: toastId });
+        resetSlotForm();
+        if (!editingSlot.qrImageUrl?.trim()) {
+          const qrToast = toast.loading("Đang tạo ảnh QR slot...");
+          try {
+            await uploadSlotQrForId(
+              editingSlot.id,
+              `SLOT-${editingSlot.id}`,
+              selectedRackId,
+            );
+            toast.success("Đã lưu ảnh QR slot.", { id: qrToast });
+          } catch {
+            toast.error(
+              "Cập nhật slot xong nhưng lưu ảnh QR thất bại. Kiểm tra Cloudinary.",
+              { id: qrToast },
+            );
+          }
+        }
+      } else {
+        resetSlotForm();
       }
-      resetSlotForm();
     } catch (err: unknown) {
       const msg =
         (err as { data?: { error?: string; message?: string } })?.data
@@ -562,22 +643,34 @@ const WarehouseConfig = () => {
 
           {/* SLOTS */}
           <div className="border border-slate-200 rounded-xl p-3 flex flex-col">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
               <h2 className="text-sm font-semibold text-slate-800">
                 Slot (ô chứa)
               </h2>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!selectedRackId) return;
-                  setSlotFormMode("create");
-                  setSlotForm({ code: "", capacity: "100" });
-                  setEditingSlot(null);
-                }}
-                className="text-xs px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
-              >
-                + Thêm
-              </button>
+              <div className="flex gap-1 flex-wrap justify-end">
+                {showSyncSlotQrButton ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleSyncMissingSlotQrImages()}
+                    className="text-xs px-2 py-1 rounded-lg bg-slate-50 text-slate-700 border border-slate-200 hover:bg-slate-100"
+                    title="Tạo ảnh QR (qrserver → Cloudinary) cho slot chưa có ảnh"
+                  >
+                    Đồng bộ ảnh QR
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!selectedRackId) return;
+                    setSlotFormMode("create");
+                    setSlotForm({ code: "", capacity: "100" });
+                    setEditingSlot(null);
+                  }}
+                  className="text-xs px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                >
+                  + Thêm
+                </button>
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto space-y-1">
               {selectedRackId ? (

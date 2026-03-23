@@ -238,6 +238,38 @@ export const userApi = api.injectEndpoints({
       query: (rackId) => ({
         url: `racks/${rackId}/slots`,
       }),
+      transformResponse: (raw: unknown): SlotItem[] => {
+        const arr = (raw as Array<Record<string, unknown>>) ?? [];
+        return arr.map((row) => ({
+          id: (row.id as number) ?? 0,
+          code: (row.code as string) ?? "",
+          qrCode:
+            (row.qrCode as string | null | undefined) ??
+            (row.QrCode as string | null | undefined) ??
+            null,
+          qrImageUrl:
+            (row.qrImageUrl as string | null | undefined) ??
+            (row.QrImageUrl as string | null | undefined) ??
+            null,
+          productVariantId:
+            (row.productVariantId as number | null | undefined) ??
+            (row.ProductVariantId as number | null | undefined) ??
+            null,
+          productVariantName:
+            (row.productVariantName as string | null | undefined) ??
+            (row.ProductVariantName as string | null | undefined) ??
+            null,
+          productName:
+            (row.productName as string | null | undefined) ??
+            (row.ProductName as string | null | undefined) ??
+            null,
+          capacity: Number(row.capacity ?? row.Capacity ?? 0),
+          currentCapacity: Number(
+            row.currentCapacity ?? row.CurrentCapacity ?? 0,
+          ),
+          rackId: (row.rackId as number) ?? (row.RackId as number) ?? 0,
+        }));
+      },
       providesTags: (_result, _error, rackId) => [
         { type: "Slot" as const, id: `RACK-${rackId}` },
       ],

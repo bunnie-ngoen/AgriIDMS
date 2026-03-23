@@ -31,6 +31,12 @@ export interface SlotItem {
   id: number;
   code: string;
   qrCode?: string | null;
+  /** URL ảnh QR (Cloudinary), từ API */
+  qrImageUrl?: string | null;
+  /** Variant đang chứa trong slot (nếu có box) */
+  productVariantId?: number | null;
+  productVariantName?: string | null;
+  productName?: string | null;
   capacity: number;
   currentCapacity: number;
   rackId: number;

@@ -11,7 +11,10 @@ import {
   useCreateBoxesMutation,
   useGetLotsByGoodsReceiptIdQuery,
   useUpdateGoodsReceiptWarehouseMutation,
+  useUpdateLotQrImageMutation,
+  useUpdateBoxQrImageMutation,
 } from "../api/goods-receipt.api";
+import { uploadQrPayloadToCloudinary } from "../../../shared/lib/qrImageCloudinary";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useEffect, useMemo, useState } from "react";
@@ -62,6 +65,8 @@ export default function GoodsReceiptQC() {
     useManagerReviewToleranceMutation();
   const [createBoxes, { isLoading: isCreatingBoxes }] =
     useCreateBoxesMutation();
+  const [updateLotQrImage] = useUpdateLotQrImageMutation();
+  const [updateBoxQrImage] = useUpdateBoxQrImageMutation();
   const [updateReceiptWarehouse, { isLoading: isUpdatingWarehouse }] =
     useUpdateGoodsReceiptWarehouseMutation();
 
@@ -98,6 +103,35 @@ export default function GoodsReceiptQC() {
     if (!lots) return [];
     return [...lots].sort((a, b) => b.id - a.id);
   }, [lots]);
+
+  /** Sau khi phiếu được duyệt và có lot: tạo ảnh QR (qrserver → Cloudinary) rồi PUT API lưu DB. */
+  const syncMissingLotQrImages = async () => {
+    const lotsRes = await refetchLots();
+    const lotList = lotsRes.data ?? [];
+    const needQr = lotList.filter((l) => l.lotCode && !l.qrImageUrl);
+    if (needQr.length === 0) return;
+    const qrToast = toast.loading(
+      `Đang tạo & lưu ảnh QR cho ${needQr.length} lot...`,
+    );
+    try {
+      for (const lot of needQr) {
+        const url = await uploadQrPayloadToCloudinary(lot.lotCode, {
+          folder: "products/lots",
+        });
+        await updateLotQrImage({
+          lotId: lot.id,
+          qrImageUrl: url,
+        }).unwrap();
+      }
+      toast.success("Đã lưu ảnh QR lot lên Cloudinary.", { id: qrToast });
+      await refetchLots();
+    } catch {
+      toast.error(
+        "Lưu ảnh QR lot thất bại. Kiểm tra .env Cloudinary (VITE_CLOUDINARY_*).",
+        { id: qrToast },
+      );
+    }
+  };
 
   useEffect(() => {
     if (!lotsSorted || lotsSorted.length === 0) return;
@@ -219,6 +253,7 @@ export default function GoodsReceiptQC() {
       await refetch();
       await refetchLots();
       if (canViewPrice) await refetchForApproval();
+      await syncMissingLotQrImages();
     } catch (err: any) {
       const msg =
         err?.data?.message ||
@@ -283,6 +318,7 @@ export default function GoodsReceiptQC() {
       );
       await refetch();
       if (canViewPrice) await refetchForApproval();
+      if (approve) await syncMissingLotQrImages();
     } catch (err: any) {
       const msg =
         err?.data?.message ||
@@ -363,12 +399,36 @@ export default function GoodsReceiptQC() {
 
     const toastId = toast.loading("Đang tạo box cho lot...");
     try {
-      await createBoxes({
+      const created = await createBoxes({
         lotId: Number(values.lotId),
         boxSize: Number(values.boxSize),
       }).unwrap();
       toast.success("Tạo box thành công.", { id: toastId });
       createBoxesForm.reset({ lotId: 0, boxSize: 0 });
+
+      if (created.boxes?.length) {
+        const qrToast = toast.loading(
+          `Đang tạo & lưu ảnh QR cho ${created.boxes.length} box...`,
+        );
+        try {
+          for (const b of created.boxes) {
+            const payload = b.qrPayload || b.boxCode;
+            const url = await uploadQrPayloadToCloudinary(payload, {
+              folder: "products/boxes",
+            });
+            await updateBoxQrImage({
+              boxId: b.id,
+              qrImageUrl: url,
+            }).unwrap();
+          }
+          toast.success("Đã lưu ảnh QR box lên Cloudinary.", { id: qrToast });
+        } catch {
+          toast.error(
+            "Tạo box xong nhưng lưu ảnh QR thất bại. Kiểm tra .env Cloudinary.",
+            { id: qrToast },
+          );
+        }
+      }
       // Sau khi tạo box thành công, quay về danh sách phiếu nhập
       setTimeout(() => {
         navigate("/admin/goods-receipts");

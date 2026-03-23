@@ -8,22 +8,7 @@ import { ProductVariantSchema, type ProductVariantDto } from "../schemas/product
 import type { ProductVariant } from "../types/product-variant.type";
 import { ImagePlus, Loader2, X, ArrowLeft, ChevronDown, Tag, Clock, BadgeDollarSign, PencilLine } from "lucide-react";
 import toast from "react-hot-toast";
-
-const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-const API_KEY = import.meta.env.VITE_CLOUDINARY_API_KEY;
-
-const uploadToCloudinary = async (file: File): Promise<string> => {
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("upload_preset", UPLOAD_PRESET);
-  if (API_KEY) formData.append("api_key", API_KEY);
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, { method: "POST", body: formData });
-  const json = await res.json();
-  if (!res.ok) throw new Error(json?.error?.message ?? "Upload ảnh thất bại");
-  if (!json?.secure_url) throw new Error("Không lấy được URL ảnh từ Cloudinary.");
-  return json.secure_url as string;
-};
+import { uploadFileToCloudinary } from "../../../shared/lib/cloudinaryUpload";
 
 const Field = ({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) => (
   <div className="space-y-1.5">
@@ -91,7 +76,7 @@ const EditProductVariant = () => {
       let imageUrl = values.imageUrl;
       if (imageFile) {
         setIsUploading(true);
-        imageUrl = await uploadToCloudinary(imageFile);
+        imageUrl = await uploadFileToCloudinary(imageFile);
         setIsUploading(false);
       }
       await updateVariant({ id: variant.id, ...values, imageUrl }).unwrap();

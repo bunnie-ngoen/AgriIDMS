@@ -39,21 +39,52 @@ export type GoodsReceiptForApprovalResponse = GoodsReceiptResponse & {
 export type LotSummary = {
   id: number;
   lotCode: string;
+  /** URL ảnh QR (Cloudinary) — do FE upload */
+  qrImageUrl?: string | null;
   totalQuantity: number;
   remainingQuantity: number;
   receivedDate: string;
   expiryDate: string;
 };
 
+export type LotByQrResponse = {
+  id: number;
+  lotCode: string;
+  qrImageUrl?: string | null;
+  expiryDate: string | Date;
+  receivedDate: string | Date;
+  totalQuantity: number;
+  remainingQuantity: number;
+  status: string;
+  productVariantId?: number | null;
+  productVariantName?: string | null;
+  productName?: string | null;
+  warehouseId?: number | null;
+};
+
+/** Phản hồi POST GoodsReceipts/boxes — dùng để tạo ảnh QR phía FE */
+export type BoxCreatedItem = {
+  id: number;
+  boxCode: string;
+  qrPayload: string;
+};
+
 export type BoxByQrResponse = {
   id: number;
   boxCode: string;
   qrCode: string | null;
+  qrImageUrl?: string | null;
   weight: number;
   status: string;
   slotId: number | null;
   warehouseId: number | null;
+  warehouseName?: string | null;
+  slotCode?: string | null;
+  lotCode?: string | null;
   lotId: number;
+  productVariantId?: number | null;
+  productVariantName?: string | null;
+  productName?: string | null;
   placedInColdAt: string | null;
 };
 
@@ -61,9 +92,11 @@ export type SlotByQrResponse = {
   id: number;
   code: string;
   qrCode: string | null;
+  qrImageUrl?: string | null;
   capacity: number;
   currentCapacity: number;
   rackId: number;
+  rackName?: string | null;
 };
 
 export type CreateGoodsReceiptRequest = {
