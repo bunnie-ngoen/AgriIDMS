@@ -14,6 +14,9 @@ import RegisterPage from './features/auth/pages/RegisterPage';
 import ForgotPasswordPage from './features/auth/pages/ForgotPasswordPage';
 import ProfilePage from './features/home/pages/ProfilePage';
 import ProductDetailPage from './features/home/pages/ProductDetailPage';
+import CartPage from './features/cart/pages/CartPage';
+import MyOrdersPage from './features/order/pages/MyOrdersPage';
+import MyOrderDetailPage from './features/order/pages/MyOrderDetailPage';
 function App() {
     return (
         <BrowserRouter>
@@ -25,6 +28,30 @@ function App() {
                         <Route path={ROUTES.GIOI_THIEU} element={<GioiThieuPage />} />
                         <Route path={ROUTES.PRODUCT_DETAIL} element={<ProductDetailPage />} />
                         <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
+                        <Route
+                            path={ROUTES.CART}
+                            element={
+                                <ProtectedRoute allowedRoles={[AUTH_ROLE.CUSTOMER]}>
+                                    <CartPage />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
+                            path={ROUTES.CUSTOMER_ORDERS_PAGE}
+                            element={
+                                <ProtectedRoute allowedRoles={[AUTH_ROLE.CUSTOMER]}>
+                                    <MyOrdersPage />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
+                            path={ROUTES.CUSTOMER_ORDER_DETAIL}
+                            element={
+                                <ProtectedRoute allowedRoles={[AUTH_ROLE.CUSTOMER]}>
+                                    <MyOrderDetailPage />
+                                </ProtectedRoute>
+                            }
+                        />
                     </Route>
 
                     {/* Auth routes — không có layout public */}
