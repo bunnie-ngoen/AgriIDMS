@@ -28,4 +28,7 @@ export const ROUTES = {
     CUSTOMER_DASHBOARD: "/customer/dashboard",
     CUSTOMER_PROFILE: "/customer/profile",
     CUSTOMER_ORDERS: "/customer/orders",
+    CUSTOMER_ORDERS_PAGE: "/my-orders",
+    CUSTOMER_ORDER_DETAIL: "/my-orders/:id",
+    CART: "/cart",
 };

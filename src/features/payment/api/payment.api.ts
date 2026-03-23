@@ -1,0 +1,74 @@
+import { api } from "../../../shared/api";
+import { paymentResponseSchema, type PaymentResponse } from "../schemas/payment.schema";
+
+function toCamelCase(obj: unknown): unknown {
+    if (obj === null || obj === undefined) return obj;
+    if (Array.isArray(obj)) return obj.map(toCamelCase);
+    if (typeof obj === "object") {
+        const out: Record<string, unknown> = {};
+        for (const key of Object.keys(obj as Record<string, unknown>)) {
+            const camel = key.charAt(0).toLowerCase() + key.slice(1);
+            out[camel] = toCamelCase((obj as Record<string, unknown>)[key]);
+        }
+        return out;
+    }
+    return obj;
+}
+
+export const paymentApi = api.injectEndpoints({
+    endpoints: (builder) => ({
+        // BE: POST api/Payments
+        createPayment: builder.mutation<
+            PaymentResponse,
+            { orderId: number; paymentMethod: number }
+        >({
+            query: (body) => ({
+                url: "Payments",
+                method: "POST",
+                body,
+            }),
+            transformResponse: (raw: unknown) => {
+                const normalized = toCamelCase(raw);
+                const parsed = paymentResponseSchema.safeParse(normalized);
+                if (!parsed.success) throw new Error("Invalid payment response");
+                return parsed.data;
+            },
+        }),
+
+        // BE: GET api/Payments/order/{orderId}
+        getLatestPaymentByOrder: builder.query<PaymentResponse, number>({
+            query: (orderId) => ({
+                url: `Payments/order/${orderId}`,
+                method: "GET",
+            }),
+            transformResponse: (raw: unknown) => {
+                const normalized = toCamelCase(raw);
+                const parsed = paymentResponseSchema.safeParse(normalized);
+                if (!parsed.success) throw new Error("Invalid payment response");
+                return parsed.data;
+            },
+        }),
+
+        // BE: POST api/Payments/{paymentId}/cancel
+        cancelPayment: builder.mutation<PaymentResponse, number>({
+            query: (paymentId) => ({
+                url: `Payments/${paymentId}/cancel`,
+                method: "POST",
+            }),
+            transformResponse: (raw: unknown) => {
+                const normalized = toCamelCase(raw);
+                const parsed = paymentResponseSchema.safeParse(normalized);
+                if (!parsed.success) throw new Error("Invalid payment response");
+                return parsed.data;
+            },
+        }),
+    }),
+});
+
+export const {
+    useCreatePaymentMutation,
+    useGetLatestPaymentByOrderQuery,
+    useLazyGetLatestPaymentByOrderQuery,
+    useCancelPaymentMutation,
+} = paymentApi;
+

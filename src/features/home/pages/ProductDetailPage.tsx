@@ -1,9 +1,11 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { Leaf, ShoppingCart, ArrowLeft, Check, AlertCircle } from "lucide-react";
+import { Leaf, ShoppingCart, ArrowLeft, AlertCircle } from "lucide-react";
 import { useGetHomeProductDetailQuery, useAddToCartMutation } from "../api/home.api";
-import type { HomeProductDetail, BoxType } from "../schemas/home.schema";
+import type { BoxType } from "../schemas/home.schema";
 import { ROUTES } from "../../../shared/constants/routes";
+import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
+import toast from "react-hot-toast";
 
 // ─── Skeleton loading ────────────────────────────────────────
 
@@ -44,11 +46,47 @@ export default function ProductDetailPage() {
 
     const [quantity, setQuantity] = useState(1);
     const [selectedBox, setSelectedBox] = useState<BoxType | null>(null);
-    const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+    const sanitizeMessage = (raw: string): string => {
+        // Một số BE trả stack trace dài trong message; chỉ lấy phần thông báo đầu tiên.
+        const firstLine = raw.split("\n")[0]?.trim() ?? raw;
+        const cutAtStack = firstLine.split(" at ")[0]?.trim() ?? firstLine;
+        return cutAtStack || "Có lỗi xảy ra. Vui lòng thử lại.";
+    };
+
+    const getApiErrorMessage = (error: unknown): string => {
+        const fallback = "Không thêm được vào giỏ. Vui lòng thử lại.";
+        const err = error as FetchBaseQueryError | undefined;
+        if (!err || typeof err !== "object" || !("status" in err)) return fallback;
+
+        if (err.status === 401 || err.status === 403) {
+            return "Bạn cần đăng nhập tài khoản Customer để thêm vào giỏ.";
+        }
+
+        const data = "data" in err ? err.data : undefined;
+        if (data && typeof data === "object") {
+            const anyData = data as {
+                message?: string;
+                title?: string;
+                detail?: string;
+                errors?: Record<string, string[]>;
+            };
+
+            if (anyData.message) return sanitizeMessage(anyData.message);
+            if (anyData.detail) return sanitizeMessage(anyData.detail);
+            if (anyData.title) return sanitizeMessage(anyData.title);
+            if (anyData.errors) {
+                const firstKey = Object.keys(anyData.errors)[0];
+                const firstErr = firstKey ? anyData.errors[firstKey]?.[0] : undefined;
+                if (firstErr) return sanitizeMessage(firstErr);
+            }
+        }
+
+        return fallback;
+    };
 
     const handleAddToCart = async () => {
         if (!product || !selectedBox) return;
-        setMessage(null);
         try {
             await addToCart({
                 productVariantId: product.id,
@@ -56,15 +94,15 @@ export default function ProductDetailPage() {
                 isPartial: selectedBox.boxType === "Partial",
                 quantity,
             }).unwrap();
-            setMessage({ type: "success", text: "Đã thêm vào giỏ hàng." });
-        } catch {
-            setMessage({ type: "error", text: "Không thêm được vào giỏ. Vui lòng đăng nhập (Customer) và thử lại." });
+            toast.success("Đã thêm vào giỏ hàng.");
+        } catch (error) {
+            const msg = getApiErrorMessage(error);
+            toast.error(msg);
         }
     };
 
     const handleBuyNow = async () => {
         if (!product || !selectedBox) return;
-        setMessage(null);
         try {
             await addToCart({
                 productVariantId: product.id,
@@ -72,9 +110,11 @@ export default function ProductDetailPage() {
                 isPartial: selectedBox.boxType === "Partial",
                 quantity,
             }).unwrap();
-            setMessage({ type: "success", text: "Đã thêm vào giỏ. Bạn có thể vào giỏ để thanh toán." });
-        } catch {
-            setMessage({ type: "error", text: "Không thêm được vào giỏ. Vui lòng đăng nhập (Customer) và thử lại." });
+            toast.success("Đã thêm vào giỏ. Chuyển đến trang giỏ hàng.");
+            navigate(ROUTES.CART);
+        } catch (error) {
+            const msg = getApiErrorMessage(error);
+            toast.error(msg);
         }
     };
 
@@ -261,12 +301,6 @@ export default function ProductDetailPage() {
                                 Mua ngay
                             </button>
                         </div>
-                        {message && (
-                            <p className={`mt-3 flex items-center gap-2 text-sm ${message.type === "success" ? "text-[#1a5f2a]" : "text-red-600"}`}>
-                                {message.type === "success" ? <Check size={16} /> : <AlertCircle size={16} />}
-                                {message.text}
-                            </p>
-                        )}
                     </div>
                 </div>
             </div>

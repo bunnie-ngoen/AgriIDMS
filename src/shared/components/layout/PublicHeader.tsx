@@ -9,6 +9,7 @@ import {
   ChevronDown,
   LogOut,
   User,
+  ShoppingCart,
 } from "lucide-react";
 
 import { ROUTES } from "../../constants/routes";
@@ -16,15 +17,27 @@ import { usePublicLayout } from "../../hooks/usePublicLayout";
 import { useAppDispatch } from "../../../app/hook";
 import { logout } from "../../../features/auth/slices/auth.slice";
 import { useGetMyProfileQuery } from "../../../features/admin/api/profile.api";
+import { useAuth } from "../../../features/auth/hooks/useAuth";
+import { AUTH_ROLE } from "../../../features/auth/constants/auth.constants";
+import { useGetMyCartQuery } from "../../../features/cart/api/cart.api";
 
 export default function PublicHeader() {
   const { isLoggedIn, hasDashboard, dashboardPath } = usePublicLayout();
+  const auth = useAuth();
+  const isCustomer = auth.user?.roles?.[0] === AUTH_ROLE.CUSTOMER;
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
   const { data: user } = useGetMyProfileQuery(undefined, {
     skip: !isLoggedIn,
   });
+
+  const { data: cart } = useGetMyCartQuery(undefined, {
+    skip: !isLoggedIn || !isCustomer,
+  });
+
+  const cartCount =
+    cart?.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -126,6 +139,29 @@ export default function PublicHeader() {
           >
             <Search size={20} className="text-[#1a5f2a]" />
           </a>
+
+          {isLoggedIn && isCustomer && (
+            <>
+              <Link
+                to={ROUTES.CUSTOMER_ORDERS_PAGE}
+                className="px-3 py-2 text-sm font-medium text-slate-700 hover:text-[#1a5f2a] hover:bg-slate-50 rounded"
+              >
+                Đơn của tôi
+              </Link>
+              <Link
+                to={ROUTES.CART}
+                className="relative p-2 text-slate-600 hover:text-[#1a5f2a] rounded-lg hover:bg-slate-50"
+                aria-label="Giỏ hàng"
+              >
+                <ShoppingCart size={20} className="text-[#1a5f2a]" />
+                {cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-[#1a5f2a] text-white text-[11px] font-bold h-5 min-w-5 px-1 rounded-full flex items-center justify-center border border-white">
+                    {cartCount}
+                  </span>
+                )}
+              </Link>
+            </>
+          )}
 
           {!isLoggedIn ? (
             <>
