@@ -117,13 +117,14 @@ export default function CreateGoodsReceipt() {
         })),
       }).unwrap();
 
-      const successMsg = "Tạo phiếu nhập thành công. Đang chuyển sang màn QC.";
+      const successMsg =
+        "Tạo phiếu nhập thành công. Đang chuyển sang màn chi tiết phiếu.";
       toast.success(successMsg, { id: toastId });
       setServerMessage(successMsg);
 
       setTimeout(() => {
         if (result?.receiptId) {
-          navigate(`/admin/goods-receipts/${result.receiptId}/qc`);
+          navigate(`/admin/goods-receipts/${result.receiptId}`);
         } else {
           navigate("/admin/goods-receipts");
         }

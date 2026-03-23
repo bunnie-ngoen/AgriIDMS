@@ -11,7 +11,10 @@ import {
   useCreateBoxesMutation,
   useGetLotsByGoodsReceiptIdQuery,
   useUpdateGoodsReceiptWarehouseMutation,
+  useUpdateLotQrImageMutation,
+  useUpdateBoxQrImageMutation,
 } from "../api/goods-receipt.api";
+import { uploadQrPayloadToCloudinary } from "../../../shared/lib/qrImageCloudinary";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useEffect, useMemo, useState } from "react";
@@ -62,10 +65,19 @@ export default function GoodsReceiptQC() {
     useManagerReviewToleranceMutation();
   const [createBoxes, { isLoading: isCreatingBoxes }] =
     useCreateBoxesMutation();
+  const [updateLotQrImage] = useUpdateLotQrImageMutation();
+  const [updateBoxQrImage] = useUpdateBoxQrImageMutation();
   const [updateReceiptWarehouse, { isLoading: isUpdatingWarehouse }] =
     useUpdateGoodsReceiptWarehouseMutation();
 
   const { data: warehouses = [] } = useGetWarehousesQuery();
+  const otherWarehouses = useMemo(
+    () =>
+      receipt
+        ? warehouses.filter((w) => w.id !== receipt.warehouseId)
+        : warehouses,
+    [warehouses, receipt],
+  );
 
   const [selectedDetailIdForQc, setSelectedDetailIdForQc] = useState<
     number | null
@@ -91,6 +103,35 @@ export default function GoodsReceiptQC() {
     if (!lots) return [];
     return [...lots].sort((a, b) => b.id - a.id);
   }, [lots]);
+
+  /** Sau khi phiếu được duyệt và có lot: tạo ảnh QR (qrserver → Cloudinary) rồi PUT API lưu DB. */
+  const syncMissingLotQrImages = async () => {
+    const lotsRes = await refetchLots();
+    const lotList = lotsRes.data ?? [];
+    const needQr = lotList.filter((l) => l.lotCode && !l.qrImageUrl);
+    if (needQr.length === 0) return;
+    const qrToast = toast.loading(
+      `Đang tạo & lưu ảnh QR cho ${needQr.length} lot...`,
+    );
+    try {
+      for (const lot of needQr) {
+        const url = await uploadQrPayloadToCloudinary(lot.lotCode, {
+          folder: "products/lots",
+        });
+        await updateLotQrImage({
+          lotId: lot.id,
+          qrImageUrl: url,
+        }).unwrap();
+      }
+      toast.success("Đã lưu ảnh QR lot lên Cloudinary.", { id: qrToast });
+      await refetchLots();
+    } catch {
+      toast.error(
+        "Lưu ảnh QR lot thất bại. Kiểm tra .env Cloudinary (VITE_CLOUDINARY_*).",
+        { id: qrToast },
+      );
+    }
+  };
 
   useEffect(() => {
     if (!lotsSorted || lotsSorted.length === 0) return;
@@ -212,6 +253,7 @@ export default function GoodsReceiptQC() {
       await refetch();
       await refetchLots();
       if (canViewPrice) await refetchForApproval();
+      await syncMissingLotQrImages();
     } catch (err: any) {
       const msg =
         err?.data?.message ||
@@ -224,7 +266,8 @@ export default function GoodsReceiptQC() {
         typeof msg === "string" &&
         (msg.includes("Không đủ dung lượng") || msg.includes("kg trống"))
       ) {
-        setSelectedWarehouseId(receipt.warehouseId || 0);
+        const firstOther = otherWarehouses[0]?.id ?? 0;
+        setSelectedWarehouseId(firstOther);
         setIsWarehouseModalOpen(true);
       }
     }
@@ -275,6 +318,7 @@ export default function GoodsReceiptQC() {
       );
       await refetch();
       if (canViewPrice) await refetchForApproval();
+      if (approve) await syncMissingLotQrImages();
     } catch (err: any) {
       const msg =
         err?.data?.message ||
@@ -355,12 +399,36 @@ export default function GoodsReceiptQC() {
 
     const toastId = toast.loading("Đang tạo box cho lot...");
     try {
-      await createBoxes({
+      const created = await createBoxes({
         lotId: Number(values.lotId),
         boxSize: Number(values.boxSize),
       }).unwrap();
       toast.success("Tạo box thành công.", { id: toastId });
       createBoxesForm.reset({ lotId: 0, boxSize: 0 });
+
+      if (created.boxes?.length) {
+        const qrToast = toast.loading(
+          `Đang tạo & lưu ảnh QR cho ${created.boxes.length} box...`,
+        );
+        try {
+          for (const b of created.boxes) {
+            const payload = b.qrPayload || b.boxCode;
+            const url = await uploadQrPayloadToCloudinary(payload, {
+              folder: "products/boxes",
+            });
+            await updateBoxQrImage({
+              boxId: b.id,
+              qrImageUrl: url,
+            }).unwrap();
+          }
+          toast.success("Đã lưu ảnh QR box lên Cloudinary.", { id: qrToast });
+        } catch {
+          toast.error(
+            "Tạo box xong nhưng lưu ảnh QR thất bại. Kiểm tra .env Cloudinary.",
+            { id: qrToast },
+          );
+        }
+      }
       // Sau khi tạo box thành công, quay về danh sách phiếu nhập
       setTimeout(() => {
         navigate("/admin/goods-receipts");
@@ -608,8 +676,10 @@ export default function GoodsReceiptQC() {
                               : "—"}
                           </td>
                           <td className="px-5 py-3 text-right text-slate-700 tabular-nums">
-                            {d.lineTotal != null
-                              ? `${moneyFmt.format(Number(d.lineTotal))} ₫`
+                            {d.unitPrice != null
+                              ? `${moneyFmt.format(
+                                  Number(d.unitPrice) * Number(d.receivedWeight),
+                                )} ₫`
                               : "—"}
                           </td>
                         </>
@@ -793,21 +863,32 @@ export default function GoodsReceiptQC() {
                   <label className="block text-xs font-medium text-slate-600 mb-1">
                     Chọn kho mới
                   </label>
-                  <select
-                    value={selectedWarehouseId || ""}
-                    onChange={(e) => setSelectedWarehouseId(Number(e.target.value))}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
-                  >
-                    <option value="">Chọn kho</option>
-                    {warehouses.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        #{w.id} · {w.name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Lưu ý: BE sẽ kiểm tra lại dung lượng kho mới khi duyệt.
-                  </p>
+                  {otherWarehouses.length === 0 ? (
+                    <p className="text-xs text-slate-500">
+                      Hiện không có kho nào khác để chuyển. Vui lòng liên hệ quản trị
+                      để tạo thêm kho hoặc giải phóng dung lượng kho hiện tại.
+                    </p>
+                  ) : (
+                    <>
+                      <select
+                        value={selectedWarehouseId || ""}
+                        onChange={(e) =>
+                          setSelectedWarehouseId(Number(e.target.value))
+                        }
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
+                      >
+                        <option value="">Chọn kho</option>
+                        {otherWarehouses.map((w) => (
+                          <option key={w.id} value={w.id}>
+                            #{w.id} · {w.name}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        Lưu ý: BE sẽ kiểm tra lại dung lượng kho mới khi duyệt.
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2 bg-slate-50/60">
@@ -822,7 +903,7 @@ export default function GoodsReceiptQC() {
                 <button
                   type="button"
                   onClick={handleConfirmChangeWarehouse}
-                  disabled={isUpdatingWarehouse}
+                  disabled={isUpdatingWarehouse || otherWarehouses.length === 0}
                   className="px-4 py-2 rounded-xl bg-emerald-600 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 inline-flex items-center gap-2"
                 >
                   {isUpdatingWarehouse && (

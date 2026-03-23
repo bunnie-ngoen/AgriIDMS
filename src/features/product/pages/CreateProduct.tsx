@@ -10,51 +10,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Sparkles, Package, ImagePlus, Loader2, X, ChevronDown } from "lucide-react";
-
-async function uploadImageToCloudinary(file: File): Promise<string> {
-  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-  const apiKey = import.meta.env.VITE_CLOUDINARY_API_KEY;
-
-  if (!cloudName || !uploadPreset) {
-    throw new Error("Cloudinary chưa được cấu hình (thiếu CLOUD_NAME hoặc UPLOAD_PRESET).");
-  }
-
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("upload_preset", uploadPreset);
-  if (apiKey) {
-    formData.append("api_key", apiKey);
-  }
-
-  const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-    {
-      method: "POST",
-      body: formData,
-    }
-  );
-
-  const json = (await res.json()) as any;
-
-  if (!res.ok) {
-    const cloudinaryMsg: string | undefined =
-      json?.error?.message || json?.message;
-    console.error("Cloudinary upload error:", json);
-    throw new Error(
-      cloudinaryMsg
-        ? `Upload ảnh thất bại: ${cloudinaryMsg}`
-        : "Upload ảnh thất bại."
-    );
-  }
-
-  if (!json?.secure_url) {
-    console.error("Cloudinary response missing secure_url:", json);
-    throw new Error("Không lấy được URL ảnh từ Cloudinary.");
-  }
-
-  return json.secure_url as string;
-}
+import { uploadFileToCloudinary } from "../../../shared/lib/cloudinaryUpload";
 
 const Field = ({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) => (
   <div className="space-y-1.5">
@@ -95,7 +51,7 @@ export default function CreateProduct() {
     try {
       let imageUrl: string | undefined;
       if (imageFile) {
-        imageUrl = await uploadImageToCloudinary(imageFile);
+        imageUrl = await uploadFileToCloudinary(imageFile);
       }
 
       await createProduct({

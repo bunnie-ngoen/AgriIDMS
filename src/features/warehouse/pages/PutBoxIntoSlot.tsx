@@ -1,7 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Loader2, QrCode, Package, MapPin } from "lucide-react";
+import {
+  ArrowLeft,
+  Loader2,
+  QrCode,
+  Package,
+  MapPin,
+  ImageUp,
+  Camera,
+} from "lucide-react";
 import toast from "react-hot-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { decodeQrFromImageFile } from "../../../shared/lib/decodeQrFromImage";
 import {
   useLazyGetBoxByQrQuery,
   useLazyGetSlotByQrQuery,
@@ -20,7 +29,6 @@ export default function PutBoxIntoSlot() {
   const [searchParams] = useSearchParams();
 
   const [boxQrInput, setBoxQrInput] = useState("");
-  const [manualBoxIdInput, setManualBoxIdInput] = useState("");
   const [slotQrInput, setSlotQrInput] = useState("");
 
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number>(0);
@@ -30,6 +38,10 @@ export default function PutBoxIntoSlot() {
 
   const boxInputRef = useRef<HTMLInputElement | null>(null);
   const slotInputRef = useRef<HTMLInputElement | null>(null);
+  const boxQrFileGalleryRef = useRef<HTMLInputElement | null>(null);
+  const boxQrFileCameraRef = useRef<HTMLInputElement | null>(null);
+  const slotQrFileGalleryRef = useRef<HTMLInputElement | null>(null);
+  const slotQrFileCameraRef = useRef<HTMLInputElement | null>(null);
 
   const [triggerBoxByQr, boxByQr] = useLazyGetBoxByQrQuery();
   const [triggerSlotByQr, slotByQr] = useLazyGetSlotByQrQuery();
@@ -57,29 +69,21 @@ export default function PutBoxIntoSlot() {
   const box = boxByQr.data;
   const slot = slotByQr.data;
 
-  // Nếu đi từ sơ đồ kho qua (bấm "Chuyển"), tự fill QR/BoxId
+  // Nếu đi từ sơ đồ kho qua (bấm "Chuyển"), tự fill QR box
   useEffect(() => {
     const prefillQr = (searchParams.get("boxQr") || "").trim();
-    const prefillBoxId = (searchParams.get("boxId") || "").trim();
 
     if (prefillQr) {
       setBoxQrInput(prefillQr);
       triggerBoxByQr(prefillQr)
         .unwrap()
         .then(() => {
-          // Sau khi load box, ưu tiên focus sang ô QR slot để chọn slot mới
           setTimeout(() => slotInputRef.current?.focus(), 50);
         })
         .catch(() => {
           // ignore toast ở đây để user tự xử lý
         });
       return;
-    }
-
-    if (prefillBoxId) {
-      setManualBoxIdInput(prefillBoxId);
-      // Không auto load vì hiện tại FE chỉ có API by-qr
-      setTimeout(() => slotInputRef.current?.focus(), 50);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -114,15 +118,16 @@ export default function PutBoxIntoSlot() {
   const slotRemaining = Math.max(0, slotCapacity - slotCurrent);
   const lockWarehouse = Boolean(box?.warehouseId && box.warehouseId > 0);
 
-  const handleLoadBox = async () => {
-    const qr = boxQrInput.trim();
+  const handleLoadBox = async (qrOverride?: string) => {
+    const qr = (qrOverride ?? boxQrInput).trim();
     if (!qr) {
-      toast.error("Vui lòng quét/nhập QR box.");
+      toast.error("Vui lòng quét/nhập QR box hoặc chọn ảnh có mã QR.");
       return;
     }
     try {
       await triggerBoxByQr(qr).unwrap();
       toast.success("Đã tải thông tin box.");
+      setTimeout(() => slotInputRef.current?.focus(), 50);
     } catch (err: any) {
       const msg =
         err?.data?.message ||
@@ -134,10 +139,39 @@ export default function PutBoxIntoSlot() {
     }
   };
 
-  const handleLoadSlot = async () => {
-    const qr = slotQrInput.trim();
+  const handleBoxQrFromImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const loading = toast.loading("Đang đọc QR từ ảnh...");
+    try {
+      const text = await decodeQrFromImageFile(file);
+      if (!text) {
+        toast.error(
+          "Không tìm thấy mã QR trong ảnh. Thử ảnh rõ hơn, đủ sáng hoặc crop sát mã QR.",
+          { id: loading },
+        );
+        return;
+      }
+      setBoxQrInput(text);
+      await triggerBoxByQr(text).unwrap();
+      toast.success("Đã tải thông tin box từ ảnh.", { id: loading });
+      setTimeout(() => slotInputRef.current?.focus(), 50);
+    } catch (err: any) {
+      const msg =
+        err?.data?.message ||
+        err?.data?.Message ||
+        err?.data?.error ||
+        err?.data?.Error ||
+        "Không tìm thấy box theo QR trong ảnh.";
+      toast.error(msg, { id: loading });
+    }
+  };
+
+  const handleLoadSlot = async (qrOverride?: string) => {
+    const qr = (qrOverride ?? slotQrInput).trim();
     if (!qr) {
-      toast.error("Vui lòng quét/nhập QR slot.");
+      toast.error("Vui lòng quét/nhập QR slot hoặc chọn ảnh có mã QR.");
       return;
     }
     try {
@@ -155,12 +189,44 @@ export default function PutBoxIntoSlot() {
     }
   };
 
+  const handleSlotQrFromImage = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const loading = toast.loading("Đang đọc QR từ ảnh...");
+    try {
+      const text = await decodeQrFromImageFile(file);
+      if (!text) {
+        toast.error(
+          "Không tìm thấy mã QR trong ảnh. Thử ảnh rõ hơn hoặc crop sát mã QR.",
+          { id: loading },
+        );
+        return;
+      }
+      setSlotQrInput(text);
+      const loaded = await triggerSlotByQr(text).unwrap();
+      setSelectedSlotId(loaded.id);
+      toast.success("Đã tải slot từ ảnh.", { id: loading });
+    } catch (err: any) {
+      const msg =
+        err?.data?.message ||
+        err?.data?.Message ||
+        err?.data?.error ||
+        err?.data?.Error ||
+        "Không tìm thấy slot theo QR trong ảnh.";
+      toast.error(msg, { id: loading });
+    }
+  };
+
   const handleAssign = async () => {
-    const manualBoxId = Number(manualBoxIdInput || 0);
-    const effectiveBoxId = box?.id && box.id > 0 ? box.id : manualBoxId;
+    const effectiveBoxId = box?.id && box.id > 0 ? box.id : 0;
 
     if (!effectiveBoxId || effectiveBoxId <= 0) {
-      toast.error("Vui lòng quét QR box hoặc nhập BoxId hợp lệ.");
+      toast.error(
+        "Vui lòng tải box bằng QR (máy quét, dán mã, hoặc ảnh có QR).",
+      );
       return;
     }
     if (!selectedSlotId || selectedSlotId <= 0) {
@@ -192,7 +258,6 @@ export default function PutBoxIntoSlot() {
 
       setBoxQrInput("");
       setSlotQrInput("");
-      setManualBoxIdInput("");
       setSelectedZoneId(0);
       setSelectedRackId(0);
       setSelectedSlotId(0);
@@ -211,7 +276,7 @@ export default function PutBoxIntoSlot() {
   const disableAssign =
     isAssigning ||
     isTransferring ||
-    (!box?.id && !Number(manualBoxIdInput || 0)) ||
+    !box?.id ||
     selectedSlotId <= 0 ||
     isLoadingWarehouses;
 
@@ -231,7 +296,8 @@ export default function PutBoxIntoSlot() {
               Kho · Xếp box vào slot
             </h1>
             <p className="text-xs text-slate-400 mt-0.5">
-              Quét QR box và QR slot để xếp nhanh, hoặc chọn slot theo kho.
+              QR box / slot: máy quét, dán mã, hoặc chọn & chụp ảnh có mã QR. Slot
+              có thể chọn thêm theo danh sách kho.
             </p>
           </div>
         </div>
@@ -274,7 +340,7 @@ export default function PutBoxIntoSlot() {
                 </div>
                 <button
                   type="button"
-                  onClick={handleLoadBox}
+                  onClick={() => void handleLoadBox()}
                   disabled={boxByQr.isFetching}
                   className="mt-6 inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-700 text-xs font-semibold text-white px-4 py-2 disabled:opacity-60"
                 >
@@ -283,24 +349,49 @@ export default function PutBoxIntoSlot() {
                 </button>
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-slate-100" />
-                <span className="text-[11px] text-slate-400">hoặc nhập tay</span>
-                <div className="h-px flex-1 bg-slate-100" />
-              </div>
-
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    BoxId (trường hợp không có QR)
-                  </label>
-                  <input
-                    value={manualBoxIdInput}
-                    onChange={(e) => setManualBoxIdInput(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
-                    placeholder="Nhập BoxId trực tiếp"
-                  />
+              <input
+                ref={boxQrFileGalleryRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleBoxQrFromImage}
+              />
+              <input
+                ref={boxQrFileCameraRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleBoxQrFromImage}
+              />
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-3 py-3">
+                <p className="text-[11px] font-medium text-slate-600 mb-2">
+                  Ảnh có mã QR box
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => boxQrFileGalleryRef.current?.click()}
+                    disabled={boxByQr.isFetching}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    <ImageUp size={14} />
+                    Chọn ảnh từ máy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => boxQrFileCameraRef.current?.click()}
+                    disabled={boxByQr.isFetching}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+                  >
+                    <Camera size={14} />
+                    Chụp ảnh QR
+                  </button>
                 </div>
+                <p className="text-[10px] text-slate-400 mt-2">
+                  Hỗ trợ ảnh chụp tem nhãn / màn hình có QR. Trên điện thoại, nút
+                  chụp sẽ mở camera sau.
+                </p>
               </div>
 
               <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-sm">
@@ -408,7 +499,7 @@ export default function PutBoxIntoSlot() {
                 </div>
                 <button
                   type="button"
-                  onClick={handleLoadSlot}
+                  onClick={() => void handleLoadSlot()}
                   disabled={slotByQr.isFetching}
                   className="mt-6 inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-700 text-xs font-semibold text-white px-4 py-2 disabled:opacity-60"
                 >
@@ -417,9 +508,50 @@ export default function PutBoxIntoSlot() {
                 </button>
               </div>
 
+              <input
+                ref={slotQrFileGalleryRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleSlotQrFromImage}
+              />
+              <input
+                ref={slotQrFileCameraRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleSlotQrFromImage}
+              />
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-3 py-3">
+                <p className="text-[11px] font-medium text-slate-600 mb-2">
+                  Ảnh có mã QR slot
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => slotQrFileGalleryRef.current?.click()}
+                    disabled={slotByQr.isFetching}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    <ImageUp size={14} />
+                    Chọn ảnh từ máy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => slotQrFileCameraRef.current?.click()}
+                    disabled={slotByQr.isFetching}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+                  >
+                    <Camera size={14} />
+                    Chụp ảnh QR
+                  </button>
+                </div>
+              </div>
+
               <div className="flex items-center gap-3">
                 <div className="h-px flex-1 bg-slate-100" />
-                <span className="text-[11px] text-slate-400">hoặc</span>
+                <span className="text-[11px] text-slate-400">hoặc chọn kho</span>
                 <div className="h-px flex-1 bg-slate-100" />
               </div>
 
@@ -613,7 +745,8 @@ export default function PutBoxIntoSlot() {
           </div>
           <div className="px-6 pb-5">
             <p className="text-xs text-slate-500">
-              Gợi ý: dùng máy quét QR để nhập nhanh (Enter sẽ tự “Tải”).
+              Gợi ý: máy quét QR gõ thẳng vào ô (Enter = Tải); ảnh chụp tem nhãn
+              dùng nút “Chọn ảnh” / “Chụp ảnh QR”.
             </p>
           </div>
         </div>

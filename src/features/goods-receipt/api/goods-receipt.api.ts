@@ -4,7 +4,9 @@ import type {
   GoodsReceiptResponse,
   GoodsReceiptForApprovalResponse,
   LotSummary,
+  LotByQrResponse,
   BoxByQrResponse,
+  BoxCreatedItem,
   SlotByQrResponse,
   CreateGoodsReceiptRequest,
   AddGoodsReceiptDetailRequest,
@@ -182,6 +184,10 @@ export const goodsReceiptApi = api.injectEndpoints({
             id: (row.id as number) ?? (row.Id as number) ?? 0,
             lotCode:
               (row.lotCode as string) ?? (row.LotCode as string) ?? "",
+            qrImageUrl:
+              (row.qrImageUrl as string | null | undefined) ??
+              (row.QrImageUrl as string | null | undefined) ??
+              null,
             totalQuantity:
               (row.totalQuantity as number) ??
               (row.TotalQuantity as number) ??
@@ -207,6 +213,53 @@ export const goodsReceiptApi = api.injectEndpoints({
       },
     }),
 
+    getLotByQr: builder.query<LotByQrResponse, string>({
+      query: (qrCode) => ({ url: `Lots/by-qr/${encodeURIComponent(qrCode)}` }),
+      transformResponse: (raw: unknown): LotByQrResponse => {
+        const row = (raw ?? {}) as RawObject;
+        return {
+          id: (row.id as number) ?? (row.Id as number) ?? 0,
+          lotCode:
+            (row.lotCode as string) ?? (row.LotCode as string) ?? "",
+          qrImageUrl:
+            (row.qrImageUrl as string | null | undefined) ??
+            (row.QrImageUrl as string | null | undefined) ??
+            null,
+          expiryDate:
+            (row.expiryDate as string | Date | undefined) ??
+            (row.ExpiryDate as string | Date | undefined) ??
+            "",
+          receivedDate:
+            (row.receivedDate as string | Date | undefined) ??
+            (row.ReceivedDate as string | Date | undefined) ??
+            "",
+          totalQuantity:
+            (row.totalQuantity as number) ?? (row.TotalQuantity as number) ?? 0,
+          remainingQuantity:
+            (row.remainingQuantity as number) ??
+            (row.RemainingQuantity as number) ??
+            0,
+          status: (row.status as string) ?? (row.Status as string) ?? "",
+          productVariantId:
+            (row.productVariantId as number | null | undefined) ??
+            (row.ProductVariantId as number | null | undefined) ??
+            null,
+          productVariantName:
+            (row.productVariantName as string | null | undefined) ??
+            (row.ProductVariantName as string | null | undefined) ??
+            null,
+          productName:
+            (row.productName as string | null | undefined) ??
+            (row.ProductName as string | null | undefined) ??
+            null,
+          warehouseId:
+            (row.warehouseId as number | null | undefined) ??
+            (row.WarehouseId as number | null | undefined) ??
+            null,
+        };
+      },
+    }),
+
     getBoxByQr: builder.query<BoxByQrResponse, string>({
       query: (qrCode) => ({ url: `Boxes/by-qr/${encodeURIComponent(qrCode)}` }),
       transformResponse: (raw: unknown): BoxByQrResponse => {
@@ -220,6 +273,10 @@ export const goodsReceiptApi = api.injectEndpoints({
             (row.qrCode as string | null | undefined) ??
             (row.QRCode as string | null | undefined) ??
             null,
+          qrImageUrl:
+            (row.qrImageUrl as string | null | undefined) ??
+            (row.QrImageUrl as string | null | undefined) ??
+            null,
           weight: (row.weight as number) ?? (row.Weight as number) ?? 0,
           status: (row.status as string) ?? (row.Status as string) ?? "",
           slotId:
@@ -230,7 +287,31 @@ export const goodsReceiptApi = api.injectEndpoints({
             (row.warehouseId as number | null | undefined) ??
             (row.WarehouseId as number | null | undefined) ??
             null,
+          warehouseName:
+            (row.warehouseName as string | null | undefined) ??
+            (row.WarehouseName as string | null | undefined) ??
+            null,
+          slotCode:
+            (row.slotCode as string | null | undefined) ??
+            (row.SlotCode as string | null | undefined) ??
+            null,
+          lotCode:
+            (row.lotCode as string | null | undefined) ??
+            (row.LotCode as string | null | undefined) ??
+            null,
           lotId: (row.lotId as number) ?? (row.LotId as number) ?? 0,
+          productVariantId:
+            (row.productVariantId as number | null | undefined) ??
+            (row.ProductVariantId as number | null | undefined) ??
+            null,
+          productVariantName:
+            (row.productVariantName as string | null | undefined) ??
+            (row.ProductVariantName as string | null | undefined) ??
+            null,
+          productName:
+            (row.productName as string | null | undefined) ??
+            (row.ProductName as string | null | undefined) ??
+            null,
           placedInColdAt:
             placed != null
               ? typeof placed === "string"
@@ -252,13 +333,87 @@ export const goodsReceiptApi = api.injectEndpoints({
             (row.qrCode as string | null | undefined) ??
             (row.QrCode as string | null | undefined) ??
             null,
+          qrImageUrl:
+            (row.qrImageUrl as string | null | undefined) ??
+            (row.QrImageUrl as string | null | undefined) ??
+            null,
           capacity: (row.capacity as number) ?? (row.Capacity as number) ?? 0,
           currentCapacity:
             (row.currentCapacity as number) ??
             (row.CurrentCapacity as number) ??
             0,
           rackId: (row.rackId as number) ?? (row.RackId as number) ?? 0,
+          rackName:
+            (row.rackName as string | null | undefined) ??
+            (row.RackName as string | null | undefined) ??
+            null,
         };
+      },
+    }),
+
+    getUnassignedBoxesByWarehouse: builder.query<
+      BoxByQrResponse[],
+      number
+    >({
+      query: (warehouseId) => ({
+        url: `Boxes/unassigned?warehouseId=${warehouseId}`,
+      }),
+      transformResponse: (raw: unknown): BoxByQrResponse[] => {
+        const arr = (raw as unknown as RawObject[]) ?? [];
+        if (!Array.isArray(arr)) return [];
+
+        return arr.map((row) => {
+          const placed = row.placedInColdAt ?? row.PlacedInColdAt;
+
+          return {
+            id: (row.id as number) ?? (row.Id as number) ?? 0,
+            boxCode:
+              (row.boxCode as string) ??
+              (row.BoxCode as string) ??
+              "",
+            qrCode:
+              (row.qrCode as string | null | undefined) ??
+              (row.QRCode as string | null | undefined) ??
+              (row.QrCode as string | null | undefined) ??
+              null,
+            qrImageUrl:
+              (row.qrImageUrl as string | null | undefined) ??
+              (row.QrImageUrl as string | null | undefined) ??
+              null,
+            weight: (row.weight as number) ?? (row.Weight as number) ?? 0,
+            status:
+              (row.status as string) ??
+              (row.Status as string) ??
+              "",
+            slotId:
+              (row.slotId as number | null | undefined) ??
+              (row.SlotId as number | null | undefined) ??
+              null,
+            warehouseId:
+              (row.warehouseId as number | null | undefined) ??
+              (row.WarehouseId as number | null | undefined) ??
+              null,
+            lotId: (row.lotId as number) ?? (row.LotId as number) ?? 0,
+            productVariantId:
+              (row.productVariantId as number | null | undefined) ??
+              (row.ProductVariantId as number | null | undefined) ??
+              null,
+            productVariantName:
+              (row.productVariantName as string | null | undefined) ??
+              (row.ProductVariantName as string | null | undefined) ??
+              null,
+            productName:
+              (row.productName as string | null | undefined) ??
+              (row.ProductName as string | null | undefined) ??
+              null,
+            placedInColdAt:
+              placed != null
+                ? typeof placed === "string"
+                  ? placed
+                  : new Date(placed as string | number).toISOString()
+                : null,
+          };
+        });
       },
     }),
 
@@ -329,13 +484,75 @@ export const goodsReceiptApi = api.injectEndpoints({
       },
     }),
 
-    createBoxes: builder.mutation<{ message: string }, CreateBoxesRequest>({
+    createBoxes: builder.mutation<
+      { message: string; boxes: BoxCreatedItem[] },
+      CreateBoxesRequest
+    >({
       query: (body) => ({
         url: "GoodsReceipts/boxes",
         method: "POST",
         body,
       }),
+      transformResponse: (raw: unknown) => {
+        const obj = (raw ?? {}) as RawObject;
+        const rawBoxes =
+          (obj.boxes as unknown[]) ?? (obj.Boxes as unknown[]) ?? [];
+        const boxes: BoxCreatedItem[] = rawBoxes.map((b) => {
+          const row = (b ?? {}) as RawObject;
+          return {
+            id: (row.id as number) ?? (row.Id as number) ?? 0,
+            boxCode:
+              (row.boxCode as string) ?? (row.BoxCode as string) ?? "",
+            qrPayload:
+              (row.qrPayload as string) ??
+              (row.QrPayload as string) ??
+              "",
+          };
+        });
+        return {
+          message:
+            (obj.message as string) ?? (obj.Message as string) ?? "OK",
+          boxes,
+        };
+      },
       invalidatesTags: [{ type: "GoodsReceipt" as const, id: "LIST" }],
+    }),
+
+    updateLotQrImage: builder.mutation<
+      { message: string },
+      { lotId: number; qrImageUrl: string }
+    >({
+      query: ({ lotId, qrImageUrl }) => ({
+        url: `Lots/${lotId}/qr-image`,
+        method: "PUT",
+        body: { qrImageUrl },
+      }),
+    }),
+
+    updateBoxQrImage: builder.mutation<
+      { message: string },
+      { boxId: number; qrImageUrl: string }
+    >({
+      query: ({ boxId, qrImageUrl }) => ({
+        url: `Boxes/${boxId}/qr-image`,
+        method: "PUT",
+        body: { qrImageUrl },
+      }),
+    }),
+
+    updateSlotQrImage: builder.mutation<
+      { message: string },
+      { slotId: number; qrImageUrl: string; rackId?: number }
+    >({
+      query: ({ slotId, qrImageUrl }) => ({
+        url: `slots/${slotId}/qr-image`,
+        method: "PUT",
+        body: { qrImageUrl },
+      }),
+      invalidatesTags: (_res, _err, arg) =>
+        arg.rackId
+          ? [{ type: "Slot" as const, id: `RACK-${arg.rackId}` }]
+          : [],
     }),
 
     approveGoodsReceipt: builder.mutation<{ message: string }, number>({
@@ -452,6 +669,8 @@ export const goodsReceiptApi = api.injectEndpoints({
         // cập nhật sơ đồ kho (currentCapacity của slot trong rack)
         { type: "Slot" as const },
         // cập nhật popup chi tiết slot (danh sách box trong slot)
+        // (xếp lại slot có thể làm thay đổi slot cũ + slot mới, nên invalidates LIST cho chắc)
+        { type: "SlotContents" as const, id: "LIST" },
         { type: "SlotContents" as const, id: arg.slotId },
       ],
     }),
@@ -479,6 +698,7 @@ export const goodsReceiptApi = api.injectEndpoints({
       },
       invalidatesTags: (_res, _err, arg) => [
         { type: "Slot" as const },
+        { type: "SlotContents" as const, id: "LIST" },
         { type: "SlotContents" as const, id: arg.toSlotId },
       ],
     }),
@@ -502,9 +722,14 @@ export const {
   useManagerReviewToleranceMutation,
   useUpdateGoodsReceiptWarehouseMutation,
   useGetLotsByGoodsReceiptIdQuery,
+  useLazyGetLotByQrQuery,
+  useGetUnassignedBoxesByWarehouseQuery,
   useLazyGetBoxByQrQuery,
   useLazyGetSlotByQrQuery,
   useAssignBoxToSlotMutation,
   useTransferBoxToSlotMutation,
+  useUpdateLotQrImageMutation,
+  useUpdateBoxQrImageMutation,
+  useUpdateSlotQrImageMutation,
 } = goodsReceiptApi;
 

@@ -14,12 +14,14 @@ import {
   UserX,
   FileText,
   PackageSearch,
+  QrCode,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { useAppDispatch } from "../../../../app/hook";
 import { logout } from "../../../auth/slices/auth.slice";
 import { persistor } from "../../../../app/store";
+import AdminQrScanPanel from "../qr/AdminQrScanPanel";
 
 type SubMenuItem = {
   name: string;
@@ -125,6 +127,7 @@ export default function AdminSidebar() {
   const location = useLocation();
 
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
+  const [isQrDropdownOpen, setIsQrDropdownOpen] = useState(false);
 
   const currentLastSegment =
     location.pathname.split("/").filter(Boolean).slice(-1)[0] ?? "";
@@ -373,6 +376,37 @@ export default function AdminSidebar() {
           <ul className="space-y-1">
             {accountMenu.map((item) => renderLeafItem(item))}
           </ul>
+        </div>
+
+        {/* SCAN QR DROPDOWN (1 dòng, bấm để mở panel) */}
+        <div className="border-t border-[#1a2226] bg-[#222d32]">
+          <button
+            type="button"
+            onClick={() => setIsQrDropdownOpen((v) => !v)}
+            className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors ${
+              isQrDropdownOpen ? "bg-[#1a2530]" : "hover:bg-[#1b2225]"
+            }`}
+          >
+            <span className="flex items-center gap-3 min-w-0">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded bg-sky-500 text-white">
+                <QrCode size={16} />
+              </span>
+              <span className="min-w-0">
+                <p className="text-sm font-semibold text-slate-100 truncate">
+                  Scan QR
+                </p>
+              </span>
+            </span>
+
+            <ChevronRight
+              size={16}
+              className={`transition-transform ${
+                isQrDropdownOpen ? "rotate-90" : ""
+              }`}
+            />
+          </button>
+
+          {isQrDropdownOpen ? <AdminQrScanPanel /> : null}
         </div>
       </div>
 
