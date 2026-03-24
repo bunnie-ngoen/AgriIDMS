@@ -1,7 +1,13 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ROUTES } from "../../../shared/constants/routes";
-import { useGetMyOrderByIdQuery } from "../api/order.api";
+import {
+    useCancelOrderMutation,
+    useCancelShortageMutation,
+    useConfirmOrderMutation,
+    useGetMyOrderByIdQuery,
+    useWaitBackorderMutation,
+} from "../api/order.api";
 import {
     useCancelPaymentMutation,
     useCreatePaymentMutation,
@@ -22,6 +28,10 @@ export default function MyOrderDetailPage() {
     const { data: latestPayment, refetch: refetchPayment } = useGetLatestPaymentByOrderQuery(orderId, { skip: !valid });
     const [createPayment, { isLoading: isCreating }] = useCreatePaymentMutation();
     const [cancelPayment, { isLoading: isCancelling }] = useCancelPaymentMutation();
+    const [confirmOrder, { isLoading: isConfirmingOrder }] = useConfirmOrderMutation();
+    const [waitBackorder, { isLoading: isWaitingBackorder }] = useWaitBackorderMutation();
+    const [cancelShortage, { isLoading: isCancellingShortage }] = useCancelShortageMutation();
+    const [cancelOrder, { isLoading: isCancellingOrder }] = useCancelOrderMutation();
 
     const [paymentMethod, setPaymentMethod] = useState<number>(paymentMethodEnum.COD);
     const [msg, setMsg] = useState<string>("");
@@ -52,6 +62,54 @@ export default function MyOrderDetailPage() {
             await refetch();
         } catch {
             setMsg("Không hủy được payment hiện tại.");
+        }
+    };
+
+    const onConfirmOrder = async () => {
+        if (!valid) return;
+        setMsg("");
+        try {
+            await confirmOrder(orderId).unwrap();
+            setMsg("Đã xác nhận đơn để giữ hàng.");
+            await refetch();
+        } catch {
+            setMsg("Không thể ConfirmOrder lúc này.");
+        }
+    };
+
+    const onWaitBackorder = async () => {
+        if (!valid) return;
+        setMsg("");
+        try {
+            await waitBackorder(orderId).unwrap();
+            setMsg("Đã chọn chờ backorder.");
+            await refetch();
+        } catch {
+            setMsg("Không thể chuyển sang chờ backorder.");
+        }
+    };
+
+    const onCancelShortage = async () => {
+        if (!valid) return;
+        setMsg("");
+        try {
+            await cancelShortage(orderId).unwrap();
+            setMsg("Đã hủy phần thiếu của đơn.");
+            await refetch();
+        } catch {
+            setMsg("Không thể hủy phần thiếu lúc này.");
+        }
+    };
+
+    const onCancelOrder = async () => {
+        if (!valid) return;
+        setMsg("");
+        try {
+            await cancelOrder(orderId).unwrap();
+            setMsg("Đã hủy đơn hàng.");
+            await refetch();
+        } catch {
+            setMsg("Không thể hủy đơn hàng lúc này.");
         }
     };
 
@@ -93,6 +151,50 @@ export default function MyOrderDetailPage() {
                     <div className="rounded-xl border border-slate-200 bg-white p-4 h-fit">
                         <h2 className="text-lg font-bold text-slate-900">Thanh toán</h2>
                         <p className="mt-1 text-sm text-slate-600">Tổng đơn: <span className="font-semibold">{vnd(total)} ₫</span></p>
+                        <div className="mt-3 space-y-2">
+                            {order.status === "AwaitingAllocation" && (
+                                <button
+                                    type="button"
+                                    onClick={onConfirmOrder}
+                                    disabled={isConfirmingOrder}
+                                    className="w-full rounded-lg border border-indigo-300 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-60"
+                                >
+                                    {isConfirmingOrder ? "Đang xác nhận..." : "ConfirmOrder (giữ hàng)"}
+                                </button>
+                            )}
+                            {order.status === "PartiallyAllocated" && (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={onWaitBackorder}
+                                        disabled={isWaitingBackorder}
+                                        className="w-full rounded-lg border border-amber-300 px-3 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-60"
+                                    >
+                                        {isWaitingBackorder ? "Đang xử lý..." : "Chờ backorder"}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={onCancelShortage}
+                                        disabled={isCancellingShortage}
+                                        className="w-full rounded-lg border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
+                                    >
+                                        {isCancellingShortage ? "Đang xử lý..." : "Hủy phần thiếu"}
+                                    </button>
+                                </>
+                            )}
+                            {order.status !== "Shipping" &&
+                                order.status !== "Completed" &&
+                                order.status !== "Cancelled" && (
+                                    <button
+                                        type="button"
+                                        onClick={onCancelOrder}
+                                        disabled={isCancellingOrder}
+                                        className="w-full rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
+                                    >
+                                        {isCancellingOrder ? "Đang hủy..." : "Hủy đơn"}
+                                    </button>
+                                )}
+                        </div>
                         <div className="mt-3">
                             <label className="text-xs font-medium text-slate-700">Phương thức</label>
                             <select

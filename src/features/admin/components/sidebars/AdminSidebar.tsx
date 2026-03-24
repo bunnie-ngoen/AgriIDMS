@@ -21,6 +21,7 @@ import { useState } from "react";
 import { useAppDispatch } from "../../../../app/hook";
 import { logout } from "../../../auth/slices/auth.slice";
 import { persistor } from "../../../../app/store";
+import { api } from "../../../../shared/api";
 import AdminQrScanPanel from "../qr/AdminQrScanPanel";
 
 type SubMenuItem = {
@@ -134,6 +135,7 @@ export default function AdminSidebar() {
 
   const handleLogout = () => {
     dispatch(logout());
+    dispatch(api.util.resetApiState());
     persistor.purge();
     navigate("/login");
   };

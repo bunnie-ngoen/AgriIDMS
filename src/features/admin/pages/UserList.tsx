@@ -96,46 +96,29 @@ const StatusDropdown = ({
   onStatusChange: (id: string, status: UserStatus) => void;
   isUpdating: boolean;
 }) => {
-  const [open, setOpen] = useState(false);
   const currentStatus = toUserStatus(user.status);
   const config = STATUS_CONFIG[currentStatus];
 
   return (
-    <div className="relative inline-block text-left">
-      <button
-        type="button"
-        disabled={isUpdating}
-        onClick={() => setOpen((v) => !v)}
-        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-opacity disabled:opacity-50 ${config.color} ${config.bg} ${config.border}`}
-      >
-        {config.label}
-        <ChevronDown size={11} className={open ? "rotate-180 transition-transform" : "transition-transform"} />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 z-20 mt-1 w-32 rounded-lg border border-slate-200 bg-white shadow-lg py-1">
-            {(Object.keys(STATUS_CONFIG) as unknown as UserStatus[]).map((key) => {
-              const numKey = Number(key) as UserStatus;
-              const cfg = STATUS_CONFIG[numKey];
-              const isActive = numKey === currentStatus;
-              return (
-                <button
-                  key={numKey}
-                  type="button"
-                  onClick={() => { setOpen(false); if (!isActive) onStatusChange(user.id, numKey); }}
-                  className={`w-full flex items-center gap-2 px-3 py-1.5 text-[11px] hover:bg-slate-50 ${isActive ? "font-semibold" : ""} ${cfg.color}`}
-                >
-                  <span className={`h-1.5 w-1.5 rounded-full border ${cfg.bg} ${cfg.border}`} />
-                  {cfg.label}
-                  {isActive && <span className="ml-auto">✓</span>}
-                </button>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
+    <select
+      value={currentStatus}
+      disabled={isUpdating}
+      onChange={(e) => {
+        const next = Number(e.target.value) as UserStatus;
+        if (next !== currentStatus) onStatusChange(user.id, next);
+      }}
+      className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition-opacity disabled:opacity-50 ${config.color} ${config.bg} ${config.border}`}
+    >
+      {(Object.keys(STATUS_CONFIG) as unknown as UserStatus[]).map((key) => {
+        const numKey = Number(key) as UserStatus;
+        const cfg = STATUS_CONFIG[numKey];
+        return (
+          <option key={numKey} value={numKey}>
+            {cfg.label}
+          </option>
+        );
+      })}
+    </select>
   );
 };
 
@@ -149,43 +132,26 @@ const RoleDropdown = ({
   onRoleChange: (id: string, roleName: string) => void;
   isUpdating: boolean;
 }) => {
-  const [open, setOpen] = useState(false);
-  const current = user.roles?.[0] ?? "—";
+  const current = user.roles?.[0] ?? "Customer";
 
   return (
-    <div className="relative inline-block text-left">
-      <button
-        type="button"
+    <div className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-[11px] font-medium text-blue-700">
+      <ShieldCheck size={11} />
+      <select
+        value={current}
         disabled={isUpdating}
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-[11px] font-medium text-blue-700 transition-opacity disabled:opacity-50"
+        onChange={(e) => {
+          const next = e.target.value;
+          if (next !== current) onRoleChange(user.id, next);
+        }}
+        className="bg-transparent outline-none"
       >
-        <ShieldCheck size={11} />
-        {current}
-        <ChevronDown size={11} className={open ? "rotate-180 transition-transform" : "transition-transform"} />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 z-20 mt-1 w-40 rounded-lg border border-slate-200 bg-white shadow-lg py-1">
-            {ROLES.map((role) => {
-              const isActive = role === current;
-              return (
-                <button
-                  key={role}
-                  type="button"
-                  onClick={() => { setOpen(false); if (!isActive) onRoleChange(user.id, role); }}
-                  className={`w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-slate-700 hover:bg-slate-50 ${isActive ? "font-semibold" : ""}`}
-                >
-                  <ShieldCheck size={11} className="text-blue-400" />
-                  {role}
-                  {isActive && <span className="ml-auto text-blue-500">✓</span>}
-                </button>
-              );
-            })}
-          </div>
-        </>
-      )}
+        {ROLES.map((role) => (
+          <option key={role} value={role}>
+            {role}
+          </option>
+        ))}
+      </select>
     </div>
   );
 };
@@ -338,7 +304,7 @@ const UserList = () => {
 
         {isError && <p className="text-red-500 text-sm mb-3">Không tải được danh sách người dùng. Vui lòng thử lại.</p>}
 
-        <div className="overflow-x-auto border border-slate-200 rounded-xl">
+        <div className="overflow-x-auto overflow-y-visible border border-slate-200 rounded-xl">
           <table className="min-w-full text-xs md:text-sm">
             <thead className="bg-slate-50 text-slate-600">
               <tr>

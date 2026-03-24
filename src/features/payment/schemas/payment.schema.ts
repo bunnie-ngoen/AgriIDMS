@@ -14,6 +14,20 @@ export const paymentResponseSchema = z.object({
 
 export type PaymentResponse = z.infer<typeof paymentResponseSchema>;
 
+export const pendingCodPaymentItemSchema = z.object({
+    paymentId: z.coerce.number().int(),
+    orderId: z.coerce.number().int(),
+    customerUserId: z.string(),
+    amount: z.coerce.number(),
+    paymentStatus: z.string(),
+    paymentMethod: z.string(),
+    orderStatus: z.string(),
+    createdAt: z.string(),
+});
+
+export const pendingCodPaymentListSchema = z.array(pendingCodPaymentItemSchema);
+export type PendingCodPaymentItem = z.infer<typeof pendingCodPaymentItemSchema>;
+
 export const paymentMethodEnum = {
     COD: 0,
     VNPAY: 1,

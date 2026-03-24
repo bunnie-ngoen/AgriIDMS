@@ -10,16 +10,24 @@ import {
   LogOut,
   User,
   ShoppingCart,
+  Bell,
 } from "lucide-react";
 
 import { ROUTES } from "../../constants/routes";
 import { usePublicLayout } from "../../hooks/usePublicLayout";
 import { useAppDispatch } from "../../../app/hook";
 import { logout } from "../../../features/auth/slices/auth.slice";
+import { api } from "../../api";
 import { useGetMyProfileQuery } from "../../../features/admin/api/profile.api";
 import { useAuth } from "../../../features/auth/hooks/useAuth";
 import { AUTH_ROLE } from "../../../features/auth/constants/auth.constants";
 import { useGetMyCartQuery } from "../../../features/cart/api/cart.api";
+import {
+  useGetMyNotificationsQuery,
+  useGetUnreadNotificationCountQuery,
+  useMarkAllNotificationsAsReadMutation,
+  useMarkNotificationAsReadMutation,
+} from "../../../features/notification/api/notification.api";
 
 export default function PublicHeader() {
   const { isLoggedIn, hasDashboard, dashboardPath } = usePublicLayout();
@@ -30,6 +38,7 @@ export default function PublicHeader() {
 
   const { data: user } = useGetMyProfileQuery(undefined, {
     skip: !isLoggedIn,
+    refetchOnMountOrArgChange: true,
   });
 
   const { data: cart } = useGetMyCartQuery(undefined, {
@@ -40,7 +49,22 @@ export default function PublicHeader() {
     cart?.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const notificationRef = useRef<HTMLDivElement>(null);
+
+  const { data: notificationData, refetch: refetchNotifications } =
+    useGetMyNotificationsQuery(
+      { page: 1, pageSize: 10 },
+      { skip: !isLoggedIn || !isCustomer },
+    );
+  const { data: unreadCountData, refetch: refetchUnreadCount } =
+    useGetUnreadNotificationCountQuery(undefined, {
+      skip: !isLoggedIn || !isCustomer,
+    });
+  const [markAsRead] = useMarkNotificationAsReadMutation();
+  const [markAllAsRead, { isLoading: isMarkingAllAsRead }] =
+    useMarkAllNotificationsAsReadMutation();
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -50,6 +74,12 @@ export default function PublicHeader() {
       ) {
         setDropdownOpen(false);
       }
+      if (
+        notificationRef.current &&
+        !notificationRef.current.contains(e.target as Node)
+      ) {
+        setNotificationOpen(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -57,12 +87,49 @@ export default function PublicHeader() {
 
   const handleLogout = () => {
     dispatch(logout());
+    dispatch(api.util.resetApiState());
     navigate(ROUTES.LOGIN);
   };
 
   const avatarLetter = (user?.fullName || user?.email || "U")
     .charAt(0)
     .toUpperCase();
+  const unreadCount = unreadCountData?.unreadCount ?? 0;
+
+  const formatNotificationTime = (iso: string) => {
+    const dt = new Date(iso);
+    if (Number.isNaN(dt.getTime())) return "";
+    return dt.toLocaleString("vi-VN");
+  };
+
+  const handleNotificationClick = async (
+    userNotificationId: number,
+    isRead: boolean,
+    referenceId?: number | null,
+  ) => {
+    if (!isRead) {
+      try {
+        await markAsRead(userNotificationId).unwrap();
+        await Promise.all([refetchNotifications(), refetchUnreadCount()]);
+      } catch {
+        // Swallow notification marking errors to keep navigation responsive.
+      }
+    }
+
+    if (referenceId) {
+      navigate(`/my-orders/${referenceId}`);
+      setNotificationOpen(false);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await markAllAsRead().unwrap();
+      await Promise.all([refetchNotifications(), refetchUnreadCount()]);
+    } catch {
+      // Ignore and allow user to continue.
+    }
+  };
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
@@ -142,6 +209,79 @@ export default function PublicHeader() {
 
           {isLoggedIn && isCustomer && (
             <>
+              <div className="relative" ref={notificationRef}>
+                <button
+                  type="button"
+                  onClick={() => setNotificationOpen((v) => !v)}
+                  className="relative p-2 text-slate-600 hover:text-[#1a5f2a] rounded-lg hover:bg-slate-50"
+                  aria-label="Thông báo"
+                >
+                  <Bell size={20} className="text-[#1a5f2a]" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-[#1a5f2a] text-white text-[11px] font-bold h-5 min-w-5 px-1 rounded-full flex items-center justify-center border border-white">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {notificationOpen && (
+                  <div className="absolute right-0 mt-2 w-[360px] max-w-[90vw] bg-white rounded-xl shadow-lg border border-slate-100 z-30 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                      <p className="text-sm font-semibold text-slate-800">
+                        Thông báo của bạn
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleMarkAllAsRead}
+                        disabled={isMarkingAllAsRead || unreadCount === 0}
+                        className="text-xs font-semibold text-[#1a5f2a] disabled:text-slate-400 hover:underline"
+                      >
+                        Đánh dấu tất cả đã đọc
+                      </button>
+                    </div>
+
+                    <div className="max-h-[380px] overflow-auto">
+                      {!notificationData?.items?.length ? (
+                        <p className="px-4 py-5 text-sm text-slate-500">
+                          Chưa có thông báo nào.
+                        </p>
+                      ) : (
+                        <div className="divide-y divide-slate-100">
+                          {notificationData.items.map((item) => (
+                            <button
+                              key={item.userNotificationId}
+                              type="button"
+                              onClick={() =>
+                                handleNotificationClick(
+                                  item.userNotificationId,
+                                  item.isRead,
+                                  item.referenceId,
+                                )
+                              }
+                              className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors ${
+                                item.isRead ? "bg-white" : "bg-emerald-50/40"
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <p className="text-sm text-slate-800 leading-5">
+                                  {item.message}
+                                </p>
+                                {!item.isRead && (
+                                  <span className="mt-1 h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-500 mt-1">
+                                {formatNotificationTime(item.createdAt)}
+                              </p>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <Link
                 to={ROUTES.CUSTOMER_ORDERS_PAGE}
                 className="px-3 py-2 text-sm font-medium text-slate-700 hover:text-[#1a5f2a] hover:bg-slate-50 rounded"

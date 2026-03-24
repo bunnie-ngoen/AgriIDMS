@@ -3,11 +3,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema, type RegisterFormValues } from "../schemas/register.schema";
 import { useRegisterCustomerMutation } from "../api/auth.api";
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 
 const RegisterForm = () => {
   const navigate = useNavigate();
-  const [registerCustomer, { isLoading, isSuccess, error }] =
+  const [registerCustomer, { isLoading }] =
     useRegisterCustomerMutation();
+  const [apiErrorMessage, setApiErrorMessage] = useState<string>("");
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -15,10 +17,23 @@ const RegisterForm = () => {
   });
 
   const onSubmit = async (values: RegisterFormValues) => {
+    setApiErrorMessage("");
     try {
       await registerCustomer(values).unwrap();
       navigate("/login");
     } catch (e : any) {
+      const message =
+        e?.data?.message ||
+        e?.data?.error ||
+        e?.data?.detail ||
+        e?.error ||
+        (Array.isArray(e?.data?.errors)
+          ? e.data.errors.join(", ")
+          : e?.data?.errors && typeof e.data.errors === "object"
+          ? Object.values(e.data.errors).flat().join(", ")
+          : null) ||
+        "Đăng ký thất bại. Vui lòng kiểm tra lại thông tin.";
+      setApiErrorMessage(String(message));
       console.error("Register failed:", e);
     }
   };
@@ -77,11 +92,11 @@ const RegisterForm = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <label className="font-medium text-xs md:text-sm text-slate-700">
-                User name *
+                Tên tài khoản đăng nhập *
               </label>
               <input
                 {...form.register("userName")}
-                placeholder="username"
+                placeholder="nhap_ten_tai_khoan"
                 className="p-2.5 w-full bg-slate-50 rounded-xl border border-slate-200 text-xs md:text-sm
                            focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-500"
               />
@@ -111,7 +126,7 @@ const RegisterForm = () => {
 
             <div className="flex flex-col gap-1.5">
               <label className="font-medium text-xs md:text-sm text-slate-700">
-                Email
+                Email *
               </label>
               <input
                 {...form.register("email")}
@@ -235,9 +250,9 @@ const RegisterForm = () => {
             )}
           </div>
 
-          {error && !isSuccess && (
+          {!!apiErrorMessage && (
             <p className="text-red-500 text-xs bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-              Đăng ký thất bại. Vui lòng kiểm tra lại thông tin.
+              {apiErrorMessage}
             </p>
           )}
 
