@@ -1,5 +1,10 @@
 import { api } from "../../../shared/api";
-import { paymentResponseSchema, type PaymentResponse } from "../schemas/payment.schema";
+import {
+    paymentResponseSchema,
+    pendingCodPaymentListSchema,
+    type PaymentResponse,
+    type PendingCodPaymentItem,
+} from "../schemas/payment.schema";
 
 function toCamelCase(obj: unknown): unknown {
     if (obj === null || obj === undefined) return obj;
@@ -62,6 +67,43 @@ export const paymentApi = api.injectEndpoints({
                 return parsed.data;
             },
         }),
+
+        // BE: GET api/Payments/staff/pending-cod
+        getPendingCodPayments: builder.query<
+            PendingCodPaymentItem[],
+            { orderId?: number; customerUserId?: string; skip?: number; take?: number } | void
+        >({
+            query: (arg) => ({
+                url: "Payments/staff/pending-cod",
+                method: "GET",
+                params: {
+                    orderId: arg?.orderId,
+                    customerUserId: arg?.customerUserId,
+                    skip: arg?.skip ?? 0,
+                    take: arg?.take ?? 50,
+                },
+            }),
+            transformResponse: (raw: unknown) => {
+                const normalized = toCamelCase(raw);
+                const parsed = pendingCodPaymentListSchema.safeParse(normalized);
+                if (!parsed.success) return [];
+                return parsed.data;
+            },
+        }),
+
+        // BE: PATCH api/Payments/{paymentId}/confirm-cod
+        confirmCodPayment: builder.mutation<PaymentResponse, number>({
+            query: (paymentId) => ({
+                url: `Payments/${paymentId}/confirm-cod`,
+                method: "PATCH",
+            }),
+            transformResponse: (raw: unknown) => {
+                const normalized = toCamelCase(raw);
+                const parsed = paymentResponseSchema.safeParse(normalized);
+                if (!parsed.success) throw new Error("Invalid payment response");
+                return parsed.data;
+            },
+        }),
     }),
 });
 
@@ -70,5 +112,7 @@ export const {
     useGetLatestPaymentByOrderQuery,
     useLazyGetLatestPaymentByOrderQuery,
     useCancelPaymentMutation,
+    useGetPendingCodPaymentsQuery,
+    useConfirmCodPaymentMutation,
 } = paymentApi;
 

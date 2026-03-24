@@ -11,6 +11,7 @@ import { ROLE_DASHBOARD_MAP } from "../constants/auth.constants";
 import type { UserRole } from "../constants/auth.constants";
 import { Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
+import { api } from "../../../shared/api";
 
 export default function LoginForm() {
     const dispatch = useAppDispatch();
@@ -36,6 +37,7 @@ export default function LoginForm() {
             const authEntity = mapLoginResponseToAuth(res);
 
             dispatch(setAuth(authEntity));
+            dispatch(api.util.resetApiState());
             const userRole = authEntity.user.roles[0] as UserRole;
             const dashboardRoute = ROLE_DASHBOARD_MAP[userRole];
 

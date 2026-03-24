@@ -4,12 +4,14 @@ import { LayoutDashboard, FilePlus, List, LogOut } from "lucide-react";
 import { useAppDispatch } from "../../../app/hook";
 import { logout } from "../../auth/slices/auth.slice";
 import { persistor } from "../../../app/store";
+import { api } from "../../../shared/api";
 
 export default function PurchaseStaffLayout() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const handleLogout = () => {
     dispatch(logout());
+    dispatch(api.util.resetApiState());
     persistor.purge();
     navigate("/login");
   };

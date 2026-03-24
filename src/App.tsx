@@ -10,6 +10,8 @@ import { ROUTES } from './shared/constants/routes';
 import { AUTH_ROLE } from './features/auth/constants/auth.constants';
 import { adminRoutes } from './features/admin/admin.routes';
 import { purchaseStaffRoutes } from './features/purchase-staff/purchase-staff.routes';
+import { salesStaffRoutes } from './features/sales-staff/sales-staff.routes';
+import { warehouseStaffRoutes } from './features/warehouse-staff/warehouse-staff.routes';
 import RegisterPage from './features/auth/pages/RegisterPage';
 import ForgotPasswordPage from './features/auth/pages/ForgotPasswordPage';
 import ProfilePage from './features/home/pages/ProfilePage';
@@ -88,6 +90,56 @@ function App() {
                             path={route.path}
                             element={
                                 <ProtectedRoute allowedRoles={[AUTH_ROLE.PURCHASING_STAFF]}>
+                                    {route.element}
+                                </ProtectedRoute>
+                            }
+                        >
+                            {route.children?.map((child, idx) => (
+                                <Route
+                                    key={idx}
+                                    {...(child.index ? { index: true } : { path: child.path })}
+                                    element={child.element}
+                                />
+                            ))}
+                        </Route>
+                    ))}
+
+                    {/* Warehouse staff routes (order + payment) */}
+                    {warehouseStaffRoutes.map((route) => (
+                        <Route
+                            key={route.path}
+                            path={route.path}
+                            element={
+                                <ProtectedRoute allowedRoles={[
+                                    AUTH_ROLE.WAREHOUSE_STAFF,
+                                    AUTH_ROLE.ADMIN,
+                                    AUTH_ROLE.MANAGER
+                                ]}>
+                                    {route.element}
+                                </ProtectedRoute>
+                            }
+                        >
+                            {route.children?.map((child, idx) => (
+                                <Route
+                                    key={idx}
+                                    {...(child.index ? { index: true } : { path: child.path })}
+                                    element={child.element}
+                                />
+                            ))}
+                        </Route>
+                    ))}
+
+                    {/* Sales staff routes */}
+                    {salesStaffRoutes.map((route) => (
+                        <Route
+                            key={route.path}
+                            path={route.path}
+                            element={
+                                <ProtectedRoute allowedRoles={[
+                                    AUTH_ROLE.SALES_STAFF,
+                                    AUTH_ROLE.ADMIN,
+                                    AUTH_ROLE.MANAGER
+                                ]}>
                                     {route.element}
                                 </ProtectedRoute>
                             }

@@ -54,9 +54,15 @@ const CreateUser = () => {
       });
 
       form.reset();
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const apiErr = err as {
+        data?: { error?: string; message?: string; detail?: string };
+      };
       const message =
-        err?.data?.error || "Có lỗi xảy ra, vui lòng thử lại";
+        apiErr?.data?.error ||
+        apiErr?.data?.message ||
+        apiErr?.data?.detail ||
+        "Có lỗi xảy ra, vui lòng thử lại";
 
       toast.error(message, {
         id: toastId,

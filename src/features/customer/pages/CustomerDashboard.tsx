@@ -4,6 +4,7 @@ import { useAppDispatch } from "../../../app/hook";
 import { logout } from "../../../features/auth/slices/auth.slice";
 import { storage } from "../../../shared/libs/storage";
 import { ROUTES } from "../../../shared/constants/routes";
+import { api } from "../../../shared/api";
 
 export default function CustomerDashboard() {
     const auth = useAuth();
@@ -12,6 +13,7 @@ export default function CustomerDashboard() {
 
     const handleLogout = () => {
         dispatch(logout());
+        dispatch(api.util.resetApiState());
         storage.clear();
         navigate(ROUTES.LOGIN);
     };

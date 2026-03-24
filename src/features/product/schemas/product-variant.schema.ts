@@ -1,14 +1,24 @@
 import { z } from "zod";
 
+export const PRODUCT_GRADE_OPTIONS = [
+  { value: 1, label: "Grade 1" },
+  { value: 2, label: "Grade 2" },
+  { value: 3, label: "Grade 3" },
+] as const;
+
+const VALID_PRODUCT_GRADES = PRODUCT_GRADE_OPTIONS.map((item) => item.value);
+
 export const ProductVariantSchema = z.object({
   productId: z
     .number({ message: "Vui lòng chọn sản phẩm" })
     .int()
     .positive("Vui lòng chọn sản phẩm"),
   grade: z
-    .number({ message: "Vui lòng nhập grade" })
+    .number({ message: "Vui lòng chọn grade" })
     .int()
-    .min(1, "Grade tối thiểu là 1"),
+    .refine((value) => VALID_PRODUCT_GRADES.includes(value as 1 | 2 | 3), {
+      message: "Grade không hợp lệ. Vui lòng chọn Grade 1, 2 hoặc 3",
+    }),
   price: z
     .number({ message: "Vui lòng nhập giá" })
     .min(0.01, "Giá tối thiểu là 0.01"),

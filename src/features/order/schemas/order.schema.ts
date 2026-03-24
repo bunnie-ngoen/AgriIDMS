@@ -37,3 +37,17 @@ export const orderDetailSchema = z.object({
 
 export type OrderDetail = z.infer<typeof orderDetailSchema>;
 
+export const overdueBackorderItemSchema = z.object({
+    orderId: z.coerce.number().int(),
+    customerUserId: z.string(),
+    createdAt: z.string(),
+    backorderDeadlineAt: z.string(),
+    totalShortageQuantity: z.coerce.number(),
+    totalReservedQuantity: z.coerce.number(),
+    currentTotalAmount: z.coerce.number(),
+    status: z.string(),
+});
+
+export const overdueBackorderListSchema = z.array(overdueBackorderItemSchema);
+export type OverdueBackorderItem = z.infer<typeof overdueBackorderItemSchema>;
+

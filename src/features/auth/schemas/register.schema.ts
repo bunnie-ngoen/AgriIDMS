@@ -4,17 +4,19 @@ export const registerSchema = z
   .object({
     userName: z
       .string()
-      .min(3, "User name tối thiểu 3 ký tự"),
+      .trim()
+      .min(3, "Tên tài khoản tối thiểu 3 ký tự")
+      .max(50, "Tên tài khoản tối đa 50 ký tự"),
     fullName: z
       .string()
       .min(3, "Họ tên tối thiểu 3 ký tự")
       .max(100, "Họ tên tối đa 100 ký tự"),
     email: z
       .string()
+      .trim()
+      .min(1, "Email là bắt buộc")
       .email("Email không hợp lệ")
-      .max(150, "Email tối đa 150 ký tự")
-      .optional()
-      .or(z.literal("")),
+      .max(150, "Email tối đa 150 ký tự"),
     password: z
       .string()
       .min(6, "Mật khẩu tối thiểu 6 ký tự")

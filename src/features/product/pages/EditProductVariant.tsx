@@ -4,7 +4,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useUpdateProductVariantMutation } from "../api/product-variant.api";
 import { useGetProductsQuery } from "../api/product.api";
-import { ProductVariantSchema, type ProductVariantDto } from "../schemas/product-variant.schema";
+import {
+  ProductVariantSchema,
+  PRODUCT_GRADE_OPTIONS,
+  type ProductVariantDto,
+} from "../schemas/product-variant.schema";
 import type { ProductVariant } from "../types/product-variant.type";
 import { ImagePlus, Loader2, X, ArrowLeft, ChevronDown, Tag, Clock, BadgeDollarSign, PencilLine } from "lucide-react";
 import toast from "react-hot-toast";
@@ -223,12 +227,24 @@ const EditProductVariant = () => {
               </Field>
 
               <Field label="Grade *" error={form.formState.errors.grade?.message}>
-                <input
-                  type="number"
-                  {...form.register("grade", { valueAsNumber: true })}
-                  placeholder="Nhập cấp độ grade, VD: 1"
-                  className={inputCls(!!form.formState.errors.grade)}
-                />
+                <div className="relative">
+                  <select
+                    {...form.register("grade", { valueAsNumber: true })}
+                    className={`w-full appearance-none rounded-xl border px-4 py-3 text-sm outline-none transition-all duration-200 bg-slate-50 focus:bg-white focus:shadow-md pr-10 ${
+                      form.formState.errors.grade
+                        ? "border-red-300 focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                        : "border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                    }`}
+                  >
+                    <option value="">Chọn grade...</option>
+                    {PRODUCT_GRADE_OPTIONS.map((grade) => (
+                      <option key={grade.value} value={grade.value}>
+                        {grade.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                </div>
               </Field>
             </div>
           </div>

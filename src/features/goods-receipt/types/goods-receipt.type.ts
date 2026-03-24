@@ -130,9 +130,17 @@ export type QCInspectionRequest = {
   usableWeight: number;
 };
 
+// Khớp BE enum BoxType: Unknown = 0, Full = 1, Partial = 2
+export enum BoxTypeEnum {
+  Unknown = 0,
+  Full = 1,
+  Partial = 2,
+}
+
 export type CreateBoxesRequest = {
   lotId: number;
   boxSize: number;
+  boxType: BoxTypeEnum;
 };
 
 export type AssignBoxToSlotRequest = {

@@ -22,7 +22,8 @@ export const userApi = api.injectEndpoints({
   endpoints: (builder) => ({
     createUser: builder.mutation<CreateEmployeeResponse, CreateEmployeeDto>({
       query: (body) => ({
-        url: "/v1/Auth/CreateEmployee/admin/create-employee",
+        // Base URL đã có "/api/", nên để relative path để ra đúng "/api/v1/..."
+        url: "/Auth/CreateEmployee/admin/create-employee",
         method: "POST",
         body,
       }),
