@@ -130,11 +130,14 @@ export type QCInspectionRequest = {
   usableWeight: number;
 };
 
-// Khớp BE enum BoxType: Unknown = 0, Full = 1, Partial = 2
+// Khớp BE enum BoxType:
+// Unknown = 0, StyrofoamBox = 1, Carton = 2, MeshBag = 3, Crate = 4
 export enum BoxTypeEnum {
   Unknown = 0,
-  Full = 1,
-  Partial = 2,
+  StyrofoamBox = 1,
+  Carton = 2,
+  MeshBag = 3,
+  Crate = 4,
 }
 
 export type CreateBoxesRequest = {

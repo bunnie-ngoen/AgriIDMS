@@ -20,6 +20,7 @@ import toast from "react-hot-toast";
 import { useEffect, useMemo, useState } from "react";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 import { useGetWarehousesQuery } from "../../admin/api/create-user.api";
+import { BoxTypeEnum } from "../types/goods-receipt.type";
 
 type QCForm = {
   usableWeight: number;
@@ -28,6 +29,7 @@ type QCForm = {
 type CreateBoxesForm = {
   lotId: number;
   boxSize: number;
+  boxType: BoxTypeEnum;
 };
 
 export default function GoodsReceiptQC() {
@@ -96,6 +98,7 @@ export default function GoodsReceiptQC() {
     defaultValues: {
       lotId: 0,
       boxSize: 0,
+      boxType: BoxTypeEnum.StyrofoamBox,
     },
   });
 
@@ -103,6 +106,7 @@ export default function GoodsReceiptQC() {
     if (!lots) return [];
     return [...lots].sort((a, b) => b.id - a.id);
   }, [lots]);
+  const selectedBoxType = createBoxesForm.watch("boxType");
 
   /** Sau khi phiếu được duyệt và có lot: tạo ảnh QR (qrserver → Cloudinary) rồi PUT API lưu DB. */
   const syncMissingLotQrImages = async () => {
@@ -396,15 +400,24 @@ export default function GoodsReceiptQC() {
       toast.error("Kích thước box phải > 0.");
       return;
     }
+    if (Number(values.boxType) === BoxTypeEnum.Unknown) {
+      toast.error("Vui lòng chọn BoxType khác Unknown khi tạo box.");
+      return;
+    }
 
     const toastId = toast.loading("Đang tạo box cho lot...");
     try {
       const created = await createBoxes({
         lotId: Number(values.lotId),
         boxSize: Number(values.boxSize),
+        boxType: values.boxType,
       }).unwrap();
       toast.success("Tạo box thành công.", { id: toastId });
-      createBoxesForm.reset({ lotId: 0, boxSize: 0 });
+      createBoxesForm.reset({
+        lotId: 0,
+        boxSize: 0,
+        boxType: BoxTypeEnum.StyrofoamBox,
+      });
 
       if (created.boxes?.length) {
         const qrToast = toast.loading(
@@ -787,7 +800,7 @@ export default function GoodsReceiptQC() {
                 onSubmit={createBoxesForm.handleSubmit(
                   handleSubmitCreateBoxes,
                 )}
-                className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm items-end"
+                className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm items-end"
               >
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">
@@ -826,6 +839,27 @@ export default function GoodsReceiptQC() {
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
                     placeholder="VD: 5 (kg mỗi box)"
                   />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    Loại box
+                  </label>
+                  <select
+                    {...createBoxesForm.register("boxType", {
+                      valueAsNumber: true,
+                    })}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
+                  >
+                    <option value={BoxTypeEnum.StyrofoamBox}>Thùng xốp</option>
+                    <option value={BoxTypeEnum.Carton}>Thùng carton</option>
+                    <option value={BoxTypeEnum.MeshBag}>Bao lưới</option>
+                    <option value={BoxTypeEnum.Crate}>Sọt</option>
+                  </select>
+                  {Number(selectedBoxType) === BoxTypeEnum.Unknown && (
+                    <p className="mt-1 text-[11px] text-rose-600">
+                      BoxType không được để Unknown.
+                    </p>
+                  )}
                 </div>
                 <div className="flex justify-end">
                   <button

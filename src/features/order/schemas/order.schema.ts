@@ -51,3 +51,53 @@ export const overdueBackorderItemSchema = z.object({
 export const overdueBackorderListSchema = z.array(overdueBackorderItemSchema);
 export type OverdueBackorderItem = z.infer<typeof overdueBackorderItemSchema>;
 
+export const saleConfirmResponseSchema = z.object({
+    message: z.string(),
+    order: orderListItemSchema,
+});
+export type SaleConfirmResponse = z.infer<typeof saleConfirmResponseSchema>;
+
+export const allocationProposalDetailSchema = z.object({
+    orderDetailId: z.coerce.number().int(),
+    productVariantId: z.coerce.number().int(),
+    productName: z.string(),
+    grade: z.string(),
+    boxWeight: z.coerce.number(),
+    isPartial: z.boolean(),
+    requestedQuantity: z.coerce.number().int(),
+    proposedQuantity: z.coerce.number().int(),
+    shortageQuantity: z.coerce.number().int(),
+    isSufficient: z.boolean(),
+});
+
+export const allocationProposalItemSchema = z.object({
+    allocationId: z.coerce.number().int(),
+    orderDetailId: z.coerce.number().int(),
+    boxId: z.coerce.number().int(),
+    boxCode: z.string(),
+    status: z.string(),
+    expiryDate: z.string().nullable().optional(),
+});
+
+export const allocationProposalsResponseSchema = z.object({
+    orderId: z.coerce.number().int(),
+    totalRequestedBoxes: z.coerce.number().int(),
+    totalProposedBoxes: z.coerce.number().int(),
+    totalShortageBoxes: z.coerce.number().int(),
+    isFullyProposed: z.boolean(),
+    details: z.array(allocationProposalDetailSchema),
+    proposals: z.array(allocationProposalItemSchema),
+});
+export type AllocationProposalsResponse = z.infer<typeof allocationProposalsResponseSchema>;
+
+export const allocationConfirmResponseSchema = z.object({
+    orderId: z.coerce.number().int(),
+    status: z.string(),
+    fulfilledQuantity: z.coerce.number().int().optional(),
+    shortageQuantity: z.coerce.number().int().optional(),
+    customerActionRequired: z.boolean().optional(),
+    customerActions: z.array(z.string()).optional(),
+    message: z.string().optional(),
+});
+export type AllocationConfirmResponse = z.infer<typeof allocationConfirmResponseSchema>;
+

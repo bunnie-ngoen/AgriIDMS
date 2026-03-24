@@ -1,11 +1,17 @@
 import { api } from "../../../shared/api";
 import {
+    allocationConfirmResponseSchema,
+    allocationProposalsResponseSchema,
     orderDetailSchema,
     orderListSchema,
     overdueBackorderListSchema,
+    saleConfirmResponseSchema,
+    type AllocationConfirmResponse,
+    type AllocationProposalsResponse,
     type OrderDetail,
     type OrderListItem,
     type OverdueBackorderItem,
+    type SaleConfirmResponse,
 } from "../schemas/order.schema";
 
 function toCamelCase(obj: unknown): unknown {
@@ -116,11 +122,17 @@ export const orderApi = api.injectEndpoints({
             },
         }),
 
-        saleConfirmOrder: builder.mutation<void, number>({
+        saleConfirmOrder: builder.mutation<SaleConfirmResponse, number>({
             query: (id) => ({
                 url: `Orders/${id}/sale-confirm`,
                 method: "PATCH",
             }),
+            transformResponse: (raw: unknown) => {
+                const normalized = toCamelCase(raw);
+                const parsed = saleConfirmResponseSchema.safeParse(normalized);
+                if (!parsed.success) throw new Error("Invalid sale confirm response");
+                return parsed.data;
+            },
         }),
 
         confirmOrder: builder.mutation<void, number>({
@@ -144,11 +156,30 @@ export const orderApi = api.injectEndpoints({
             }),
         }),
 
-        confirmAllocationAsStaff: builder.mutation<void, number>({
+        getAllocationProposalsByOrderId: builder.query<AllocationProposalsResponse, number>({
+            query: (id) => ({
+                url: `Orders/${id}/allocation/proposals`,
+                method: "GET",
+            }),
+            transformResponse: (raw: unknown) => {
+                const normalized = toCamelCase(raw);
+                const parsed = allocationProposalsResponseSchema.safeParse(normalized);
+                if (!parsed.success) throw new Error("Invalid allocation proposals response");
+                return parsed.data;
+            },
+        }),
+
+        confirmAllocationAsStaff: builder.mutation<AllocationConfirmResponse, number>({
             query: (id) => ({
                 url: `Orders/${id}/allocation/confirm`,
                 method: "PATCH",
             }),
+            transformResponse: (raw: unknown) => {
+                const normalized = toCamelCase(raw);
+                const parsed = allocationConfirmResponseSchema.safeParse(normalized);
+                if (!parsed.success) throw new Error("Invalid allocation confirm response");
+                return parsed.data;
+            },
         }),
 
         waitBackorder: builder.mutation<void, number>({
@@ -208,6 +239,7 @@ export const {
     useConfirmOrderMutation,
     useAllocateAsStaffMutation,
     useAutoProposeAllocationAsStaffMutation,
+    useGetAllocationProposalsByOrderIdQuery,
     useConfirmAllocationAsStaffMutation,
     useWaitBackorderMutation,
     useCancelShortageMutation,
