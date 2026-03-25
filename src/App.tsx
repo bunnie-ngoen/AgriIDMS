@@ -9,6 +9,7 @@ import PublicLayout from './shared/components/layout/PublicLayout';
 import { ROUTES } from './shared/constants/routes';
 import { AUTH_ROLE } from './features/auth/constants/auth.constants';
 import { adminRoutes } from './features/admin/admin.routes';
+import { managerRoutes } from './features/manager/manager.routes';
 import { purchaseStaffRoutes } from './features/purchase-staff/purchase-staff.routes';
 import { salesStaffRoutes } from './features/sales-staff/sales-staff.routes';
 import { warehouseStaffRoutes } from './features/warehouse-staff/warehouse-staff.routes';
@@ -68,7 +69,28 @@ function App() {
                             key={route.path}
                             path={route.path}
                             element={
-                                <ProtectedRoute allowedRoles={[AUTH_ROLE.ADMIN, AUTH_ROLE.MANAGER]}>
+                                <ProtectedRoute allowedRoles={[AUTH_ROLE.ADMIN]}>
+                                    {route.element}
+                                </ProtectedRoute>
+                            }
+                        >
+                            {route.children?.map((child, idx) => (
+                                <Route
+                                    key={idx}
+                                    {...(child.index ? { index: true } : { path: child.path })}
+                                    element={child.element}
+                                />
+                            ))}
+                        </Route>
+                    ))}
+
+                    {/* Manager routes (riêng) */}
+                    {managerRoutes.map((route) => (
+                        <Route
+                            key={route.path}
+                            path={route.path}
+                            element={
+                                <ProtectedRoute allowedRoles={[AUTH_ROLE.MANAGER]}>
                                     {route.element}
                                 </ProtectedRoute>
                             }

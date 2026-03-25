@@ -1,13 +1,26 @@
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
-import { ClipboardList, LayoutDashboard, LogOut, Warehouse } from "lucide-react";
+import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
+import {
+  ChevronRight,
+  ClipboardList,
+  LayoutDashboard,
+  LogOut,
+  ShieldCheck,
+  Warehouse,
+} from "lucide-react";
 import { useAppDispatch } from "../../../app/hook";
 import { logout } from "../../auth/slices/auth.slice";
 import { api } from "../../../shared/api";
 import { persistor } from "../../../app/store";
+import { useState } from "react";
 
 export default function WarehouseStaffLayout() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const [isStockCheckOpen, setIsStockCheckOpen] = useState(
+    location.pathname.includes("/warehouse/stock-checks")
+  );
 
   const handleLogout = () => {
     dispatch(logout());
@@ -65,6 +78,60 @@ export default function WarehouseStaffLayout() {
                 </span>
                 Đơn hàng & COD
               </NavLink>
+            </li>
+
+            <li>
+              <button
+                type="button"
+                onClick={() => setIsStockCheckOpen((v) => !v)}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                  location.pathname.includes("/warehouse/stock-checks")
+                    ? "bg-slate-800 text-white border border-slate-700"
+                    : "text-slate-300 hover:bg-slate-800/70"
+                }`}
+              >
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-800 text-slate-200">
+                  <ShieldCheck size={15} />
+                </span>
+                Kiểm kê
+                <ChevronRight
+                  size={16}
+                  className={`transition-transform ${isStockCheckOpen ? "rotate-90" : ""}`}
+                />
+              </button>
+
+              {isStockCheckOpen ? (
+                <ul className="mt-1 pl-3 space-y-1">
+                  <li>
+                    <NavLink
+                      to="/warehouse/stock-checks"
+                      className={({ isActive }) =>
+                        `w-full flex items-center px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                          isActive
+                            ? "bg-slate-700 text-white border border-slate-600"
+                            : "text-slate-300 hover:bg-slate-800/70"
+                        }`
+                      }
+                    >
+                      Phiếu kiểm kê
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink
+                      to="/warehouse/stock-checks/create"
+                      className={({ isActive }) =>
+                        `w-full flex items-center px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                          isActive
+                            ? "bg-slate-700 text-white border border-slate-600"
+                            : "text-slate-300 hover:bg-slate-800/70"
+                        }`
+                      }
+                    >
+                      Tạo phiếu
+                    </NavLink>
+                  </li>
+                </ul>
+              ) : null}
             </li>
           </ul>
         </div>

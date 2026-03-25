@@ -1,7 +1,6 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Archive,
-  Users,
   CirclePlus,
   List,
   LogOut,
@@ -11,7 +10,6 @@ import {
   Truck,
   Tags,
   Layers,
-  UserX,
   FileText,
   PackageSearch,
   ShieldCheck,
@@ -23,7 +21,7 @@ import { useAppDispatch } from "../../../../app/hook";
 import { logout } from "../../../auth/slices/auth.slice";
 import { persistor } from "../../../../app/store";
 import { api } from "../../../../shared/api";
-import AdminQrScanPanel from "../qr/AdminQrScanPanel";
+import AdminQrScanPanel from "../../../admin/components/qr/AdminQrScanPanel";
 
 type SubMenuItem = {
   name: string;
@@ -44,22 +42,15 @@ type MenuItem = {
   children?: (SubMenuItem | NestedMenuItem)[];
 };
 
-// Type guard để phân biệt NestedMenuItem vs SubMenuItem
-function isNestedMenuItem(item: SubMenuItem | NestedMenuItem): item is NestedMenuItem {
+function isNestedMenuItem(
+  item: SubMenuItem | NestedMenuItem,
+): item is NestedMenuItem {
   return "children" in item && !("path" in item);
 }
 
+// Giống AdminSidebar nhưng bỏ "User Management"
 const mainMenu: MenuItem[] = [
   { name: "Dashboard", path: "dashboard", icon: Archive },
-  {
-    name: "User Management",
-    icon: Users,
-    children: [
-      { name: "Create Employee", path: "create-user", icon: CirclePlus },
-      { name: "User list", path: "users", icon: List },
-      { name: "Tài khoản đã xóa", path: "users/deleted", icon: UserX },
-    ],
-  },
   {
     name: "Quản lý kho",
     icon: Boxes,
@@ -80,9 +71,7 @@ const mainMenu: MenuItem[] = [
   {
     name: "Đơn mua hàng",
     icon: FileText,
-    children: [
-      { name: "Duyệt đơn mua", path: "purchase-orders", icon: List },
-    ],
+    children: [{ name: "Duyệt đơn mua", path: "purchase-orders", icon: List }],
   },
   {
     name: "Nhập kho",
@@ -111,24 +100,25 @@ const mainMenu: MenuItem[] = [
     children: [
       { name: "Danh sách sản phẩm", path: "products", icon: List },
       { name: "Tạo sản phẩm", path: "products/create", icon: CirclePlus },
-      // ← Nested dropdown cho Product Variant
       {
         name: "Product Variant",
         icon: Layers,
         children: [
           { name: "Danh sách biến thể", path: "product-variants", icon: List },
-          { name: "Tạo biến thể", path: "product-variants/create", icon: CirclePlus },
+          {
+            name: "Tạo biến thể",
+            path: "product-variants/create",
+            icon: CirclePlus,
+          },
         ],
       },
     ],
   },
 ];
 
-const accountMenu: MenuItem[] = [
-  { name: "Profile", path: "profile", icon: Users },
-];
+const accountMenu: MenuItem[] = [{ name: "Profile", path: "profile", icon: Archive }];
 
-export default function AdminSidebar() {
+export default function ManagerSidebar() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -153,7 +143,6 @@ export default function AdminSidebar() {
     }));
   };
 
-  // Kiểm tra xem parent có child đang active không (hỗ trợ cả nested)
   const isParentActive = (item: MenuItem): boolean => {
     if (!item.children) return false;
     return item.children.some((child) => {
@@ -167,7 +156,6 @@ export default function AdminSidebar() {
   const isNestedParentActive = (nested: NestedMenuItem): boolean =>
     nested.children.some((c) => c.path === currentLastSegment);
 
-  // ── Render leaf (không có children) ──────────────────────────────────────
   const renderLeafItem = (item: MenuItem) => {
     const Icon = item.icon;
     if (!item.path) return null;
@@ -198,7 +186,6 @@ export default function AdminSidebar() {
     );
   };
 
-  // ── Render nested dropdown (cấp 3) ────────────────────────────────────────
   const renderNestedItem = (nested: NestedMenuItem, parentKey: string) => {
     const Icon = nested.icon;
     const active = isNestedParentActive(nested);
@@ -263,7 +250,6 @@ export default function AdminSidebar() {
     );
   };
 
-  // ── Render parent (cấp 1 có children) ────────────────────────────────────
   const renderParentItem = (item: MenuItem) => {
     const Icon = item.icon;
     const active = isParentActive(item);
@@ -303,12 +289,9 @@ export default function AdminSidebar() {
         {isOpen && item.children && (
           <ul className="mt-1 pl-4 space-y-1">
             {item.children.map((child) => {
-              // Nếu child là nested menu (có children riêng)
               if (isNestedMenuItem(child)) {
                 return renderNestedItem(child, item.name);
               }
-
-              // Nếu child là leaf bình thường
               const ChildIcon = child.icon;
               return (
                 <li key={child.path}>
@@ -342,29 +325,26 @@ export default function AdminSidebar() {
 
   return (
     <aside className="w-64 bg-[#222d32] text-slate-100 flex flex-col h-screen border-r border-[#1a2226] shadow-xl">
-      {/* BRAND HEADER */}
       <div className="flex items-center gap-3 px-4 h-14 border-b border-[#1a2226] bg-[#1a2226]">
         <div className="inline-flex h-8 w-8 items-center justify-center rounded bg-sky-500 text-white">
           <LayoutDashboard size={18} />
         </div>
         <div>
-          <p className="text-sm font-semibold tracking-wide">AgriIDMS Admin</p>
+          <p className="text-sm font-semibold tracking-wide">AgriIDMS Manager</p>
           <p className="text-[11px] text-slate-300">Dashboard</p>
         </div>
       </div>
 
-      {/* USER PANEL */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-[#1a2226] bg-[#222d32]">
         <div className="h-9 w-9 rounded-full bg-sky-500 flex items-center justify-center text-xs font-semibold">
-          AD
+          MG
         </div>
         <div className="flex-1">
-          <p className="text-sm font-semibold">Admin User</p>
+          <p className="text-sm font-semibold">Manager</p>
           <p className="text-[11px] text-emerald-400">Online</p>
         </div>
       </div>
 
-      {/* SCROLLABLE MENU AREA */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
         <div>
           <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
@@ -372,8 +352,45 @@ export default function AdminSidebar() {
           </p>
           <ul className="space-y-1">
             {mainMenu.map((item) =>
-              item.children ? renderParentItem(item) : renderLeafItem(item)
+              item.children ? renderParentItem(item) : renderLeafItem(item),
             )}
+          </ul>
+        </div>
+
+        <div>
+          <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            Quick tools
+          </p>
+          <ul className="space-y-1">
+            <li>
+              <button
+                type="button"
+                onClick={() => setIsQrDropdownOpen((v) => !v)}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                  isQrDropdownOpen
+                    ? "bg-[#1e282c] text-white border-l-4 border-sky-400"
+                    : "text-slate-200 hover:bg-[#1b2225]"
+                }`}
+              >
+                <span className="flex items-center min-w-0">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded mr-3 bg-[#1f2d3a] text-slate-200">
+                    <QrCode size={15} />
+                  </span>
+                  <span className="truncate">Scan QR</span>
+                </span>
+                <ChevronRight
+                  size={13}
+                  className={`ml-2 transition-transform ${
+                    isQrDropdownOpen ? "rotate-90" : ""
+                  }`}
+                />
+              </button>
+              {isQrDropdownOpen ? (
+                <div className="mt-2 pl-2">
+                  <AdminQrScanPanel />
+                </div>
+              ) : null}
+            </li>
           </ul>
         </div>
 
@@ -382,49 +399,18 @@ export default function AdminSidebar() {
             Account
           </p>
           <ul className="space-y-1">
-            {accountMenu.map((item) => renderLeafItem(item))}
+            {accountMenu.map((item) =>
+              item.children ? renderParentItem(item) : renderLeafItem(item),
+            )}
           </ul>
-        </div>
-
-        {/* SCAN QR DROPDOWN (1 dòng, bấm để mở panel) */}
-        <div className="border-t border-[#1a2226] bg-[#222d32]">
-          <button
-            type="button"
-            onClick={() => setIsQrDropdownOpen((v) => !v)}
-            className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors ${
-              isQrDropdownOpen ? "bg-[#1a2530]" : "hover:bg-[#1b2225]"
-            }`}
-          >
-            <span className="flex items-center gap-3 min-w-0">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded bg-sky-500 text-white">
-                <QrCode size={16} />
-              </span>
-              <span className="min-w-0">
-                <p className="text-sm font-semibold text-slate-100 truncate">
-                  Scan QR
-                </p>
-              </span>
-            </span>
-
-            <ChevronRight
-              size={16}
-              className={`transition-transform ${
-                isQrDropdownOpen ? "rotate-90" : ""
-              }`}
-            />
-          </button>
-
-          {isQrDropdownOpen ? <AdminQrScanPanel /> : null}
         </div>
       </div>
 
-      {/* FOOTER / LOGOUT */}
-      <div className="px-4 py-4 border-t border-[#1a2226] bg-[#222d32]">
+      <div className="px-4 py-4 border-t border-[#1a2226] bg-[#1a2226]">
         <button
+          type="button"
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 rounded bg-[#1f2d3a]
-                     px-4 py-2.5 text-xs font-semibold text-slate-100 hover:bg-[#243447]
-                     transition-colors"
+          className="w-full flex items-center justify-center gap-2 rounded-lg bg-[#222d32] px-4 py-2 text-xs font-semibold text-slate-100 hover:bg-[#1b2225] transition-colors"
         >
           <LogOut size={16} />
           <span>Đăng xuất</span>
@@ -433,3 +419,4 @@ export default function AdminSidebar() {
     </aside>
   );
 }
+
