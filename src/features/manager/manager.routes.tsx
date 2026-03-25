@@ -1,16 +1,24 @@
-// admin.routes.ts
 import { lazy } from "react";
 
-const DashboardPage = lazy(() => import("../admin/pages/AdminDashboard"));
-const AdminLayout = lazy(
-  () => import("../admin/components/layouts/AdminLayout")
+// Manager layout/sidebar
+const ManagerLayout = lazy(
+  () => import("./components/layouts/ManagerLayout")
 );
-const CreateUserPage = lazy(
-  () => import("../admin/pages/CreateUser")
+
+// Dashboard riêng cho Manager
+const ManagerDashboardPage = lazy(
+  () => import("./pages/ManagerDashboard")
 );
-const UserListPage = lazy(
-  () => import("../admin/pages/UserList")
+
+// Kiểm kê
+const ManagerStockChecksDashboardPage = lazy(
+  () => import("../stock-check/pages/ManagerStockChecksDashboard")
 );
+const StockCheckDetailsPage = lazy(
+  () => import("../stock-check/pages/StockCheckDetailsPage")
+);
+
+// Reuse các page hiện có của Admin (Manager chỉ bỏ phần User Management)
 const CreateWarehousePage = lazy(
   () => import("../admin/pages/CreateWarehouse")
 );
@@ -26,9 +34,7 @@ const WarehouseConfigPage = lazy(
 const WarehouseMapPage = lazy(
   () => import("../admin/pages/WarehouseMap")
 );
-const ProfilePage = lazy(
-  () => import("../admin/pages/Profile")
-);
+const ProfilePage = lazy(() => import("../admin/pages/Profile"));
 
 const SupplierListPage = lazy(
   () => import("../supplier/pages/SupplierList")
@@ -50,17 +56,12 @@ const EditCategoryPage = lazy(
   () => import("../category/pages/EditCategory")
 );
 
-const ProductListPage = lazy(
-  () => import("../product/pages/ProductList")
-);
+const ProductListPage = lazy(() => import("../product/pages/ProductList"));
 const CreateProductPage = lazy(
   () => import("../product/pages/CreateProduct")
 );
-const EditProductPage = lazy(
-  () => import("../product/pages/EditProduct")
-);
+const EditProductPage = lazy(() => import("../product/pages/EditProduct"));
 
-// Product Variant
 const ProductVariantListPage = lazy(
   () => import("../product/pages/ProductVariantList")
 );
@@ -73,9 +74,7 @@ const EditProductVariantPage = lazy(
 const ProductVariantDetailPage = lazy(
   () => import("../product/pages/ProductVariantDetail")
 );
-const DeletedUserListPage = lazy(() => import("../admin/pages/DeletedUserList"));
 
-// Purchase Order (Admin: duyệt đơn — danh sách + chi tiết)
 const PurchaseOrderListPage = lazy(
   () => import("../purchase-staff/pages/PurchaseOrderList")
 );
@@ -89,7 +88,6 @@ const EditPurchaseOrderPage = lazy(
   () => import("../purchase-staff/pages/EditPurchaseOrder")
 );
 
-// Goods Receipt (Admin/Warehouse)
 const GoodsReceiptListPage = lazy(
   () => import("../goods-receipt/pages/GoodsReceiptList")
 );
@@ -103,57 +101,39 @@ const GoodsReceiptQCPage = lazy(
   () => import("../goods-receipt/pages/GoodsReceiptQC")
 );
 
-// Warehouse putaway (xếp box vào slot)
 const PutBoxIntoSlotPage = lazy(
   () => import("../warehouse/pages/PutBoxIntoSlot")
 );
 
-// Kiểm kê (Manager duyệt, WarehouseStaff nhập)
-const ManagerStockChecksDashboardPage = lazy(
-  () => import("../stock-check/pages/ManagerStockChecksDashboard")
-);
-const StockCheckDetailsPage = lazy(
-  () => import("../stock-check/pages/StockCheckDetailsPage")
-);
-
-export const adminRoutes = [
+export const managerRoutes = [
   {
-    path: "/admin",
-    element: <AdminLayout />,
+    path: "/manager",
+    element: <ManagerLayout />,
     children: [
-      { index: true, element: <DashboardPage /> },
-      { path: "dashboard", element: <DashboardPage /> },
-      { path: "create-user", element: <CreateUserPage /> },
-      { path: "users", element: <UserListPage /> },
-
+      { index: true, element: <ManagerDashboardPage /> },
+      { path: "dashboard", element: <ManagerDashboardPage /> },
       { path: "profile", element: <ProfilePage /> },
 
+      // Kiểm kê (Manager duyệt)
+      { path: "stock-checks", element: <ManagerStockChecksDashboardPage /> },
+      { path: "stock-checks/:id", element: <StockCheckDetailsPage /> },
+
+      // Quản lý kho
       { path: "warehouses", element: <WarehouseListPage /> },
       { path: "warehouses/create", element: <CreateWarehousePage /> },
       { path: "warehouses/:id/edit", element: <EditWarehousePage /> },
       { path: "warehouses/:id/config", element: <WarehouseConfigPage /> },
       { path: "warehouses/:id/map", element: <WarehouseMapPage /> },
 
+      // Xếp box vào slot
+      { path: "putaway", element: <PutBoxIntoSlotPage /> },
+
+      // Nhà cung cấp
       { path: "suppliers", element: <SupplierListPage /> },
       { path: "suppliers/create", element: <CreateSupplierPage /> },
       { path: "suppliers/:id/edit", element: <EditSupplierPage /> },
 
-      { path: "categories", element: <CategoryListPage /> },
-      { path: "categories/create", element: <CreateCategoryPage /> },
-      { path: "categories/:id/edit", element: <EditCategoryPage /> },
-
-      { path: "products", element: <ProductListPage /> },
-      { path: "products/create", element: <CreateProductPage /> },
-      { path: "products/:id/edit", element: <EditProductPage /> },
-
-      // Product Variant
-      { path: "product-variants", element: <ProductVariantListPage /> },
-      { path: "product-variants/create", element: <CreateProductVariantPage /> },
-      { path: "product-variants/:id/edit", element: <EditProductVariantPage /> },
-      { path: "product-variants/:id/detail", element: <ProductVariantDetailPage /> },
-      { path: "users/deleted", element: <DeletedUserListPage /> },
-
-      // Đơn mua hàng (Admin: danh sách + duyệt)
+      // Đơn mua hàng
       { path: "purchase-orders", element: <PurchaseOrderListPage /> },
       { path: "purchase-orders/create", element: <CreatePurchaseOrderPage /> },
       { path: "purchase-orders/:id", element: <PurchaseOrderDetailPage /> },
@@ -165,12 +145,22 @@ export const adminRoutes = [
       { path: "goods-receipts/:id", element: <GoodsReceiptDetailPage /> },
       { path: "goods-receipts/:id/qc", element: <GoodsReceiptQCPage /> },
 
-      // Kho: xếp box vào slot
-      { path: "putaway", element: <PutBoxIntoSlotPage /> },
+      // Danh mục sản phẩm
+      { path: "categories", element: <CategoryListPage /> },
+      { path: "categories/create", element: <CreateCategoryPage /> },
+      { path: "categories/:id/edit", element: <EditCategoryPage /> },
 
-      // Kiểm kê
-      { path: "stock-checks", element: <ManagerStockChecksDashboardPage /> },
-      { path: "stock-checks/:id", element: <StockCheckDetailsPage /> },
+      // Sản phẩm
+      { path: "products", element: <ProductListPage /> },
+      { path: "products/create", element: <CreateProductPage /> },
+      { path: "products/:id/edit", element: <EditProductPage /> },
+
+      // Product Variant
+      { path: "product-variants", element: <ProductVariantListPage /> },
+      { path: "product-variants/create", element: <CreateProductVariantPage /> },
+      { path: "product-variants/:id/edit", element: <EditProductVariantPage /> },
+      { path: "product-variants/:id/detail", element: <ProductVariantDetailPage /> },
     ],
   },
 ];
+
