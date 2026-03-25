@@ -1,11 +1,11 @@
 import toast from "react-hot-toast";
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Boxes, Clock3, PackageSearch, ShieldAlert, Sparkles } from "lucide-react";
 import {
   useAllocateAsStaffMutation,
   useAllocateBackorderAsStaffMutation,
   useAutoProposeAllocationAsStaffMutation,
-  useConfirmAllocationAsStaffMutation,
   useGetOverdueBackordersQuery,
   useGetPendingAllocationOrdersQuery,
   useGetPendingSaleConfirmOrdersQuery,
@@ -20,6 +20,7 @@ import type { OrderListItem } from "../../order/schemas/order.schema";
 import type { PendingCodPaymentItem } from "../../payment/schemas/payment.schema";
 import { useAuth } from "../../auth/hooks/useAuth";
 import { AUTH_ROLE } from "../../auth/constants/auth.constants";
+import type { SaleConfirmResponse } from "../../order/schemas/order.schema";
 
 function vnd(n: number) {
   return n.toLocaleString("vi-VN");
@@ -35,16 +36,61 @@ function orderStatusTone(status: string) {
   if (status === "PartiallyAllocated") {
     return "bg-amber-100 text-amber-700 border-amber-200";
   }
+  if (status === "PendingWarehouseConfirm") {
+    return "bg-indigo-100 text-indigo-700 border-indigo-200";
+  }
   if (status === "BackorderWaiting") {
     return "bg-violet-100 text-violet-700 border-violet-200";
   }
   return "bg-slate-100 text-slate-700 border-slate-200";
 }
 
+function orderStatusLabel(status: string) {
+  if (status === "PendingSaleConfirmation") return "Chờ xác nhận bán";
+  if (status === "AwaitingAllocation") return "Chờ giữ hàng";
+  if (status === "PendingWarehouseConfirm") return "Chờ kho xác nhận";
+  if (status === "PartiallyAllocated") return "Giữ hàng một phần";
+  if (status === "BackorderWaiting") return "Chờ backorder";
+  if (status === "Completed") return "Hoàn thành";
+  if (status === "Cancelled") return "Đã hủy";
+  return status;
+}
+
+function paymentStatusLabel(status: string) {
+  if (status === "Pending") return "Chờ xử lý";
+  if (status === "Paid") return "Đã thanh toán";
+  if (status === "Cancelled") return "Đã hủy";
+  if (status === "Failed") return "Thất bại";
+  return status;
+}
+
+function sourceLabel(source: string) {
+  if (source === "Online") return "Trực tuyến";
+  if (source === "POS") return "Tại quầy";
+  return source;
+}
+
 export default function SalesOrdersPage() {
+  type SaleConfirmPreviewCard = {
+    orderId: number;
+    totalAmount: number;
+    source: string;
+    itemCount: number;
+    createdAt: string;
+    previousStatus: string;
+    feedback: SaleConfirmResponse;
+  };
+
+  const navigate = useNavigate();
   const auth = useAuth();
   const userRoles = auth.user?.roles ?? [];
   const hasAnyRole = (...roles: string[]) => roles.some((role) => userRoles.includes(role));
+  const isSalesOnly =
+    hasAnyRole(AUTH_ROLE.SALES_STAFF) &&
+    !hasAnyRole(AUTH_ROLE.WAREHOUSE_STAFF, AUTH_ROLE.ADMIN, AUTH_ROLE.MANAGER);
+  const isWarehouseOnly =
+    hasAnyRole(AUTH_ROLE.WAREHOUSE_STAFF) &&
+    !hasAnyRole(AUTH_ROLE.SALES_STAFF, AUTH_ROLE.ADMIN, AUTH_ROLE.MANAGER);
   const canSaleConfirm =
     hasAnyRole(AUTH_ROLE.SALES_STAFF, AUTH_ROLE.ADMIN, AUTH_ROLE.MANAGER);
   const canAutoPropose =
@@ -60,7 +106,7 @@ export default function SalesOrdersPage() {
   const [sourceFilter, setSourceFilter] = useState<string>("ALL");
   const [orderIdQuery, setOrderIdQuery] = useState<string>("");
   const defaultQueue: "saleConfirm" | "allocation" | "warehouseConfirm" | "pendingCod" | "backorder" =
-    canSaleConfirm ? "saleConfirm" : "allocation";
+    isWarehouseOnly ? "warehouseConfirm" : (canSaleConfirm ? "saleConfirm" : "allocation");
   const [activeQueue, setActiveQueue] = useState<
     "saleConfirm" | "allocation" | "warehouseConfirm" | "pendingCod" | "backorder"
   >(defaultQueue);
@@ -74,6 +120,10 @@ export default function SalesOrdersPage() {
     pendingCod: 1,
     backorder: 1,
   });
+  const [saleConfirmFeedbackByOrderId, setSaleConfirmFeedbackByOrderId] = useState<
+    Record<number, SaleConfirmResponse>
+  >({});
+  const [recentSaleConfirmedCards, setRecentSaleConfirmedCards] = useState<SaleConfirmPreviewCard[]>([]);
   const currentPage = pageByQueue[activeQueue] ?? 1;
   const currentSkip = (currentPage - 1) * pageSize;
 
@@ -106,8 +156,6 @@ export default function SalesOrdersPage() {
     useAllocateAsStaffMutation();
   const [autoProposeAllocationAsStaff, { isLoading: isAutoProposing }] =
     useAutoProposeAllocationAsStaffMutation();
-  const [confirmAllocationAsStaff, { isLoading: isConfirmingAllocation }] =
-    useConfirmAllocationAsStaffMutation();
   const [confirmCodPayment, { isLoading: isConfirmingCod }] =
     useConfirmCodPaymentMutation();
 
@@ -157,43 +205,75 @@ export default function SalesOrdersPage() {
   const [allocateBackorderAsStaff, { isLoading: isAllocatingBackorder }] =
     useAllocateBackorderAsStaffMutation();
 
-  const metricCards = [
-    {
-      key: "sale-confirm",
-      label: "Chờ sale-confirm",
-      value: filteredPendingSaleConfirm.length,
-      icon: Sparkles,
-      tone: "text-sky-700 bg-sky-50 border-sky-200",
-    },
-    {
-      key: "pending-allocation",
-      label: "Chờ allocate",
-      value: filteredPendingAllocation.length,
-      icon: Boxes,
-      tone: "text-emerald-700 bg-emerald-50 border-emerald-200",
-    },
-    {
-      key: "pending-warehouse-confirm",
-      label: "Chờ kho xác nhận",
-      value: filteredPendingWarehouseConfirm.length,
-      icon: ShieldAlert,
-      tone: "text-indigo-700 bg-indigo-50 border-indigo-200",
-    },
-    {
-      key: "overdue-backorder",
-      label: "Backorder quá hạn",
-      value: filteredBackorders.length,
-      icon: Clock3,
-      tone: "text-amber-700 bg-amber-50 border-amber-200",
-    },
-    {
-      key: "pending-cod",
-      label: "COD chờ xác nhận",
-      value: filteredPendingCodPayments.length,
-      icon: PackageSearch,
-      tone: "text-violet-700 bg-violet-50 border-violet-200",
-    },
-  ] as const;
+  const metricCards = isSalesOnly
+    ? ([{
+        key: "sale-confirm",
+        label: "Chờ xác nhận bán",
+        value: filteredPendingSaleConfirm.length,
+        icon: Sparkles,
+        tone: "text-sky-700 bg-sky-50 border-sky-200",
+      }] as const)
+    : isWarehouseOnly
+      ? ([{
+          key: "pending-warehouse-confirm",
+          label: "Chờ kho xác nhận",
+          value: filteredPendingWarehouseConfirm.length,
+          icon: ShieldAlert,
+          tone: "text-indigo-700 bg-indigo-50 border-indigo-200",
+        }] as const)
+      : ([
+          ...(canSaleConfirm
+            ? [{
+                key: "sale-confirm",
+                label: "Chờ xác nhận bán",
+                value: filteredPendingSaleConfirm.length,
+                icon: Sparkles,
+                tone: "text-sky-700 bg-sky-50 border-sky-200",
+              } as const]
+            : []),
+          {
+            key: "pending-allocation",
+            label: "Chờ giữ hàng",
+            value: filteredPendingAllocation.length,
+            icon: Boxes,
+            tone: "text-emerald-700 bg-emerald-50 border-emerald-200",
+          },
+          {
+            key: "pending-warehouse-confirm",
+            label: "Chờ kho xác nhận",
+            value: filteredPendingWarehouseConfirm.length,
+            icon: ShieldAlert,
+            tone: "text-indigo-700 bg-indigo-50 border-indigo-200",
+          },
+          {
+            key: "overdue-backorder",
+            label: "Backorder quá hạn",
+            value: filteredBackorders.length,
+            icon: Clock3,
+            tone: "text-amber-700 bg-amber-50 border-amber-200",
+          },
+          {
+            key: "pending-cod",
+            label: "COD chờ xác nhận",
+            value: filteredPendingCodPayments.length,
+            icon: PackageSearch,
+            tone: "text-violet-700 bg-violet-50 border-violet-200",
+          },
+        ] as const);
+
+  const queueTabs = isSalesOnly
+    ? ([{ key: "saleConfirm", label: "Hàng đợi xác nhận bán", count: filteredPendingSaleConfirm.length }] as const)
+    : isWarehouseOnly
+      ? ([{ key: "warehouseConfirm", label: "Chờ kho xác nhận", count: filteredPendingWarehouseConfirm.length }] as const)
+      : ([
+          ...(canSaleConfirm
+            ? [{ key: "saleConfirm", label: "Hàng đợi xác nhận bán", count: filteredPendingSaleConfirm.length } as const]
+            : []),
+          { key: "allocation", label: "Hàng đợi giữ hàng", count: filteredPendingAllocation.length } as const,
+          { key: "warehouseConfirm", label: "Hàng đợi kho xác nhận", count: filteredPendingWarehouseConfirm.length } as const,
+          { key: "pendingCod", label: "Hàng đợi COD", count: filteredPendingCodPayments.length } as const,
+          { key: "backorder", label: "Hàng đợi backorder", count: filteredBackorders.length } as const,
+        ] as const);
 
   const setQueuePage = (page: number) => {
     setPageByQueue((prev) => ({ ...prev, [activeQueue]: Math.max(1, page) }));
@@ -240,13 +320,120 @@ export default function SalesOrdersPage() {
   const handleSaleConfirm = async (id: number) => {
     const t = toast.loading(`Đang sale-confirm đơn #${id}...`);
     try {
-      await saleConfirmOrder(id).unwrap();
-      toast.success(`Sale-confirm đơn #${id} thành công`, { id: t });
+      const currentOrder =
+        pendingSaleConfirm.find((o) => o.orderId === id) ??
+        filteredPendingSaleConfirm.find((o) => o.orderId === id);
+      const res = await saleConfirmOrder(id).unwrap();
+      toast.success(res.message || `Sale-confirm đơn #${id} thành công`, { id: t });
+      setSaleConfirmFeedbackByOrderId((prev) => ({ ...prev, [id]: res }));
+      if (currentOrder) {
+        setRecentSaleConfirmedCards((prev) =>
+          [
+            {
+              orderId: currentOrder.orderId,
+              totalAmount: currentOrder.totalAmount,
+              source: currentOrder.source,
+              itemCount: currentOrder.itemCount,
+              createdAt: currentOrder.createdAt,
+              previousStatus: currentOrder.status,
+              feedback: res,
+            },
+            ...prev.filter((x) => x.orderId !== currentOrder.orderId),
+          ].slice(0, 5),
+        );
+      }
       await refetchPendingSaleConfirm();
-      await refetchPendingAllocation();
+      await refetchPendingWarehouseConfirm();
     } catch {
       toast.error(`Sale-confirm đơn #${id} thất bại`, { id: t });
     }
+  };
+
+  const renderSaleConfirmCards = (
+    rows: OrderListItem[],
+    emptyText: string,
+    isLoading: boolean,
+  ) => {
+    const sortedRows = sortOrders(rows);
+    if (isLoading) {
+      return <p className="text-sm text-slate-500 mt-3">Đang tải...</p>;
+    }
+    if (sortedRows.length === 0) {
+      return <p className="text-sm text-slate-500 mt-3">{emptyText}</p>;
+    }
+
+    return (
+      <div className="mt-4 space-y-3">
+        {sortedRows.map((o) => {
+          const feedback = saleConfirmFeedbackByOrderId[o.orderId];
+          return (
+            <div key={o.orderId} className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-3">
+                <div>
+                  <p className="text-sm text-slate-500">Đơn hàng</p>
+                  <p className="text-2xl font-bold text-slate-900">#{o.orderId}</p>
+                </div>
+                <span
+                  className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${orderStatusTone(
+                    o.status,
+                  )}`}
+                >
+                  {orderStatusLabel(o.status)}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 py-3 text-sm md:grid-cols-4">
+                <div>
+                  <p className="text-slate-500">Tổng tiền</p>
+                  <p className="font-semibold text-slate-900">{vnd(o.totalAmount)} ₫</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Nguồn</p>
+                  <p className="font-semibold text-slate-900">{sourceLabel(o.source)}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Số sản phẩm</p>
+                  <p className="font-semibold text-slate-900">{o.itemCount} loại</p>
+                </div>
+                <div>
+                  <p className="text-slate-500">Ngày tạo</p>
+                  <p className="font-semibold text-slate-900">
+                    {new Date(o.createdAt).toLocaleDateString("vi-VN")}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                <p className="font-semibold">Sau khi xác nhận</p>
+                <p>Hệ thống tự động tạo đề xuất phân bổ FEFO và chuyển đơn sang trạng thái chờ kho duyệt.</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleSaleConfirm(o.orderId)}
+                disabled={isConfirming || !canSaleConfirm}
+                className="mt-3 w-full rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-60"
+              >
+                Xác nhận đơn & tạo đề xuất FEFO ↗
+              </button>
+
+              {feedback && (
+                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                  <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
+                    Đã xác nhận
+                  </span>
+                  <p className="mt-2 text-sm text-slate-600">Trạng thái mới</p>
+                  <p className="text-2xl font-bold text-slate-900">{feedback.order.status}</p>
+                  <div className="mt-3 border-t border-slate-200 pt-2">
+                    <p className="text-sm text-slate-700">{feedback.message}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   const handleAllocate = async (id: number) => {
@@ -283,19 +470,6 @@ export default function SalesOrdersPage() {
       await refetchPendingWarehouseConfirm();
     } catch {
       toast.error(`Auto-propose FEFO thất bại cho đơn #${id}`, { id: t });
-    }
-  };
-
-  const handleConfirmAllocation = async (id: number) => {
-    const t = toast.loading(`Đang warehouse-confirm đơn #${id}...`);
-    try {
-      await confirmAllocationAsStaff(id).unwrap();
-      toast.success(`Kho đã xác nhận allocate đơn #${id}`, { id: t });
-      await refetchPendingWarehouseConfirm();
-      await refetchPendingAllocation();
-      await refetchPendingSaleConfirm();
-    } catch {
-      toast.error(`Warehouse confirm thất bại cho đơn #${id}`, { id: t });
     }
   };
 
@@ -346,6 +520,7 @@ export default function SalesOrdersPage() {
     actionDisabled: boolean,
     actionClassName: string,
     showSource = false,
+    showFefoBadge = false,
   ) => {
     const sortedRows = sortOrders(rows);
     if (isLoading) {
@@ -387,13 +562,22 @@ export default function SalesOrdersPage() {
                     className="h-4 w-4 rounded border-slate-300 text-slate-900"
                   />
                 </td>
-                <td className="py-3 pr-3 font-semibold text-slate-900">#{o.orderId}</td>
+                <td className="py-3 pr-3 font-semibold text-slate-900">
+                  <div className="flex items-center gap-2">
+                    <span>#{o.orderId}</span>
+                    {showFefoBadge && (
+                      <span className="inline-flex rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+                        FEFO
+                      </span>
+                    )}
+                  </div>
+                </td>
                 <td className="py-3 pr-3">
                   <span className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-semibold ${orderStatusTone(o.status)}`}>
-                    {o.status}
+                    {orderStatusLabel(o.status)}
                   </span>
                 </td>
-                {showSource && <td className="py-3 pr-3 text-slate-700">{o.source}</td>}
+                {showSource && <td className="py-3 pr-3 text-slate-700">{sourceLabel(o.source)}</td>}
                 <td className="py-3 pr-3 text-slate-700">{new Date(o.createdAt).toLocaleString("vi-VN")}</td>
                 <td className="py-3 pr-3 text-slate-700">{o.itemCount}</td>
                 <td className="py-3 pr-3 font-semibold text-slate-900">{vnd(o.totalAmount)} ₫</td>
@@ -446,7 +630,8 @@ export default function SalesOrdersPage() {
                 <td className="py-3 pr-3 font-semibold text-slate-900">#{p.paymentId}</td>
                 <td className="py-3 pr-3 font-semibold text-slate-900">#{p.orderId}</td>
                 <td className="py-3 pr-3 text-slate-700">{p.paymentStatus}</td>
-                <td className="py-3 pr-3 text-slate-700">{p.orderStatus}</td>
+                <td className="py-3 pr-3 text-slate-700">{paymentStatusLabel(p.paymentStatus)}</td>
+                <td className="py-3 pr-3 text-slate-700">{orderStatusLabel(p.orderStatus)}</td>
                 <td className="py-3 pr-3 text-slate-700">{new Date(p.createdAt).toLocaleString("vi-VN")}</td>
                 <td className="py-3 pr-3 font-semibold text-slate-900">{vnd(p.amount)} ₫</td>
                 <td className="py-3 pr-3">
@@ -498,10 +683,11 @@ export default function SalesOrdersPage() {
               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
             >
               <option value="ALL">Tất cả</option>
-              <option value="PendingSaleConfirmation">PendingSaleConfirmation</option>
-              <option value="AwaitingAllocation">AwaitingAllocation</option>
-              <option value="BackorderWaiting">BackorderWaiting</option>
-              <option value="PartiallyAllocated">PartiallyAllocated</option>
+              <option value="PendingSaleConfirmation">Chờ xác nhận bán</option>
+              <option value="AwaitingAllocation">Chờ giữ hàng</option>
+              <option value="PendingWarehouseConfirm">Chờ kho xác nhận</option>
+              <option value="BackorderWaiting">Chờ backorder</option>
+              <option value="PartiallyAllocated">Giữ hàng một phần</option>
             </select>
           </div>
           <div>
@@ -512,8 +698,8 @@ export default function SalesOrdersPage() {
               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
             >
               <option value="ALL">Tất cả</option>
-              <option value="Online">Online</option>
-              <option value="POS">POS</option>
+              <option value="Online">Trực tuyến</option>
+              <option value="POS">Tại quầy</option>
             </select>
           </div>
           <div>
@@ -613,28 +799,15 @@ export default function SalesOrdersPage() {
               </>
             )}
             {activeQueue === "warehouseConfirm" && (
-              <button
-                type="button"
-                onClick={() =>
-                  runBulkAction("Kho xác nhận loạt", (id) => confirmAllocationAsStaff(id).unwrap())
-                }
-                disabled={!canWarehouseConfirm}
-                className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700"
-              >
-                Kho xác nhận loạt
-              </button>
+              <span className="text-xs text-slate-500">
+                Mở chi tiết từng đơn để xác nhận phân bổ.
+              </span>
             )}
           </div>
         )}
 
         <div className="flex flex-wrap gap-2">
-          {[
-            { key: "saleConfirm", label: "Hàng đợi xác nhận bán", count: filteredPendingSaleConfirm.length },
-            { key: "allocation", label: "Hàng đợi giữ hàng", count: filteredPendingAllocation.length },
-            { key: "warehouseConfirm", label: "Hàng đợi kho xác nhận", count: filteredPendingWarehouseConfirm.length },
-            { key: "pendingCod", label: "Hàng đợi COD", count: filteredPendingCodPayments.length },
-            { key: "backorder", label: "Hàng đợi backorder", count: filteredBackorders.length },
-          ].map((tab) => (
+          {queueTabs.map((tab) => (
             <button
               key={tab.key}
               type="button"
@@ -659,15 +832,50 @@ export default function SalesOrdersPage() {
         )}
 
         {activeQueue === "saleConfirm" &&
-          renderOrderTable(
+          renderSaleConfirmCards(
             filteredPendingSaleConfirm,
             "Không có đơn chờ xử lý.",
             isLoadingPendingSaleConfirm,
-            handleSaleConfirm,
-            "Xác nhận bán",
-            isConfirming || !canSaleConfirm,
-            "px-3 py-2 rounded-lg bg-sky-600 text-white text-sm font-semibold hover:bg-sky-700 disabled:opacity-60",
           )}
+        {activeQueue === "saleConfirm" && recentSaleConfirmedCards.length > 0 && (
+          <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-slate-900">Đã xác nhận gần đây</p>
+              <button
+                type="button"
+                onClick={() => setRecentSaleConfirmedCards([])}
+                className="text-xs font-semibold text-slate-500 hover:text-slate-700"
+              >
+                Xóa danh sách
+              </button>
+            </div>
+            <div className="space-y-3">
+              {recentSaleConfirmedCards.map((c) => (
+                <div key={c.orderId} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-slate-900">Đơn #{c.orderId}</p>
+                    <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
+                      Đã xác nhận
+                    </span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-3 text-xs text-slate-600 md:grid-cols-4">
+                    <p>Tổng tiền: <span className="font-semibold text-slate-800">{vnd(c.totalAmount)} ₫</span></p>
+                    <p>Nguồn: <span className="font-semibold text-slate-800">{sourceLabel(c.source)}</span></p>
+                    <p>Số sản phẩm: <span className="font-semibold text-slate-800">{c.itemCount} loại</span></p>
+                    <p>Ngày tạo: <span className="font-semibold text-slate-800">{new Date(c.createdAt).toLocaleDateString("vi-VN")}</span></p>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-600">
+                    Trạng thái cũ: <span className="font-semibold">{orderStatusLabel(c.previousStatus)}</span>
+                  </p>
+                  <p className="text-xs text-slate-600">
+                    Trạng thái mới: <span className="font-semibold">{orderStatusLabel(c.feedback.order.status)}</span>
+                  </p>
+                  <p className="mt-2 text-sm text-slate-700">{c.feedback.message}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {activeQueue === "allocation" &&
           (isLoadingPendingAllocation ? (
@@ -710,10 +918,10 @@ export default function SalesOrdersPage() {
                       <td className="py-3 pr-3 font-semibold text-slate-900">#{o.orderId}</td>
                       <td className="py-3 pr-3">
                         <span className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-semibold ${orderStatusTone(o.status)}`}>
-                          {o.status}
+                          {orderStatusLabel(o.status)}
                         </span>
                       </td>
-                      <td className="py-3 pr-3 text-slate-700">{o.source}</td>
+                      <td className="py-3 pr-3 text-slate-700">{sourceLabel(o.source)}</td>
                       <td className="py-3 pr-3 text-slate-700">{new Date(o.createdAt).toLocaleString("vi-VN")}</td>
                       <td className="py-3 pr-3 text-slate-700">{o.itemCount}</td>
                       <td className="py-3 pr-3 font-semibold text-slate-900">{vnd(o.totalAmount)} ₫</td>
@@ -749,10 +957,11 @@ export default function SalesOrdersPage() {
             filteredPendingWarehouseConfirm,
             "Không có đơn chờ kho xác nhận.",
             isLoadingPendingWarehouseConfirm,
-            handleConfirmAllocation,
-            "Kho xác nhận",
-            isConfirmingAllocation || !canWarehouseConfirm,
-            "px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60",
+            (id) => navigate(`/warehouse/orders/${id}/proposals`),
+            "Xem đề xuất",
+            false,
+            "px-3 py-2 rounded-lg border border-indigo-300 text-indigo-700 text-sm font-semibold hover:bg-indigo-50 disabled:opacity-60",
+            true,
             true,
           )}
 
@@ -787,7 +996,7 @@ export default function SalesOrdersPage() {
                       <td className="py-3 pr-3 font-semibold text-slate-900">#{o.orderId}</td>
                       <td className="py-3 pr-3">
                         <span className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-semibold ${orderStatusTone(o.status)}`}>
-                          {o.status}
+                          {orderStatusLabel(o.status)}
                         </span>
                       </td>
                       <td className="py-3 pr-3 text-slate-700">{o.totalShortageQuantity}</td>

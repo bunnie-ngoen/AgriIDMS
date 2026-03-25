@@ -15,6 +15,8 @@ const WarehouseStockCheckCreatePage = lazy(
 );
 const StockCheckDetailsPage = lazy(
   () => import("../stock-check/pages/StockCheckDetailsPage")
+const WarehouseAllocationProposalPage = lazy(
+  () => import("./pages/WarehouseAllocationProposalPage"),
 );
 
 export const warehouseStaffRoutes = [
@@ -31,6 +33,7 @@ export const warehouseStaffRoutes = [
         element: <WarehouseStockCheckCreatePage />,
       },
       { path: "stock-checks/:id", element: <StockCheckDetailsPage /> },
+      { path: "orders/:orderId/proposals", element: <WarehouseAllocationProposalPage /> },
     ],
   },
 ];

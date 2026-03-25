@@ -19,6 +19,27 @@ function vnd(n: number) {
     return n.toLocaleString("vi-VN");
 }
 
+function orderStatusLabel(status: string) {
+    if (status === "PendingSaleConfirmation") return "Chờ xác nhận bán";
+    if (status === "AwaitingAllocation") return "Chờ giữ hàng";
+    if (status === "PendingWarehouseConfirm") return "Chờ kho xác nhận";
+    if (status === "PartiallyAllocated") return "Giữ hàng một phần";
+    if (status === "BackorderWaiting") return "Chờ backorder";
+    if (status === "Shipping") return "Đang giao";
+    if (status === "Completed") return "Hoàn thành";
+    if (status === "Cancelled") return "Đã hủy";
+    return status;
+}
+
+function paymentStatusLabel(status?: string | null) {
+    if (!status) return "Chưa có";
+    if (status === "Pending") return "Chờ xử lý";
+    if (status === "Paid") return "Đã thanh toán";
+    if (status === "Cancelled") return "Đã hủy";
+    if (status === "Failed") return "Thất bại";
+    return status;
+}
+
 export default function MyOrderDetailPage() {
     const { id } = useParams();
     const orderId = Number(id);
@@ -43,12 +64,12 @@ export default function MyOrderDetailPage() {
         setMsg("");
         try {
             const res = await createPayment({ orderId, paymentMethod }).unwrap();
-            setMsg(`Đã tạo payment #${res.id} (${res.paymentStatus}).`);
+            setMsg(`Đã tạo thanh toán #${res.id} (${paymentStatusLabel(res.paymentStatus)}).`);
             if (res.checkoutUrl) window.open(res.checkoutUrl, "_blank", "noopener,noreferrer");
             await refetchPayment();
             await refetch();
         } catch {
-            setMsg("Không tạo được payment. Đơn cần ở trạng thái Confirmed và BE chỉ hỗ trợ COD/Banking.");
+            setMsg("Không tạo được thanh toán. Đơn cần đúng trạng thái và chỉ hỗ trợ COD/chuyển khoản.");
         }
     };
 
@@ -57,11 +78,11 @@ export default function MyOrderDetailPage() {
         setMsg("");
         try {
             await cancelPayment(latestPayment.id).unwrap();
-            setMsg("Đã hủy payment.");
+            setMsg("Đã hủy thanh toán.");
             await refetchPayment();
             await refetch();
         } catch {
-            setMsg("Không hủy được payment hiện tại.");
+            setMsg("Không hủy được thanh toán hiện tại.");
         }
     };
 
@@ -73,7 +94,7 @@ export default function MyOrderDetailPage() {
             setMsg("Đã xác nhận đơn để giữ hàng.");
             await refetch();
         } catch {
-            setMsg("Không thể ConfirmOrder lúc này.");
+            setMsg("Không thể xác nhận giữ hàng lúc này.");
         }
     };
 
@@ -117,7 +138,7 @@ export default function MyOrderDetailPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
             <Link to={ROUTES.CUSTOMER_ORDERS_PAGE} className="text-sm text-slate-600 hover:text-[#1a5f2a]">← Quay lại đơn hàng của tôi</Link>
             {!valid ? (
-                <div className="mt-4 text-red-600">OrderId không hợp lệ.</div>
+                <div className="mt-4 text-red-600">Mã đơn hàng không hợp lệ.</div>
             ) : isLoading ? (
                 <div className="mt-4 rounded-xl border border-slate-200 bg-white p-6 text-slate-600">Đang tải chi tiết đơn...</div>
             ) : isError || !order ? (
@@ -131,10 +152,10 @@ export default function MyOrderDetailPage() {
                         <div className="rounded-xl border border-slate-200 bg-white p-4">
                             <h1 className="text-xl font-bold text-slate-900">Đơn #{order.orderId}</h1>
                             <div className="mt-2 text-sm text-slate-700 flex flex-wrap gap-4">
-                                <p>Trạng thái: <span className="font-semibold">{order.status}</span></p>
+                                <p>Trạng thái: <span className="font-semibold">{orderStatusLabel(order.status)}</span></p>
                                 <p>Nguồn: <span className="font-semibold">{order.source}</span></p>
                                 <p>Tạo lúc: <span className="font-semibold">{new Date(order.createdAt).toLocaleString("vi-VN")}</span></p>
-                                <p>Latest payment: <span className="font-semibold">{order.latestPaymentStatus ?? "N/A"}</span></p>
+                                <p>Thanh toán gần nhất: <span className="font-semibold">{paymentStatusLabel(order.latestPaymentStatus)}</span></p>
                             </div>
                         </div>
                         {order.items.map((i, idx) => (
@@ -149,9 +170,14 @@ export default function MyOrderDetailPage() {
                     </div>
 
                     <div className="rounded-xl border border-slate-200 bg-white p-4 h-fit">
-                        <h2 className="text-lg font-bold text-slate-900">Thanh toán</h2>
+                        <h2 className="text-lg font-bold text-slate-900">Thanh toán & xử lý đơn</h2>
                         <p className="mt-1 text-sm text-slate-600">Tổng đơn: <span className="font-semibold">{vnd(total)} ₫</span></p>
-                        <div className="mt-3 space-y-2">
+                        {order.status === "PartiallyAllocated" && (
+                            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                                Đơn đang thiếu hàng. Vui lòng chọn 1 trong 3 phương án bên dưới.
+                            </div>
+                        )}
+                        <div className="mt-3 space-y-3">
                             {order.status === "AwaitingAllocation" && (
                                 <button
                                     type="button"
@@ -159,40 +185,52 @@ export default function MyOrderDetailPage() {
                                     disabled={isConfirmingOrder}
                                     className="w-full rounded-lg border border-indigo-300 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-60"
                                 >
-                                    {isConfirmingOrder ? "Đang xác nhận..." : "ConfirmOrder (giữ hàng)"}
+                                    {isConfirmingOrder ? "Đang xác nhận..." : "Xác nhận đơn để giữ hàng"}
                                 </button>
                             )}
                             {order.status === "PartiallyAllocated" && (
                                 <>
-                                    <button
-                                        type="button"
-                                        onClick={onWaitBackorder}
-                                        disabled={isWaitingBackorder}
-                                        className="w-full rounded-lg border border-amber-300 px-3 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-60"
-                                    >
-                                        {isWaitingBackorder ? "Đang xử lý..." : "Chờ backorder"}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={onCancelShortage}
-                                        disabled={isCancellingShortage}
-                                        className="w-full rounded-lg border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
-                                    >
-                                        {isCancellingShortage ? "Đang xử lý..." : "Hủy phần thiếu"}
-                                    </button>
+                                    <div className="rounded-lg border border-sky-200 bg-sky-50 p-3">
+                                        <p className="text-sm font-semibold text-sky-800">Chờ hàng về (Backorder)</p>
+                                        <p className="mt-1 text-xs text-sky-700">Phần thiếu sẽ được giao sau khi kho có hàng.</p>
+                                        <button
+                                            type="button"
+                                            onClick={onWaitBackorder}
+                                            disabled={isWaitingBackorder}
+                                            className="mt-2 w-full rounded-lg border border-sky-300 px-3 py-2 text-sm font-semibold text-sky-800 hover:bg-sky-100 disabled:opacity-60"
+                                        >
+                                            {isWaitingBackorder ? "Đang xử lý..." : "Chờ backorder"}
+                                        </button>
+                                    </div>
+                                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                                        <p className="text-sm font-semibold text-amber-800">Hủy phần thiếu</p>
+                                        <p className="mt-1 text-xs text-amber-700">Chỉ nhận phần hàng đã có, không chờ phần thiếu.</p>
+                                        <button
+                                            type="button"
+                                            onClick={onCancelShortage}
+                                            disabled={isCancellingShortage}
+                                            className="mt-2 w-full rounded-lg border border-amber-300 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-60"
+                                        >
+                                            {isCancellingShortage ? "Đang xử lý..." : "Hủy phần thiếu"}
+                                        </button>
+                                    </div>
                                 </>
                             )}
                             {order.status !== "Shipping" &&
                                 order.status !== "Completed" &&
                                 order.status !== "Cancelled" && (
-                                    <button
-                                        type="button"
-                                        onClick={onCancelOrder}
-                                        disabled={isCancellingOrder}
-                                        className="w-full rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
-                                    >
-                                        {isCancellingOrder ? "Đang hủy..." : "Hủy đơn"}
-                                    </button>
+                                    <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+                                        <p className="text-sm font-semibold text-rose-800">Hủy toàn bộ đơn</p>
+                                        <p className="mt-1 text-xs text-rose-700">Dừng toàn bộ đơn hàng hiện tại.</p>
+                                        <button
+                                            type="button"
+                                            onClick={onCancelOrder}
+                                            disabled={isCancellingOrder}
+                                            className="mt-2 w-full rounded-lg border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60"
+                                        >
+                                            {isCancellingOrder ? "Đang hủy..." : "Hủy cả đơn"}
+                                        </button>
+                                    </div>
                                 )}
                         </div>
                         <div className="mt-3">
@@ -203,7 +241,7 @@ export default function MyOrderDetailPage() {
                                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                             >
                                 <option value={paymentMethodEnum.COD}>COD (0)</option>
-                                <option value={paymentMethodEnum.BANKING}>Banking/PayOS (3)</option>
+                                <option value={paymentMethodEnum.BANKING}>Chuyển khoản/PayOS (3)</option>
                             </select>
                         </div>
                         <button
@@ -212,12 +250,12 @@ export default function MyOrderDetailPage() {
                             disabled={isCreating}
                             className="mt-3 w-full rounded-lg bg-[#1a5f2a] text-white px-3 py-2 text-sm font-semibold hover:bg-[#145026] disabled:opacity-60"
                         >
-                            {isCreating ? "Đang tạo payment..." : "Tạo payment"}
+                            {isCreating ? "Đang tạo thanh toán..." : "Tạo thanh toán"}
                         </button>
                         {latestPayment && (
                             <div className="mt-3 rounded-lg bg-slate-50 border border-slate-200 p-3 text-xs space-y-1">
-                                <p>Payment #{latestPayment.id}</p>
-                                <p>Trạng thái: <span className="font-semibold">{latestPayment.paymentStatus}</span></p>
+                                <p>Thanh toán #{latestPayment.id}</p>
+                                <p>Trạng thái: <span className="font-semibold">{paymentStatusLabel(latestPayment.paymentStatus)}</span></p>
                                 {latestPayment.checkoutUrl && (
                                     <a href={latestPayment.checkoutUrl} target="_blank" rel="noreferrer" className="text-[#1a5f2a] font-semibold hover:underline">
                                         Mở link thanh toán
@@ -229,7 +267,7 @@ export default function MyOrderDetailPage() {
                                     disabled={isCancelling}
                                     className="mt-2 w-full rounded-lg border border-red-300 text-red-600 px-3 py-2 text-sm font-semibold hover:bg-red-50 disabled:opacity-60"
                                 >
-                                    {isCancelling ? "Đang hủy..." : "Hủy payment"}
+                                    {isCancelling ? "Đang hủy..." : "Hủy thanh toán"}
                                 </button>
                             </div>
                         )}
