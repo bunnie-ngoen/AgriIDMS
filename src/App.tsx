@@ -78,7 +78,28 @@ function App() {
                             key={route.path}
                             path={route.path}
                             element={
-                                <ProtectedRoute allowedRoles={[AUTH_ROLE.ADMIN, AUTH_ROLE.MANAGER]}>
+                                <ProtectedRoute allowedRoles={[AUTH_ROLE.ADMIN]}>
+                                    {route.element}
+                                </ProtectedRoute>
+                            }
+                        >
+                            {route.children?.map((child, idx) => (
+                                <Route
+                                    key={idx}
+                                    {...(child.index ? { index: true } : { path: child.path })}
+                                    element={child.element}
+                                />
+                            ))}
+                        </Route>
+                    ))}
+
+                    {/* Manager routes (riêng) */}
+                    {managerRoutes.map((route) => (
+                        <Route
+                            key={route.path}
+                            path={route.path}
+                            element={
+                                <ProtectedRoute allowedRoles={[AUTH_ROLE.MANAGER]}>
                                     {route.element}
                                 </ProtectedRoute>
                             }

@@ -108,6 +108,14 @@ const PutBoxIntoSlotPage = lazy(
   () => import("../warehouse/pages/PutBoxIntoSlot")
 );
 
+// Kiểm kê (Manager duyệt, WarehouseStaff nhập)
+const ManagerStockChecksDashboardPage = lazy(
+  () => import("../stock-check/pages/ManagerStockChecksDashboard")
+);
+const StockCheckDetailsPage = lazy(
+  () => import("../stock-check/pages/StockCheckDetailsPage")
+);
+
 export const adminRoutes = [
   {
     path: "/admin",
@@ -159,6 +167,10 @@ export const adminRoutes = [
 
       // Kho: xếp box vào slot
       { path: "putaway", element: <PutBoxIntoSlotPage /> },
+
+      // Kiểm kê
+      { path: "stock-checks", element: <ManagerStockChecksDashboardPage /> },
+      { path: "stock-checks/:id", element: <StockCheckDetailsPage /> },
     ],
   },
 ];
