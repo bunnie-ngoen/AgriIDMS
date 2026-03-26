@@ -106,6 +106,8 @@ export default function PublicHeader() {
     userNotificationId: number,
     isRead: boolean,
     referenceId?: number | null,
+    referenceType?: string | null,
+    message?: string,
   ) => {
     if (!isRead) {
       try {
@@ -116,10 +118,29 @@ export default function PublicHeader() {
       }
     }
 
+    const extractOrderIdFromMessage = (text?: string) => {
+      if (!text) return null;
+      const match = text.match(/Đơn hàng\s*#?(\d+)/i);
+      if (!match) return null;
+      const parsed = Number(match[1]);
+      return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+    };
+
+    if (referenceType === "ExportReceipt") {
+      const orderIdFromMessage = extractOrderIdFromMessage(message);
+      navigate(orderIdFromMessage ? `/my-orders/${orderIdFromMessage}` : "/my-orders");
+      setNotificationOpen(false);
+      return;
+    }
+
     if (referenceId) {
       navigate(`/my-orders/${referenceId}`);
       setNotificationOpen(false);
+      return;
     }
+
+    navigate("/my-orders");
+    setNotificationOpen(false);
   };
 
   const handleMarkAllAsRead = async () => {
@@ -256,6 +277,8 @@ export default function PublicHeader() {
                                   item.userNotificationId,
                                   item.isRead,
                                   item.referenceId,
+                                  item.referenceType,
+                                  item.message,
                                 )
                               }
                               className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors ${

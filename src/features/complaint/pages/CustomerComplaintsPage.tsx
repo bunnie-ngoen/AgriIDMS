@@ -9,20 +9,21 @@ import {
   useGetOrderBoxesForComplaintQuery,
 } from "../api/complaint.api";
 import { type ComplaintType } from "../schemas/complaint.schema";
+import { uploadFileToCloudinary } from "../../../shared/lib/cloudinaryUpload";
 
 function typeLabel(type: string) {
-  if (type === "Damaged") return "Hang hu hong";
-  if (type === "MissingQuantity") return "Thieu so luong";
-  if (type === "WrongItem") return "Sai mat hang";
-  if (type === "Other") return "Khac";
+  if (type === "Damaged") return "Hàng hư hỏng";
+  if (type === "MissingQuantity") return "Thiếu số lượng";
+  if (type === "WrongItem") return "Sai mặt hàng";
+  if (type === "Other") return "Khác";
   return type;
 }
 
 function statusLabel(status: string) {
-  if (status === "Pending") return "Cho xu ly";
-  if (status === "Verified") return "Da chap nhan";
-  if (status === "Rejected") return "Tu choi";
-  if (status === "Closed") return "Da dong";
+  if (status === "Pending") return "Chờ xử lý";
+  if (status === "Verified") return "Đã chấp nhận";
+  if (status === "Rejected") return "Từ chối";
+  if (status === "Closed") return "Đã đóng";
   return status;
 }
 
@@ -73,7 +74,8 @@ export default function CustomerComplaintsPage() {
   const [type, setType] = useState<ComplaintType>("Damaged");
   const [damagedQuantity, setDamagedQuantity] = useState("");
   const [description, setDescription] = useState("");
-  const [customerEvidenceUrl, setCustomerEvidenceUrl] = useState("");
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+  const [isUploadingEvidence, setIsUploadingEvidence] = useState(false);
 
   useEffect(() => {
     // Reset box when switching to/from a specific order
@@ -102,29 +104,44 @@ export default function CustomerComplaintsPage() {
 
   const onCreate = async () => {
     if (!hasOrderId) {
-      toast.error("Chua xac dinh duoc OrderId.");
+      toast.error("Chưa xác định được đơn hàng.");
       return;
     }
     if (selectedBoxId == null) {
-      toast.error("Chua chon box de khiếu nại.");
+      toast.error("Chưa chọn box để khiếu nại.");
       return;
     }
 
     const qty = Number(damagedQuantity);
     if (!(qty > 0)) {
-      toast.error("So luong khiếu nại khong hop le.");
+      toast.error("Số lượng khiếu nại không hợp lệ.");
       return;
     }
     if (selectedBox?.hasPendingComplaint) {
-      toast.error("Box nay da co khiếu nại dang cho xu ly.");
+      toast.error("Box này đã có khiếu nại đang chờ xử lý.");
       return;
     }
     if (selectedBox && qty > Number(selectedBox.complaintableQuantity)) {
-      toast.error(`Vuot gioi han. Toi da co the khieu nai: ${selectedBox.complaintableQuantity}.`);
+      toast.error(`Vượt giới hạn. Tối đa có thể khiếu nại: ${selectedBox.complaintableQuantity}.`);
       return;
     }
 
-    const t = toast.loading("Dang tao khiếu nại...");
+    let uploadedEvidenceUrl: string | undefined;
+    if (evidenceFile) {
+      const uploadToast = toast.loading("Đang tải ảnh minh chứng...");
+      setIsUploadingEvidence(true);
+      try {
+        uploadedEvidenceUrl = await uploadFileToCloudinary(evidenceFile, { folder: "complaints" });
+        toast.success("Tải ảnh thành công.", { id: uploadToast });
+      } catch (err) {
+        toast.error(getApiErrorMessage(err, "Tải ảnh thất bại."), { id: uploadToast });
+        return;
+      } finally {
+        setIsUploadingEvidence(false);
+      }
+    }
+
+    const t = toast.loading("Đang tạo khiếu nại...");
     try {
       const res = await createComplaint({
         orderId: orderIdFromQuery,
@@ -132,67 +149,67 @@ export default function CustomerComplaintsPage() {
         type,
         damagedQuantity: qty,
         description: description.trim() || undefined,
-        customerEvidenceUrl: customerEvidenceUrl.trim() || undefined,
+        customerEvidenceUrl: uploadedEvidenceUrl,
       }).unwrap();
-      toast.success(`Da tao khiếu nại #${res.id}.`, { id: t });
+      toast.success(`Đã tạo khiếu nại #${res.id}.`, { id: t });
       setDescription("");
-      setCustomerEvidenceUrl("");
+      setEvidenceFile(null);
       setDamagedQuantity("");
       await refetch();
       // Update box pending status
       await refetchBoxes();
     } catch (err) {
-      toast.error(getApiErrorMessage(err, "Tao khiếu nại that bai."), { id: t });
+      toast.error(getApiErrorMessage(err, "Tạo khiếu nại thất bại."), { id: t });
     }
   };
 
   const onCancel = async (complaintId: number) => {
-    const t = toast.loading(`Dang huy khiếu nại #${complaintId}...`);
+    const t = toast.loading(`Đang hủy khiếu nại #${complaintId}...`);
     try {
       await cancelComplaint(complaintId).unwrap();
-      toast.success(`Da huy khiếu nại #${complaintId}.`, { id: t });
+      toast.success(`Đã hủy khiếu nại #${complaintId}.`, { id: t });
       await refetch();
     } catch (err) {
-      toast.error(getApiErrorMessage(err, "Huy khiếu nại that bai."), { id: t });
+      toast.error(getApiErrorMessage(err, "Hủy khiếu nại thất bại."), { id: t });
     }
   };
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 space-y-4">
       <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <h1 className="text-xl font-bold text-slate-900">Khiếu nại don hang</h1>
+        <h1 className="text-xl font-bold text-slate-900">Khiếu nại đơn hàng</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Chi tao duoc khi don dang giao hoac da hoan thanh (Shipping/Completed).
+          Chỉ tạo được khi đơn đang giao hoặc đã hoàn thành (Shipping/Completed).
         </p>
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-        <h2 className="text-sm font-semibold text-slate-900">Tao khiếu nại moi</h2>
+        <h2 className="text-sm font-semibold text-slate-900">Tạo khiếu nại mới</h2>
         {!hasOrderId ? (
           <div className="space-y-3">
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-              Chon 1 don co the khiếu nại. (Shipping/Completed)
+              Chọn 1 đơn có thể khiếu nại. (Shipping/Completed)
             </div>
 
             {isLoadingEligibleOrders ? (
-              <p className="text-sm text-slate-500">Dang tai danh sach...</p>
+              <p className="text-sm text-slate-500">Đang tải danh sách...</p>
             ) : (
               <div className="overflow-auto rounded-lg border border-slate-200">
                 <table className="w-full min-w-[720px] text-sm">
                   <thead className="bg-slate-50 text-xs text-slate-500">
                     <tr>
-                      <th className="py-2 px-3 text-left">OrderId</th>
-                      <th className="py-2 px-3 text-left">Trang thai</th>
-                      <th className="py-2 px-3 text-left">So box</th>
-                      <th className="py-2 px-3 text-left">Tao luc</th>
-                      <th className="py-2 px-3 w-[160px]">Thao tac</th>
+                      <th className="py-2 px-3 text-left">Đơn hàng</th>
+                      <th className="py-2 px-3 text-left">Trạng thái</th>
+                      <th className="py-2 px-3 text-left">Số box</th>
+                      <th className="py-2 px-3 text-left">Tạo lúc</th>
+                      <th className="py-2 px-3 w-[160px]">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
                     {eligibleOrders.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="py-6 px-3 text-center text-slate-500">
-                          Khong co don nao duoc phe duyet de khiếu nại.
+                          Không có đơn nào đủ điều kiện để khiếu nại.
                         </td>
                       </tr>
                     ) : (
@@ -212,7 +229,7 @@ export default function CustomerComplaintsPage() {
                               }}
                               className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
                             >
-                              Khieu nai don nay
+                              Khiếu nại đơn này
                             </button>
                           </td>
                         </tr>
@@ -230,7 +247,7 @@ export default function CustomerComplaintsPage() {
                 onClick={() => setEligiblePage((p) => Math.max(1, p - 1))}
                 className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
-                Truoc
+                Trước
               </button>
               <span className="text-sm text-slate-600">Trang {eligiblePage}</span>
               <button
@@ -245,25 +262,25 @@ export default function CustomerComplaintsPage() {
                 type="button"
                 onClick={async () => {
                   await refetchEligibleOrders();
-                  toast.success("Da lam moi danh sach don eligible.");
+                  toast.success("Đã làm mới danh sách đơn đủ điều kiện.");
                 }}
                 disabled={isFetchingEligibleOrders}
                 className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
-                Lam moi
+                Làm mới
               </button>
             </div>
           </div>
         ) : (
           <div className="space-y-3">
             <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">
-              Dang tao khiếu nại cho đơn <span className="font-bold">#{orderIdFromQuery}</span>
+              Đang tạo khiếu nại cho đơn <span className="font-bold">Đơn hàng {orderIdFromQuery}</span>
             </div>
 
             {isLoadingBoxes ? (
-              <p className="text-sm text-slate-500">Dang tai danh sach box...</p>
+              <p className="text-sm text-slate-500">Đang tải danh sách box...</p>
             ) : boxes.length === 0 ? (
-              <p className="text-sm text-slate-500">Khong co box hop le de khiếu nại cho don nay.</p>
+              <p className="text-sm text-slate-500">Không có box hợp lệ để khiếu nại cho đơn này.</p>
             ) : (
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 items-end">
                 <div className="md:col-span-2 lg:col-span-2">
@@ -271,12 +288,12 @@ export default function CustomerComplaintsPage() {
                     <div className="rounded-lg border border-indigo-200 bg-white p-3">
                       <p className="text-sm font-semibold text-indigo-900">{boxes[0].boxCode}</p>
                       <p className="text-xs text-indigo-700">
-                        Tối đa khiếu nại: {boxes[0].complaintableQuantity}. {boxes[0].hasPendingComplaint ? "(Da co complaint pending)" : ""}
+                        Tối đa khiếu nại: {boxes[0].complaintableQuantity}. {boxes[0].hasPendingComplaint ? "(Đã có khiếu nại chờ xử lý)" : ""}
                       </p>
                     </div>
                   ) : (
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-slate-700">Chon box</label>
+                      <label className="text-xs font-medium text-slate-700">Chọn box</label>
                       <select
                         value={selectedBoxId ?? ""}
                         onChange={(e) => setSelectedBoxId(Number(e.target.value))}
@@ -284,7 +301,7 @@ export default function CustomerComplaintsPage() {
                       >
                         {boxes.map((b) => (
                           <option key={b.boxId} value={b.boxId} disabled={b.hasPendingComplaint}>
-                            {b.boxCode} (max: {b.complaintableQuantity}){b.hasPendingComplaint ? " - pending" : ""}
+                            {b.boxCode} (max: {b.complaintableQuantity}){b.hasPendingComplaint ? " - đang chờ xử lý" : ""}
                           </option>
                         ))}
                       </select>
@@ -296,7 +313,7 @@ export default function CustomerComplaintsPage() {
                   <input
                     value={damagedQuantity}
                     onChange={(e) => setDamagedQuantity(e.target.value)}
-                    placeholder={selectedBox ? `So luong (max ${selectedBox.complaintableQuantity})` : "So luong khiếu nại (kg)"}
+                    placeholder={selectedBox ? `Số lượng (max ${selectedBox.complaintableQuantity})` : "Số lượng khiếu nại (kg)"}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                   />
                 </div>
@@ -315,19 +332,27 @@ export default function CustomerComplaintsPage() {
                 </div>
 
                 <div className="md:col-span-2 lg:col-span-2">
-                  <input
-                    value={customerEvidenceUrl}
-                    onChange={(e) => setCustomerEvidenceUrl(e.target.value)}
-                    placeholder="Evidence URL (tuy chon)"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                  />
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-slate-700">Ảnh minh chứng (tùy chọn)</label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setEvidenceFile(e.target.files?.[0] ?? null)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    />
+                    {evidenceFile && (
+                      <p className="text-xs text-slate-500">
+                        Đã chọn: <span className="font-medium text-slate-700">{evidenceFile.name}</span>
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="md:col-span-3 lg:col-span-3">
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Mo ta"
+                    placeholder="Mô tả"
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                     rows={3}
                   />
@@ -337,10 +362,10 @@ export default function CustomerComplaintsPage() {
                   <button
                     type="button"
                     onClick={onCreate}
-                    disabled={isCreating || !selectedBoxId || !!selectedBox?.hasPendingComplaint}
+                    disabled={isCreating || isUploadingEvidence || !selectedBoxId || !!selectedBox?.hasPendingComplaint}
                     className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
                   >
-                    {isCreating ? "Dang tao..." : "Tao khiếu nại"}
+                    {isUploadingEvidence ? "Đang tải ảnh..." : isCreating ? "Đang tạo..." : "Tạo khiếu nại"}
                   </button>
                 </div>
               </div>
@@ -355,11 +380,11 @@ export default function CustomerComplaintsPage() {
                   setSelectedBoxId(null);
                   setDamagedQuantity("");
                   setDescription("");
-                  setCustomerEvidenceUrl("");
+                  setEvidenceFile(null);
                 }}
                 className="text-sm font-semibold text-indigo-700 hover:text-indigo-800"
               >
-                Chon don khac
+                Chọn đơn khác
               </button>
             </div>
           </div>
@@ -368,31 +393,31 @@ export default function CustomerComplaintsPage() {
 
       <div className="rounded-xl border border-slate-200 bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-900">Khiếu nại cua toi</h2>
-          <button onClick={() => refetch()} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Lam moi</button>
+          <h2 className="text-sm font-semibold text-slate-900">Khiếu nại của tôi</h2>
+          <button onClick={() => refetch()} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Làm mới</button>
         </div>
         {isLoading ? (
-          <p className="text-sm text-slate-500">Dang tai...</p>
+          <p className="text-sm text-slate-500">Đang tải...</p>
         ) : rows.length === 0 ? (
-          <p className="text-sm text-slate-500">Ban chua co khiếu nại nao.</p>
+          <p className="text-sm text-slate-500">Bạn chưa có khiếu nại nào.</p>
         ) : (
           <div className="overflow-auto">
             <table className="w-full min-w-[980px] text-sm">
               <thead className="bg-slate-50 text-xs text-slate-500">
                 <tr>
                   <th className="py-2 px-3 text-left">ID</th>
-                  <th className="py-2 px-3 text-left">Don/Box</th>
-                  <th className="py-2 px-3 text-left">Loai</th>
-                  <th className="py-2 px-3 text-left">Trang thai</th>
-                  <th className="py-2 px-3 text-left">Tao luc</th>
-                  <th className="py-2 px-3 text-left">Thao tac</th>
+                  <th className="py-2 px-3 text-left">Đơn/Box</th>
+                  <th className="py-2 px-3 text-left">Loại</th>
+                  <th className="py-2 px-3 text-left">Trạng thái</th>
+                  <th className="py-2 px-3 text-left">Tạo lúc</th>
+                  <th className="py-2 px-3 text-left">Thao tác</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id} className="border-t border-slate-100">
                     <td className="py-2 px-3 font-semibold">#{r.id}</td>
-                    <td className="py-2 px-3">#{r.orderId} / {r.boxCode ?? `Box#${r.boxId}`}</td>
+                    <td className="py-2 px-3">Đơn hàng {r.orderId} / {r.boxCode ?? `Box#${r.boxId}`}</td>
                     <td className="py-2 px-3">{typeLabel(r.type)}</td>
                     <td className="py-2 px-3">
                       <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${statusTone(r.status)}`}>
@@ -407,7 +432,7 @@ export default function CustomerComplaintsPage() {
                         disabled={r.status !== "Pending" || isCancelling}
                         className="rounded-lg border border-rose-300 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
                       >
-                        Huy
+                        Hủy
                       </button>
                     </td>
                   </tr>

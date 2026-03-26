@@ -79,6 +79,11 @@ const mainMenu: MenuItem[] = [
     children: [{ name: "Xử lý khiếu nại", path: "complaints", icon: List }],
   },
   {
+    name: "Xuất hàng",
+    icon: PackageSearch,
+    children: [{ name: "Duyệt xuất hàng", path: "exports", icon: List }],
+  },
+  {
     name: "Nhập kho",
     icon: PackageSearch,
     children: [
