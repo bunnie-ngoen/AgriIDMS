@@ -11,7 +11,8 @@ const WarehouseStockCheckCreatePage = lazy(
   () => import("../stock-check/pages/WarehouseStockCheckCreatePage")
 );
 const StockCheckDetailsPage = lazy(
-  () => import("../stock-check/pages/StockCheckDetailsPage")
+  () => import("../stock-check/pages/StockCheckDetailsPage"),
+);
 const WarehouseAllocationProposalPage = lazy(
   () => import("./pages/WarehouseAllocationProposalPage"),
 );

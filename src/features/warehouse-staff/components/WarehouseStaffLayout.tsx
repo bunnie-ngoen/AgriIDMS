@@ -1,11 +1,9 @@
-import { Outlet, NavLink, useNavigate } from "react-router-dom";
-import { ClipboardList, LogOut, PackageCheck, Warehouse } from "lucide-react";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   ChevronRight,
   ClipboardList,
-  LayoutDashboard,
   LogOut,
+  PackageCheck,
   ShieldCheck,
   Warehouse,
 } from "lucide-react";
