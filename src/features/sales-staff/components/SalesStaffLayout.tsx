@@ -11,13 +11,21 @@ export default function SalesStaffLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const isOrdersRouteActive = location.pathname.startsWith("/sales/orders");
+  const isComplaintsRouteActive = location.pathname.startsWith("/sales/complaints");
   const [isOrdersOpen, setIsOrdersOpen] = useState<boolean>(isOrdersRouteActive);
+  const [isComplaintsOpen, setIsComplaintsOpen] = useState<boolean>(isComplaintsRouteActive);
 
   useEffect(() => {
     if (isOrdersRouteActive) {
       setIsOrdersOpen(true);
     }
   }, [isOrdersRouteActive]);
+
+  useEffect(() => {
+    if (isComplaintsRouteActive) {
+      setIsComplaintsOpen(true);
+    }
+  }, [isComplaintsRouteActive]);
 
   const handleLogout = () => {
     dispatch(logout());
@@ -109,21 +117,59 @@ export default function SalesStaffLayout() {
               </div>
             </li>
             <li>
-              <NavLink
-                to="/sales/complaints"
-                className={({ isActive }) =>
-                  `w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-slate-800 text-white border border-slate-700"
-                      : "text-slate-300 hover:bg-slate-800/70"
-                  }`
-                }
+              <button
+                type="button"
+                onClick={() => setIsComplaintsOpen((prev) => !prev)}
+                className={`w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                  isComplaintsRouteActive
+                    ? "bg-slate-800 text-white border border-slate-700"
+                    : "text-slate-300 hover:bg-slate-800/70"
+                }`}
               >
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-800 text-slate-200">
                   <MessageCircleWarning size={15} />
                 </span>
-                Khiếu nại
-              </NavLink>
+                <span className="flex-1 text-left">Khiếu nại</span>
+                <ChevronDown
+                  size={15}
+                  className={`transition-transform duration-200 ${isComplaintsOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              <div className={`grid transition-all duration-200 ${isComplaintsOpen ? "grid-rows-[1fr] mt-1" : "grid-rows-[0fr]"}`}>
+                <ul className="overflow-hidden space-y-1 pl-4">
+                  <li>
+                    <NavLink
+                      to="/sales/complaints/pending"
+                      className={({ isActive }) =>
+                        `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                          isActive
+                            ? "bg-amber-900/30 text-amber-200 border border-amber-700/60"
+                            : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                        }`
+                      }
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                      Khiếu nại chờ xử lý
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink
+                      to="/sales/complaints/processed"
+                      className={({ isActive }) =>
+                        `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                          isActive
+                            ? "bg-emerald-900/30 text-emerald-200 border border-emerald-700/60"
+                            : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                        }`
+                      }
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      Khiếu nại đã xử lý
+                    </NavLink>
+                  </li>
+                </ul>
+              </div>
             </li>
           </ul>
         </div>

@@ -9,8 +9,6 @@ import {
   useLazyGetExportReceiptByIdQuery,
 } from "../../export/api/export.api";
 import { useGetPaidPendingExportOrdersQuery } from "../../order/api/order.api";
-import { useAuth } from "../../auth/hooks/useAuth";
-import { AUTH_ROLE } from "../../auth/constants/auth.constants";
 
 function vnd(n: number) {
   return n.toLocaleString("vi-VN");
@@ -59,11 +57,8 @@ function normalizeExportStatus(status?: string | null) {
 }
 
 export default function WarehouseExportsPage() {
-  const auth = useAuth();
-  const roles = auth.user?.roles ?? [];
-  const isManager = roles.includes(AUTH_ROLE.MANAGER);
-  const isAdmin = roles.includes(AUTH_ROLE.ADMIN);
-  const canApproveExport = isManager || isAdmin;
+  // Màn kho chỉ xử lý thao tác của kho: tạo phiếu + xác nhận lấy hàng.
+  const canApproveExport = false;
 
   const [activeTab, setActiveTab] = useState<"paidOrders" | "pendingApprove">("paidOrders");
 
@@ -687,22 +682,13 @@ export default function WarehouseExportsPage() {
                 title={
                   !canConfirmPick && receipt
                     ? receiptNorm === "ReadyToExport"
-                      ? "Đã xác nhận lấy hàng rồi — dùng Duyệt xuất"
+                      ? "Đã xác nhận lấy hàng rồi — chờ Admin/Manager duyệt xuất"
                       : "Không áp dụng ở trạng thái này"
                     : undefined
                 }
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
               >
                 {isConfirmingPick ? "Đang xác nhận..." : "Kho xác nhận lấy hàng"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => onApprove()}
-                disabled={!canApprove || isApproving}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-              >
-                {isApproving ? "Đang duyệt..." : "Duyệt xuất (Admin/Manager)"}
               </button>
 
               <button

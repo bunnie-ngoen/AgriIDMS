@@ -3,7 +3,8 @@ import { lazy } from "react";
 const SalesStaffLayout = lazy(() => import("./components/SalesStaffLayout"));
 const SalesSaleConfirmPage = lazy(() => import("./pages/SalesSaleConfirmPage"));
 const SalesPendingCodPage = lazy(() => import("./pages/SalesPendingCodPage"));
-const StaffComplaintsPage = lazy(() => import("../complaint/pages/StaffComplaintsPage"));
+const SalesComplaintsPendingPage = lazy(() => import("./pages/SalesComplaintsPendingPage"));
+const SalesComplaintsProcessedPage = lazy(() => import("./pages/SalesComplaintsProcessedPage"));
 
 export const salesStaffRoutes = [
   {
@@ -15,7 +16,9 @@ export const salesStaffRoutes = [
       { path: "orders", element: <SalesSaleConfirmPage /> },
       { path: "orders/sale-confirm", element: <SalesSaleConfirmPage /> },
       { path: "orders/pending-cod", element: <SalesPendingCodPage /> },
-      { path: "complaints", element: <StaffComplaintsPage /> },
+      { path: "complaints", element: <SalesComplaintsPendingPage /> },
+      { path: "complaints/pending", element: <SalesComplaintsPendingPage /> },
+      { path: "complaints/processed", element: <SalesComplaintsProcessedPage /> },
     ],
   },
 ];
