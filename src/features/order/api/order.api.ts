@@ -1,16 +1,20 @@
 import { api } from "../../../shared/api";
 import {
+    allocationProposalResultSchema,
     allocationConfirmResponseSchema,
     allocationProposalsResponseSchema,
     orderDetailSchema,
     orderListSchema,
     overdueBackorderListSchema,
+    paidPendingExportOrderListSchema,
     saleConfirmResponseSchema,
+    type AllocationProposalResult,
     type AllocationConfirmResponse,
     type AllocationProposalsResponse,
     type OrderDetail,
     type OrderListItem,
     type OverdueBackorderItem,
+    type PaidPendingExportOrderListItem,
     type SaleConfirmResponse,
 } from "../schemas/order.schema";
 
@@ -100,6 +104,35 @@ export const orderApi = api.injectEndpoints({
             },
         }),
 
+        getPaidPendingExportOrders: builder.query<
+            PaidPendingExportOrderListItem[],
+            {
+                skip?: number;
+                take?: number;
+                sort?: string;
+                orderId?: number;
+                source?: string;
+            } | void
+        >({
+            query: (arg) => ({
+                url: "Orders/staff/paid-pending-export",
+                method: "GET",
+                params: {
+                    skip: arg?.skip ?? 0,
+                    take: arg?.take ?? 50,
+                    sort: arg?.sort,
+                    orderId: arg?.orderId,
+                    source: arg?.source,
+                },
+            }),
+            transformResponse: (raw: unknown) => {
+                const normalized = toCamelCase(raw);
+                const parsed = paidPendingExportOrderListSchema.safeParse(normalized);
+                if (!parsed.success) return [];
+                return parsed.data;
+            },
+        }),
+
         getPendingWarehouseConfirmOrders: builder.query<
             OrderListItem[],
             { customerUserId?: string; source?: string; skip?: number; take?: number } | void
@@ -149,11 +182,17 @@ export const orderApi = api.injectEndpoints({
             }),
         }),
 
-        autoProposeAllocationAsStaff: builder.mutation<void, number>({
+        autoProposeAllocationAsStaff: builder.mutation<AllocationProposalResult, number>({
             query: (id) => ({
                 url: `Orders/${id}/allocation/auto-propose`,
                 method: "PATCH",
             }),
+            transformResponse: (raw: unknown) => {
+                const normalized = toCamelCase(raw);
+                const parsed = allocationProposalResultSchema.safeParse(normalized);
+                if (!parsed.success) throw new Error("Invalid allocation proposal result");
+                return parsed.data;
+            },
         }),
 
         getAllocationProposalsByOrderId: builder.query<AllocationProposalsResponse, number>({
@@ -234,6 +273,7 @@ export const {
     useGetMyOrderByIdQuery,
     useGetPendingSaleConfirmOrdersQuery,
     useGetPendingAllocationOrdersQuery,
+    useGetPaidPendingExportOrdersQuery,
     useGetPendingWarehouseConfirmOrdersQuery,
     useSaleConfirmOrderMutation,
     useConfirmOrderMutation,

@@ -23,6 +23,31 @@ function getOrderStatusTone(status: string) {
     return "bg-slate-100 text-slate-700 border-slate-200";
 }
 
+function orderStatusLabel(status: string) {
+    if (status === "PendingSaleConfirmation") return "Chờ xác nhận bán";
+    if (status === "AwaitingAllocation") return "Chờ giữ hàng";
+    if (status === "PendingWarehouseConfirm") return "Chờ kho xác nhận";
+    if (status === "PartiallyAllocated") return "Giữ hàng một phần";
+    if (status === "BackorderWaiting") return "Chờ backorder";
+    if (status === "Confirmed") return "Đã xác nhận";
+    if (status === "Paid") return "Đã thanh toán";
+    if (status === "Shipping") return "Đang giao";
+    if (status === "Completed") return "Hoàn thành";
+    if (status === "Cancelled") return "Đã hủy";
+    if (status === "InventoryFailed") return "Thiếu tồn kho";
+    return status;
+}
+
+function paymentStatusLabel(status?: string | null) {
+    if (!status) return "N/A";
+    if (status === "Pending") return "Chờ xử lý";
+    if (status === "Processing") return "Đang xử lý";
+    if (status === "Paid" || status === "Success") return "Đã thanh toán";
+    if (status === "Cancelled") return "Đã hủy";
+    if (status === "Failed") return "Thất bại";
+    return status;
+}
+
 export default function MyOrdersPage() {
     const { data, isLoading, isError, refetch } = useGetMyOrdersQuery();
     const orders = data ?? [];
@@ -192,12 +217,12 @@ export default function MyOrdersPage() {
                                                 <span
                                                     className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-semibold ${getOrderStatusTone(o.status)}`}
                                                 >
-                                                    {o.status}
+                                                    {orderStatusLabel(o.status)}
                                                 </span>
                                             </td>
                                             <td className="py-3 px-4 text-slate-700">{o.itemCount}</td>
                                             <td className="py-3 px-4 font-semibold text-slate-900">{vnd(o.totalAmount)} ₫</td>
-                                            <td className="py-3 px-4 text-slate-700">{o.latestPaymentStatus ?? "N/A"}</td>
+                                            <td className="py-3 px-4 text-slate-700">{paymentStatusLabel(o.latestPaymentStatus)}</td>
                                             <td className="py-3 px-4">
                                                 <Link
                                                     to={ROUTES.CUSTOMER_ORDER_DETAIL.replace(":id", String(o.orderId))}

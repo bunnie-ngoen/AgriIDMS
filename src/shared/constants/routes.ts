@@ -30,5 +30,6 @@ export const ROUTES = {
     CUSTOMER_ORDERS: "/customer/orders",
     CUSTOMER_ORDERS_PAGE: "/my-orders",
     CUSTOMER_ORDER_DETAIL: "/my-orders/:id",
+    CUSTOMER_COMPLAINTS: "/my-complaints",
     CART: "/cart",
 };

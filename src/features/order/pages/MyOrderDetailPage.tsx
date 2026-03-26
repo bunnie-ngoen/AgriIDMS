@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ROUTES } from "../../../shared/constants/routes";
 import {
@@ -34,10 +34,20 @@ function orderStatusLabel(status: string) {
 function paymentStatusLabel(status?: string | null) {
     if (!status) return "Chưa có";
     if (status === "Pending") return "Chờ xử lý";
+    if (status === "Processing") return "Đang xử lý";
     if (status === "Paid") return "Đã thanh toán";
+    if (status === "Success") return "Đã thanh toán";
     if (status === "Cancelled") return "Đã hủy";
     if (status === "Failed") return "Thất bại";
     return status;
+}
+
+function getApiErrorMessage(err: unknown, fallback: string) {
+    const e = err as {
+        data?: { message?: string; error?: string; detail?: string };
+        message?: string;
+    };
+    return e?.data?.message || e?.data?.error || e?.data?.detail || e?.message || fallback;
 }
 
 export default function MyOrderDetailPage() {
@@ -58,6 +68,35 @@ export default function MyOrderDetailPage() {
     const [msg, setMsg] = useState<string>("");
 
     const total = useMemo(() => order?.totalAmount ?? 0, [order?.totalAmount]);
+    const latestPaymentStatus = latestPayment?.paymentStatus;
+    const isLatestPaymentPaid = latestPaymentStatus === "Paid" || latestPaymentStatus === "Success";
+    const isLatestPaymentActive =
+        latestPaymentStatus === "Pending" || latestPaymentStatus === "Processing";
+    const canCreatePayment =
+        !!order &&
+        order.status === "Confirmed" &&
+        !isLatestPaymentPaid &&
+        !isLatestPaymentActive;
+    const canCancelPayment =
+        !!latestPayment &&
+        (latestPayment.paymentStatus === "Processing" || latestPayment.paymentStatus === "Pending");
+
+    useEffect(() => {
+        if (!valid || !order) return;
+        const shouldPoll =
+            order.status === "Confirmed" ||
+            order.status === "Paid" ||
+            latestPaymentStatus === "Pending" ||
+            latestPaymentStatus === "Processing";
+        if (!shouldPoll) return;
+
+        const timer = window.setInterval(() => {
+            refetchPayment();
+            refetch();
+        }, 8000);
+
+        return () => window.clearInterval(timer);
+    }, [valid, order, latestPaymentStatus, refetch, refetchPayment]);
 
     const onCreatePayment = async () => {
         if (!valid) return;
@@ -68,8 +107,8 @@ export default function MyOrderDetailPage() {
             if (res.checkoutUrl) window.open(res.checkoutUrl, "_blank", "noopener,noreferrer");
             await refetchPayment();
             await refetch();
-        } catch {
-            setMsg("Không tạo được thanh toán. Đơn cần đúng trạng thái và chỉ hỗ trợ COD/chuyển khoản.");
+        } catch (err) {
+            setMsg(getApiErrorMessage(err, "Không tạo được thanh toán. Đơn cần đúng trạng thái Confirmed và chỉ hỗ trợ COD/chuyển khoản."));
         }
     };
 
@@ -81,8 +120,8 @@ export default function MyOrderDetailPage() {
             setMsg("Đã hủy thanh toán.");
             await refetchPayment();
             await refetch();
-        } catch {
-            setMsg("Không hủy được thanh toán hiện tại.");
+        } catch (err) {
+            setMsg(getApiErrorMessage(err, "Không hủy được thanh toán hiện tại."));
         }
     };
 
@@ -172,6 +211,14 @@ export default function MyOrderDetailPage() {
                     <div className="rounded-xl border border-slate-200 bg-white p-4 h-fit">
                         <h2 className="text-lg font-bold text-slate-900">Thanh toán & xử lý đơn</h2>
                         <p className="mt-1 text-sm text-slate-600">Tổng đơn: <span className="font-semibold">{vnd(total)} ₫</span></p>
+                        {(order.status === "Shipping" || order.status === "Completed") && (
+                            <Link
+                                to={`${ROUTES.CUSTOMER_COMPLAINTS}?orderId=${order.orderId}`}
+                                className="mt-2 inline-flex text-sm font-semibold text-indigo-700 hover:text-indigo-800"
+                            >
+                                Gửi khiếu nại cho đơn/box đã giao →
+                            </Link>
+                        )}
                         {order.status === "PartiallyAllocated" && (
                             <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                                 Đơn đang thiếu hàng. Vui lòng chọn 1 trong 3 phương án bên dưới.
@@ -238,7 +285,8 @@ export default function MyOrderDetailPage() {
                             <select
                                 value={paymentMethod}
                                 onChange={(e) => setPaymentMethod(Number(e.target.value))}
-                                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                disabled={!canCreatePayment || isCreating}
+                                className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
                             >
                                 <option value={paymentMethodEnum.COD}>COD (0)</option>
                                 <option value={paymentMethodEnum.BANKING}>Chuyển khoản/PayOS (3)</option>
@@ -247,11 +295,16 @@ export default function MyOrderDetailPage() {
                         <button
                             type="button"
                             onClick={onCreatePayment}
-                            disabled={isCreating}
+                            disabled={isCreating || !canCreatePayment}
                             className="mt-3 w-full rounded-lg bg-[#1a5f2a] text-white px-3 py-2 text-sm font-semibold hover:bg-[#145026] disabled:opacity-60"
                         >
                             {isCreating ? "Đang tạo thanh toán..." : "Tạo thanh toán"}
                         </button>
+                        {!canCreatePayment && (
+                            <p className="mt-2 text-xs text-amber-700">
+                                Chỉ tạo thanh toán khi đơn ở trạng thái Confirmed và không có payment đang chờ xử lý.
+                            </p>
+                        )}
                         {latestPayment && (
                             <div className="mt-3 rounded-lg bg-slate-50 border border-slate-200 p-3 text-xs space-y-1">
                                 <p>Thanh toán #{latestPayment.id}</p>
@@ -264,13 +317,39 @@ export default function MyOrderDetailPage() {
                                 <button
                                     type="button"
                                     onClick={onCancelPayment}
-                                    disabled={isCancelling}
+                                    disabled={isCancelling || !canCancelPayment}
                                     className="mt-2 w-full rounded-lg border border-red-300 text-red-600 px-3 py-2 text-sm font-semibold hover:bg-red-50 disabled:opacity-60"
                                 >
                                     {isCancelling ? "Đang hủy..." : "Hủy thanh toán"}
                                 </button>
                             </div>
                         )}
+                        <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 space-y-1">
+                            <p className="font-semibold text-slate-900">Tiến trình đơn hàng</p>
+                            <p>
+                                Bước 4 - Thanh toán:{" "}
+                                <span className="font-semibold">
+                                    {isLatestPaymentPaid ? "Hoàn tất" : "Chưa hoàn tất"}
+                                </span>
+                            </p>
+                            <p>
+                                Bước 5 - Giao hàng/hoàn thành:{" "}
+                                <span className="font-semibold">
+                                    {order.status === "Shipping"
+                                        ? "Đang giao"
+                                        : order.status === "Completed"
+                                          ? "Hoàn thành"
+                                          : order.status === "Paid"
+                                            ? "Đã thanh toán, chờ xuất kho"
+                                            : "Chưa bắt đầu"}
+                                </span>
+                            </p>
+                            {(order.status === "Shipping" || order.status === "Completed") && (
+                                <p className="text-emerald-700">
+                                    Đơn đã đủ điều kiện để tạo khiếu nại theo rule backend.
+                                </p>
+                            )}
+                        </div>
                         {!!msg && <p className="mt-3 text-xs text-slate-700">{msg}</p>}
                     </div>
                 </div>
