@@ -9,6 +9,23 @@ import {
 import { useGetSuppliersQuery } from "../../supplier/api/supplier.api";
 import { ArrowLeft, FilePlus, Loader2, Eye, X, Pencil, Trash2, CheckCircle } from "lucide-react";
 
+function toVietnamesePoStatus(status: string): string {
+  switch (status) {
+    case "Pending":
+      return "Chờ duyệt";
+    case "Approved":
+      return "Đã duyệt";
+    case "Rejected":
+      return "Đã từ chối";
+    case "Completed":
+      return "Hoàn tất";
+    case "Cancelled":
+      return "Đã hủy";
+    default:
+      return status;
+  }
+}
+
 export default function PurchaseOrderList() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -292,7 +309,7 @@ export default function PurchaseOrderList() {
                               : "text-slate-600"
                         }
                       >
-                        {po.status}
+                        {toVietnamesePoStatus(po.status)}
                       </span>
                     </td>
                       <td className="px-5 py-3.5 text-slate-600 max-w-[140px]">
@@ -443,7 +460,7 @@ export default function PurchaseOrderList() {
                                   : "text-rose-600"
                             }
                           >
-                            {order.status}
+                            {toVietnamesePoStatus(order.status)}
                           </span>
                         </p>
                       </div>

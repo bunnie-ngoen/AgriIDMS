@@ -19,12 +19,15 @@ import {
   useDeleteSlotMutation,
 } from "../api/create-user.api";
 import type { ZoneItem, RackItem, SlotItem } from "../types/warehouse.type";
+import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 const MIN_NAME_LENGTH = 3;
 
 type FormMode = "idle" | "create" | "edit";
 
 const WarehouseConfig = () => {
+  const { isManager } = useRoleGuard();
+  const warehouseBasePath = isManager() ? "/manager/warehouses" : "/admin/warehouses";
   const { id } = useParams<{ id: string }>();
   const warehouseId = Number(id);
 
@@ -330,7 +333,7 @@ const WarehouseConfig = () => {
             )}
           </div>
           <Link
-            to="/admin/warehouses"
+            to={warehouseBasePath}
             className="text-xs text-emerald-600 hover:underline"
           >
             ← Quay lại danh sách kho

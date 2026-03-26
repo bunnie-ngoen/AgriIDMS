@@ -9,6 +9,10 @@ import {
 } from "../api/stock-check.api";
 import type { StockCheckDashboardItem } from "../types/stock-check.type";
 import { ClipboardList, Loader2, Play, ShieldCheck } from "lucide-react";
+import {
+  toVietnameseStockCheckStatus,
+  toVietnameseStockCheckType,
+} from "../utils/stock-check-labels";
 
 function formatDateTime(input: string | Date) {
   const d = typeof input === "string" ? new Date(input) : input;
@@ -76,7 +80,8 @@ export default function WarehouseStockChecksDashboard() {
                     #{it.stockCheckId}
                   </div>
                   <div className="text-xs text-slate-600 truncate">
-                    {it.checkType} · {it.status}
+                    {toVietnameseStockCheckType(it.checkType)} ·{" "}
+                    {toVietnameseStockCheckStatus(it.status)}
                   </div>
                   <div className="text-xs text-slate-500 mt-1">
                     Snapshot: {formatDateTime(it.snapshotAt)}

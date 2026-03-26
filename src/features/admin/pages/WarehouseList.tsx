@@ -7,10 +7,13 @@ import {
 import type { WarehouseItem } from "../types/warehouse.type";
 import { Trash2, Pencil, Package, Plus, ChevronDown, RotateCw } from "lucide-react";
 import EditWarehouseModal from "../components/EditWarehouseModal";
+import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 const PAGE_SIZE = 10;
 
 const WarehouseList = () => {
+  const { isManager } = useRoleGuard();
+  const warehouseBasePath = isManager() ? "/manager/warehouses" : "/admin/warehouses";
   const [searchParams, setSearchParams] = useSearchParams();
   const initialPage = Number(searchParams.get("page") ?? "1") || 1;
 
@@ -105,7 +108,7 @@ const WarehouseList = () => {
             </div>
           </div>
           <Link
-            to="/admin/warehouses/create"
+            to={`${warehouseBasePath}/create`}
             className="inline-flex items-center justify-center gap-2 rounded-2xl py-3 px-5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
           >
             <Plus size={16} />
@@ -224,13 +227,13 @@ const WarehouseList = () => {
                             Sửa
                           </button>
                           <Link
-                            to={`/admin/warehouses/${warehouse.id}/config`}
+                            to={`${warehouseBasePath}/${warehouse.id}/config`}
                             className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                           >
                             Cấu hình
                           </Link>
                           <Link
-                            to={`/admin/warehouses/${warehouse.id}/map`}
+                            to={`${warehouseBasePath}/${warehouse.id}/map`}
                             className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                           >
                             Sơ đồ

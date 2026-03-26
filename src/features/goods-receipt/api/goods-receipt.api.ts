@@ -393,7 +393,93 @@ export const goodsReceiptApi = api.injectEndpoints({
               (row.warehouseId as number | null | undefined) ??
               (row.WarehouseId as number | null | undefined) ??
               null,
+            warehouseName:
+              (row.warehouseName as string | null | undefined) ??
+              (row.WarehouseName as string | null | undefined) ??
+              null,
             lotId: (row.lotId as number) ?? (row.LotId as number) ?? 0,
+            lotCode:
+              (row.lotCode as string | null | undefined) ??
+              (row.LotCode as string | null | undefined) ??
+              null,
+            slotCode:
+              (row.slotCode as string | null | undefined) ??
+              (row.SlotCode as string | null | undefined) ??
+              null,
+            productVariantId:
+              (row.productVariantId as number | null | undefined) ??
+              (row.ProductVariantId as number | null | undefined) ??
+              null,
+            productVariantName:
+              (row.productVariantName as string | null | undefined) ??
+              (row.ProductVariantName as string | null | undefined) ??
+              null,
+            productName:
+              (row.productName as string | null | undefined) ??
+              (row.ProductName as string | null | undefined) ??
+              null,
+            placedInColdAt:
+              placed != null
+                ? typeof placed === "string"
+                  ? placed
+                  : new Date(placed as string | number).toISOString()
+                : null,
+          };
+        });
+      },
+    }),
+
+    getBoxesByGoodsReceiptId: builder.query<BoxByQrResponse[], number>({
+      query: (goodsReceiptId) => ({
+        url: `Boxes/by-goods-receipt/${goodsReceiptId}`,
+      }),
+      transformResponse: (raw: unknown): BoxByQrResponse[] => {
+        const arr = (raw as unknown as RawObject[]) ?? [];
+        if (!Array.isArray(arr)) return [];
+
+        return arr.map((row) => {
+          const placed = row.placedInColdAt ?? row.PlacedInColdAt;
+          return {
+            id: (row.id as number) ?? (row.Id as number) ?? 0,
+            boxCode:
+              (row.boxCode as string) ??
+              (row.BoxCode as string) ??
+              "",
+            qrCode:
+              (row.qrCode as string | null | undefined) ??
+              (row.QRCode as string | null | undefined) ??
+              (row.QrCode as string | null | undefined) ??
+              null,
+            qrImageUrl:
+              (row.qrImageUrl as string | null | undefined) ??
+              (row.QrImageUrl as string | null | undefined) ??
+              null,
+            weight: (row.weight as number) ?? (row.Weight as number) ?? 0,
+            status:
+              (row.status as string) ??
+              (row.Status as string) ??
+              "",
+            slotId:
+              (row.slotId as number | null | undefined) ??
+              (row.SlotId as number | null | undefined) ??
+              null,
+            warehouseId:
+              (row.warehouseId as number | null | undefined) ??
+              (row.WarehouseId as number | null | undefined) ??
+              null,
+            warehouseName:
+              (row.warehouseName as string | null | undefined) ??
+              (row.WarehouseName as string | null | undefined) ??
+              null,
+            lotId: (row.lotId as number) ?? (row.LotId as number) ?? 0,
+            lotCode:
+              (row.lotCode as string | null | undefined) ??
+              (row.LotCode as string | null | undefined) ??
+              null,
+            slotCode:
+              (row.slotCode as string | null | undefined) ??
+              (row.SlotCode as string | null | undefined) ??
+              null,
             productVariantId:
               (row.productVariantId as number | null | undefined) ??
               (row.ProductVariantId as number | null | undefined) ??
@@ -724,6 +810,7 @@ export const {
   useGetLotsByGoodsReceiptIdQuery,
   useLazyGetLotByQrQuery,
   useGetUnassignedBoxesByWarehouseQuery,
+  useGetBoxesByGoodsReceiptIdQuery,
   useLazyGetBoxByQrQuery,
   useLazyGetSlotByQrQuery,
   useAssignBoxToSlotMutation,

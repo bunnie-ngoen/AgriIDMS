@@ -20,6 +20,7 @@ import {
   type VnWard,
 } from "../../../shared/api/vn-address.api";
 import { ArrowLeft, Sparkles, Package, MapPin, Loader2, ChevronDown } from "lucide-react";
+import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 const Field = ({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) => (
   <div className="space-y-1.5">
@@ -61,6 +62,8 @@ const normalizeName = (s: string) => {
 const EditWarehouse = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { isManager } = useRoleGuard();
+  const warehouseBasePath = isManager() ? "/manager/warehouses" : "/admin/warehouses";
   const warehouseId = Number(id);
   const [serverMessage, setServerMessage] = useState<{
     type: "success" | "error";
@@ -268,7 +271,7 @@ const EditWarehouse = () => {
         <div className="flex items-center gap-4 mb-8">
           <button
             type="button"
-            onClick={() => navigate("/admin/warehouses")}
+            onClick={() => navigate(warehouseBasePath)}
             className="h-10 w-10 rounded-2xl border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:border-slate-300 hover:shadow-md transition-all duration-200 shadow-sm"
           >
             <ArrowLeft size={16} />
@@ -423,7 +426,7 @@ const EditWarehouse = () => {
           <div className="flex gap-3 pt-1 pb-6">
             <button
               type="button"
-              onClick={() => navigate("/admin/warehouses")}
+              onClick={() => navigate(warehouseBasePath)}
               className="flex-1 rounded-2xl border border-slate-200 py-3.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 bg-white shadow-sm"
             >
               Hủy bỏ

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, QrCode, Search, Upload, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { decodeQrFromImageFile } from "../../../../shared/lib/decodeQrFromImage";
+import QrCameraScannerModal from "../../../../shared/components/QrCameraScannerModal";
 import {
   useLazyGetBoxByQrQuery,
   useLazyGetLotByQrQuery,
@@ -24,6 +25,7 @@ export default function AdminHeaderQrMiniScan() {
   const [activeSlotId, setActiveSlotId] = useState<number | null>(null);
   const [slotBoxDetail, setSlotBoxDetail] = useState<any>(null);
   const [isLoadingSlotBoxDetail, setIsLoadingSlotBoxDetail] = useState(false);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
 
   const [triggerLot, lotState] = useLazyGetLotByQrQuery();
   const [triggerBox, boxState] = useLazyGetBoxByQrQuery();
@@ -196,12 +198,22 @@ export default function AdminHeaderQrMiniScan() {
         <button
           type="button"
           className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white p-2 hover:bg-gray-50"
-          title="Chụp ảnh QR"
-          onClick={() => fileInputRef.current?.click()}
+          title="Quét bằng camera"
+          onClick={() => setIsCameraOpen(true)}
         >
           <Camera size={16} />
         </button>
       </div>
+
+      <QrCameraScannerModal
+        open={isCameraOpen}
+        title="Quét QR bằng camera"
+        onClose={() => setIsCameraOpen(false)}
+        onDetected={(value) => {
+          setQrInput(value);
+          void runScan(value);
+        }}
+      />
 
       {/* Dropdown kết quả */}
       {currentResult || isAnyFetching ? (

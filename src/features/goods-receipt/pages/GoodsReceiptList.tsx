@@ -4,9 +4,37 @@ import { useGetGoodsReceiptsQuery } from "../api/goods-receipt.api";
 import { useGetSuppliersQuery } from "../../supplier/api/supplier.api";
 import { useGetWarehousesQuery } from "../../admin/api/create-user.api";
 import { Loader2, FileText, FilePlus2, Eye } from "lucide-react";
+import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
+
+function toVietnameseReceiptStatus(status: string): string {
+  switch (status) {
+    case "Draft":
+      return "Nháp";
+    case "Received":
+      return "Đã nhận";
+    case "QCCompleted":
+      return "Đã hoàn tất QC";
+    case "PendingManagerApproval":
+      return "Chờ quản lý duyệt";
+    case "PendingManagerApprovalQc":
+      return "Chờ quản lý duyệt (QC)";
+    case "Approved":
+      return "Đã duyệt";
+    case "Rejected":
+      return "Đã từ chối";
+    default:
+      return status;
+  }
+}
 
 export default function GoodsReceiptList() {
   const navigate = useNavigate();
+  const { isManager, isWarehouseStaff } = useRoleGuard();
+  const basePath = isWarehouseStaff()
+    ? "/warehouse/goods-receipts"
+    : isManager()
+      ? "/manager/goods-receipts"
+      : "/admin/goods-receipts";
   const { data: receipts = [], isLoading, isError, error, refetch } =
     useGetGoodsReceiptsQuery();
   const { data: suppliers = [] } = useGetSuppliersQuery();
@@ -68,7 +96,7 @@ export default function GoodsReceiptList() {
           </div>
           <button
             type="button"
-            onClick={() => navigate("/admin/goods-receipts/create")}
+            onClick={() => navigate(`${basePath}/create`)}
             className="inline-flex items-center justify-center gap-2 rounded-2xl py-2.5 px-4 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
           >
             <FilePlus2 size={16} />
@@ -180,33 +208,25 @@ export default function GoodsReceiptList() {
                     >
                       <td
                         className="px-5 py-3.5 font-medium text-slate-900 cursor-pointer"
-                        onClick={() =>
-                          navigate(`/admin/goods-receipts/${r.id}`)
-                        }
+                        onClick={() => navigate(`${basePath}/${r.id}`)}
                       >
                         {r.receiptCode}
                       </td>
                       <td
                         className="px-5 py-3.5 text-slate-700 cursor-pointer"
-                        onClick={() =>
-                          navigate(`/admin/goods-receipts/${r.id}`)
-                        }
+                        onClick={() => navigate(`${basePath}/${r.id}`)}
                       >
                         {r.supplierName}
                       </td>
                       <td
                         className="px-5 py-3.5 text-slate-700 cursor-pointer"
-                        onClick={() =>
-                          navigate(`/admin/goods-receipts/${r.id}`)
-                        }
+                        onClick={() => navigate(`${basePath}/${r.id}`)}
                       >
                         {r.warehouseName}
                       </td>
                       <td
                         className="px-5 py-3.5 text-slate-600 cursor-pointer"
-                        onClick={() =>
-                          navigate(`/admin/goods-receipts/${r.id}`)
-                        }
+                        onClick={() => navigate(`${basePath}/${r.id}`)}
                       >
                         {r.receivedDate
                           ? new Date(r.receivedDate).toLocaleDateString("vi-VN")
@@ -214,23 +234,19 @@ export default function GoodsReceiptList() {
                       </td>
                       <td
                         className="px-5 py-3.5 cursor-pointer"
-                        onClick={() =>
-                          navigate(`/admin/goods-receipts/${r.id}`)
-                        }
+                        onClick={() => navigate(`${basePath}/${r.id}`)}
                       >
                         <span
                           className={`text-sm font-medium ${statusClass(
                             r.status,
                           )}`}
                         >
-                          {r.status}
+                          {toVietnameseReceiptStatus(r.status)}
                         </span>
                       </td>
                       <td
                         className="px-5 py-3.5 text-right text-slate-700 cursor-pointer"
-                        onClick={() =>
-                          navigate(`/admin/goods-receipts/${r.id}`)
-                        }
+                        onClick={() => navigate(`${basePath}/${r.id}`)}
                       >
                         {r.totalReceivedWeight} kg /{" "}
                         <span className="font-semibold">
@@ -240,9 +256,7 @@ export default function GoodsReceiptList() {
                       <td className="px-5 py-3.5 text-right">
                         <button
                           type="button"
-                          onClick={() =>
-                            navigate(`/admin/goods-receipts/${r.id}`)
-                          }
+                          onClick={() => navigate(`${basePath}/${r.id}`)}
                           className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200"
                         >
                           <Eye size={14} className="text-emerald-600" />
