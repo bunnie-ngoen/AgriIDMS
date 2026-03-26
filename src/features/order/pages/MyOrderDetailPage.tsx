@@ -68,6 +68,11 @@ export default function MyOrderDetailPage() {
     const [msg, setMsg] = useState<string>("");
 
     const total = useMemo(() => order?.totalAmount ?? 0, [order?.totalAmount]);
+    const fulfilledQty = useMemo(
+        () => (order?.items ?? []).reduce((sum, item) => sum + Number(item.fulfilledQuantity ?? 0), 0),
+        [order?.items],
+    );
+    const hasAnyFulfilled = fulfilledQty > 0;
     const latestPaymentStatus = latestPayment?.paymentStatus;
     const isLatestPaymentPaid = latestPaymentStatus === "Paid" || latestPaymentStatus === "Success";
     const isLatestPaymentActive =
@@ -221,7 +226,7 @@ export default function MyOrderDetailPage() {
                         )}
                         {order.status === "PartiallyAllocated" && (
                             <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                                Đơn đang thiếu hàng. Vui lòng chọn 1 trong 3 phương án bên dưới.
+                                Đơn đang thiếu hàng. Vui lòng chọn hướng xử lý phù hợp bên dưới.
                             </div>
                         )}
                         <div className="mt-3 space-y-3">
@@ -249,23 +254,39 @@ export default function MyOrderDetailPage() {
                                             {isWaitingBackorder ? "Đang xử lý..." : "Chờ backorder"}
                                         </button>
                                     </div>
-                                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                                        <p className="text-sm font-semibold text-amber-800">Hủy phần thiếu</p>
-                                        <p className="mt-1 text-xs text-amber-700">Chỉ nhận phần hàng đã có, không chờ phần thiếu.</p>
-                                        <button
-                                            type="button"
-                                            onClick={onCancelShortage}
-                                            disabled={isCancellingShortage}
-                                            className="mt-2 w-full rounded-lg border border-amber-300 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-60"
-                                        >
-                                            {isCancellingShortage ? "Đang xử lý..." : "Hủy phần thiếu"}
-                                        </button>
-                                    </div>
+                                    {hasAnyFulfilled ? (
+                                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                                            <p className="text-sm font-semibold text-amber-800">Hủy phần thiếu</p>
+                                            <p className="mt-1 text-xs text-amber-700">Chỉ nhận phần hàng đã giữ được, không chờ phần thiếu.</p>
+                                            <button
+                                                type="button"
+                                                onClick={onCancelShortage}
+                                                disabled={isCancellingShortage}
+                                                className="mt-2 w-full rounded-lg border border-amber-300 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-60"
+                                            >
+                                                {isCancellingShortage ? "Đang xử lý..." : "Hủy phần thiếu"}
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+                                            <p className="text-sm font-semibold text-rose-800">Hủy toàn bộ đơn</p>
+                                            <p className="mt-1 text-xs text-rose-700">Đơn chưa giữ được phần hàng nào, bạn có thể hủy toàn bộ đơn.</p>
+                                            <button
+                                                type="button"
+                                                onClick={onCancelOrder}
+                                                disabled={isCancellingOrder}
+                                                className="mt-2 w-full rounded-lg border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60"
+                                            >
+                                                {isCancellingOrder ? "Đang hủy..." : "Hủy cả đơn"}
+                                            </button>
+                                        </div>
+                                    )}
                                 </>
                             )}
                             {order.status !== "Shipping" &&
                                 order.status !== "Completed" &&
-                                order.status !== "Cancelled" && (
+                                order.status !== "Cancelled" &&
+                                order.status !== "PartiallyAllocated" && (
                                     <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
                                         <p className="text-sm font-semibold text-rose-800">Hủy toàn bộ đơn</p>
                                         <p className="mt-1 text-xs text-rose-700">Dừng toàn bộ đơn hàng hiện tại.</p>
