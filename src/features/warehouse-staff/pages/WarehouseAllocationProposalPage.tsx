@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
+  useAutoProposeAllocationAsStaffMutation,
   useConfirmAllocationAsStaffMutation,
   useGetAllocationProposalsByOrderIdQuery,
 } from "../../order/api/order.api";
@@ -22,6 +23,7 @@ function allocationStatusLabel(status: string) {
 
 export default function WarehouseAllocationProposalPage() {
   const { orderId } = useParams();
+  const navigate = useNavigate();
   const id = Number(orderId);
   const valid = Number.isInteger(id) && id > 0;
   const { data, isLoading, isError, error, refetch } = useGetAllocationProposalsByOrderIdQuery(id, {
@@ -32,6 +34,8 @@ export default function WarehouseAllocationProposalPage() {
     ((error as { data?: { error?: string; message?: string } })?.data?.message) ||
     "Không tải được chi tiết phân bổ đề xuất.";
 
+  const [autoPropose, { isLoading: isRefreshingProposal }] =
+    useAutoProposeAllocationAsStaffMutation();
   const [confirmAllocation, { isLoading: isConfirming }] =
     useConfirmAllocationAsStaffMutation();
   const [confirmResultMessage, setConfirmResultMessage] = useState<string>("");
@@ -42,12 +46,22 @@ export default function WarehouseAllocationProposalPage() {
     return data.totalShortageBoxes > 0 ? "text-rose-700" : "text-emerald-700";
   }, [data]);
 
+  const getApiErrorMessage = (err: unknown, fallback: string) => {
+    const e = err as { data?: { message?: string; error?: string; detail?: string }; message?: string };
+    return e?.data?.message || e?.data?.error || e?.data?.detail || e?.message || fallback;
+  };
+
   const onConfirmAllocation = async () => {
     if (!valid) return;
-    const t = toast.loading(`Đang xác nhận phân bổ cho đơn #${id}...`);
+    const t = toast.loading(`Đang làm mới đề xuất và xác nhận cho đơn #${id}...`);
     setConfirmResultMessage("");
     setConfirmResult(null);
     try {
+      // Làm mới đề xuất ngay trước khi xác nhận để tránh dữ liệu stale:
+      // UI đang "Đủ" nhưng thực tế box vừa bị đơn khác giữ.
+      await autoPropose(id).unwrap();
+      await refetch();
+
       const result = await confirmAllocation(id).unwrap();
       const message =
         result.message ||
@@ -57,8 +71,21 @@ export default function WarehouseAllocationProposalPage() {
       toast.success(message, { id: t });
       setConfirmResultMessage(message);
       setConfirmResult(result);
-    } catch {
-      toast.error("Kho xác nhận phân bổ thất bại.", { id: t });
+
+      // Khi đơn đã Confirmed thì BE không cho xem proposal nữa.
+      // Điều hướng về hàng đợi kho để tránh gọi lại API proposal gây lỗi.
+      if (result.status === "Confirmed") {
+        navigate("/warehouse/orders");
+        return;
+      }
+
+      await refetch();
+    } catch (err) {
+      const m = getApiErrorMessage(err, "Kho xác nhận phân bổ thất bại.");
+      toast.error(m, { id: t });
+      setConfirmResultMessage(m);
+      // Refetch lại để màn hình cập nhật ngay "Đủ/Thiếu" theo trạng thái mới nhất.
+      await refetch();
     }
   };
 
@@ -98,7 +125,7 @@ export default function WarehouseAllocationProposalPage() {
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h1 className="text-lg font-bold text-slate-900">
-                Đề xuất phân bổ FEFO - Đơn #{data.orderId}
+                Đề xuất phân bổ FEFO - Đơn hàng {data.orderId}
               </h1>
               <span className="text-sm font-semibold text-slate-700">
                 Tổng đề xuất: {vnd(data.totalProposedBoxes)} / {vnd(data.totalRequestedBoxes)} thùng
@@ -201,11 +228,21 @@ export default function WarehouseAllocationProposalPage() {
             <button
               type="button"
               onClick={onConfirmAllocation}
-              disabled={isConfirming}
+              disabled={isConfirming || isRefreshingProposal}
               className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
             >
-              {isConfirming ? "Đang xác nhận..." : "Xác nhận phân bổ"}
+              {isRefreshingProposal
+                ? "Đang làm mới đề xuất..."
+                : isConfirming
+                  ? "Đang xác nhận..."
+                  : "Xác nhận phân bổ"}
             </button>
+            {data.proposals.length === 0 && (
+              <p className="mt-2 text-xs text-amber-700">
+                Hiện không có box đề xuất khả dụng. Bạn vẫn có thể bấm xác nhận để hệ thống cập nhật thiếu hàng
+                và trả luồng xử lý cho khách.
+              </p>
+            )}
             {!!confirmResultMessage && (
               <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                 {confirmResultMessage}
@@ -232,8 +269,28 @@ export default function WarehouseAllocationProposalPage() {
                     <p className="text-sm font-semibold text-amber-800">Cần khách hàng quyết định</p>
                     <p className="mt-1 text-xs text-amber-700">
                       Đơn đang ở trạng thái {allocationStatusLabel(confirmResult.status)}.
-                      Vui lòng để khách chọn chờ backorder hoặc hủy phần thiếu.
+                      Vui lòng để khách chọn một trong các hướng xử lý sau.
                     </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(confirmResult.customerActions ?? []).map((action) => {
+                        const label =
+                          action === "wait_backorder"
+                            ? "Chờ backorder"
+                            : action === "cancel_shortage"
+                              ? "Hủy phần thiếu"
+                              : action === "cancel_order"
+                                ? "Hủy toàn bộ đơn"
+                                : action;
+                        return (
+                          <span
+                            key={action}
+                            className="inline-flex rounded-full border border-amber-300 bg-white px-2 py-1 text-xs font-semibold text-amber-800"
+                          >
+                            {label}
+                          </span>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>

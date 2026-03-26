@@ -20,6 +20,7 @@ import ProductDetailPage from './features/home/pages/ProductDetailPage';
 import CartPage from './features/cart/pages/CartPage';
 import MyOrdersPage from './features/order/pages/MyOrdersPage';
 import MyOrderDetailPage from './features/order/pages/MyOrderDetailPage';
+import CustomerComplaintsPage from './features/complaint/pages/CustomerComplaintsPage';
 function App() {
     return (
         <BrowserRouter>
@@ -55,6 +56,14 @@ function App() {
                                 </ProtectedRoute>
                             }
                         />
+                        <Route
+                            path={ROUTES.CUSTOMER_COMPLAINTS}
+                            element={
+                                <ProtectedRoute allowedRoles={[AUTH_ROLE.CUSTOMER]}>
+                                    <CustomerComplaintsPage />
+                                </ProtectedRoute>
+                            }
+                        />
                     </Route>
 
                     {/* Auth routes — không có layout public */}
@@ -63,7 +72,7 @@ function App() {
                     <Route path={ROUTES.FORGET_PASSWORD} element={<ForgotPasswordPage />} />
                     <Route path={ROUTES.UNAUTHORIZED} element={<UnauthorizedPage />} />
 
-                    {/* Admin routes (tạm dùng chung cho Admin + Manager) */}
+                    {/* Admin routes */}
                     {adminRoutes.map((route) => (
                         <Route
                             key={route.path}
@@ -85,6 +94,27 @@ function App() {
                     ))}
 
                     {/* Manager routes (riêng) */}
+                    {managerRoutes.map((route) => (
+                        <Route
+                            key={route.path}
+                            path={route.path}
+                            element={
+                                <ProtectedRoute allowedRoles={[AUTH_ROLE.MANAGER]}>
+                                    {route.element}
+                                </ProtectedRoute>
+                            }
+                        >
+                            {route.children?.map((child, idx) => (
+                                <Route
+                                    key={idx}
+                                    {...(child.index ? { index: true } : { path: child.path })}
+                                    element={child.element}
+                                />
+                            ))}
+                        </Route>
+                    ))}
+
+                    {/* Manager routes */}
                     {managerRoutes.map((route) => (
                         <Route
                             key={route.path}

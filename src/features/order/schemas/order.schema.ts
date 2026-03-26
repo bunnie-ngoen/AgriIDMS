@@ -57,6 +57,13 @@ export const saleConfirmResponseSchema = z.object({
 });
 export type SaleConfirmResponse = z.infer<typeof saleConfirmResponseSchema>;
 
+export const allocationProposalResultSchema = z.object({
+    orderId: z.coerce.number().int(),
+    proposedBoxCount: z.coerce.number().int(),
+    message: z.string(),
+});
+export type AllocationProposalResult = z.infer<typeof allocationProposalResultSchema>;
+
 export const allocationProposalDetailSchema = z.object({
     orderDetailId: z.coerce.number().int(),
     productVariantId: z.coerce.number().int(),
@@ -100,4 +107,22 @@ export const allocationConfirmResponseSchema = z.object({
     message: z.string().optional(),
 });
 export type AllocationConfirmResponse = z.infer<typeof allocationConfirmResponseSchema>;
+
+/** GET Orders/staff/paid-pending-export */
+export const paidPendingExportOrderListItemSchema = z.object({
+    orderId: z.coerce.number().int(),
+    status: z.string(),
+    totalAmount: z.coerce.number(),
+    paidAt: z.string().nullable().optional(),
+    createdAt: z.string(),
+    itemCount: z.coerce.number().int(),
+    source: z.string(),
+    hasExportReceipt: z.boolean(),
+    exportReceiptId: z.coerce.number().int().nullable().optional(),
+    exportStatus: z.string().nullable().optional(),
+    exportCode: z.string().nullable().optional(),
+});
+
+export const paidPendingExportOrderListSchema = z.array(paidPendingExportOrderListItemSchema);
+export type PaidPendingExportOrderListItem = z.infer<typeof paidPendingExportOrderListItemSchema>;
 

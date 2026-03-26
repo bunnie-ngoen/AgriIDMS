@@ -1,3 +1,5 @@
+import { Outlet, NavLink, useNavigate } from "react-router-dom";
+import { ClipboardList, LogOut, PackageCheck, Warehouse } from "lucide-react";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   ChevronRight,
@@ -46,24 +48,6 @@ export default function WarehouseStaffLayout() {
           <ul className="space-y-1">
             <li>
               <NavLink
-                to="/warehouse/dashboard"
-                end
-                className={({ isActive }) =>
-                  `w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-slate-800 text-white border border-slate-700"
-                      : "text-slate-300 hover:bg-slate-800/70"
-                  }`
-                }
-              >
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-800 text-slate-200">
-                  <LayoutDashboard size={15} />
-                </span>
-                Tổng quan
-              </NavLink>
-            </li>
-            <li>
-              <NavLink
                 to="/warehouse/orders"
                 className={({ isActive }) =>
                   `w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
@@ -79,6 +63,23 @@ export default function WarehouseStaffLayout() {
                 Đơn hàng & COD
               </NavLink>
             </li>
+                        <li>
+                          <NavLink
+                            to="/warehouse/exports"
+                            className={({ isActive }) =>
+                              `w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                                isActive
+                                  ? "bg-slate-800 text-white border border-slate-700"
+                                  : "text-slate-300 hover:bg-slate-800/70"
+                              }`
+                            }
+                          >
+                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-800 text-slate-200">
+                              <PackageCheck size={15} />
+                            </span>
+                            Xuất hàng
+                          </NavLink>
+                        </li>
 
             <li>
               <button
@@ -153,7 +154,7 @@ export default function WarehouseStaffLayout() {
           <div>
             <p className="text-sm text-slate-500">Không gian kho</p>
             <span className="text-slate-800 font-semibold">
-              Xử lý allocate, warehouse confirm và COD
+              Xử lý allocate, COD và xuất hàng
             </span>
           </div>
         </header>

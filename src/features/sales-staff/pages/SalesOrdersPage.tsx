@@ -1,5 +1,5 @@
 import toast from "react-hot-toast";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Boxes, Clock3, PackageSearch, ShieldAlert, Sparkles } from "lucide-react";
 import {
@@ -70,7 +70,14 @@ function sourceLabel(source: string) {
   return source;
 }
 
-export default function SalesOrdersPage() {
+type QueueKey = "saleConfirm" | "allocation" | "warehouseConfirm" | "pendingCod" | "backorder";
+
+type SalesOrdersPageProps = {
+  forcedQueue?: QueueKey;
+  hideQueueTabs?: boolean;
+};
+
+export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQueue }: SalesOrdersPageProps) {
   type SaleConfirmPreviewCard = {
     orderId: number;
     totalAmount: number;
@@ -102,14 +109,13 @@ export default function SalesOrdersPage() {
   const canConfirmCod =
     hasAnyRole(AUTH_ROLE.SALES_STAFF, AUTH_ROLE.WAREHOUSE_STAFF, AUTH_ROLE.ADMIN, AUTH_ROLE.MANAGER);
 
-  const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [sourceFilter, setSourceFilter] = useState<string>("ALL");
   const [orderIdQuery, setOrderIdQuery] = useState<string>("");
-  const defaultQueue: "saleConfirm" | "allocation" | "warehouseConfirm" | "pendingCod" | "backorder" =
-    isWarehouseOnly ? "warehouseConfirm" : (canSaleConfirm ? "saleConfirm" : "allocation");
-  const [activeQueue, setActiveQueue] = useState<
-    "saleConfirm" | "allocation" | "warehouseConfirm" | "pendingCod" | "backorder"
-  >(defaultQueue);
+  const [saleConfirmOrderIdQuery, setSaleConfirmOrderIdQuery] = useState<string>("");
+  const [pendingCodOrderIdQuery, setPendingCodOrderIdQuery] = useState<string>("");
+  const defaultQueue: QueueKey =
+    forcedQueue ?? (isWarehouseOnly ? "warehouseConfirm" : (canSaleConfirm ? "saleConfirm" : "allocation"));
+  const [activeQueue, setActiveQueue] = useState<QueueKey>(defaultQueue);
   const [sortBy, setSortBy] = useState<"createdDesc" | "createdAsc" | "totalDesc" | "totalAsc">("createdDesc");
   const [pageSize, setPageSize] = useState<20 | 50 | 100>(20);
   const [selectedByQueue, setSelectedByQueue] = useState<Record<string, Record<number, boolean>>>({});
@@ -124,6 +130,13 @@ export default function SalesOrdersPage() {
     Record<number, SaleConfirmResponse>
   >({});
   const [recentSaleConfirmedCards, setRecentSaleConfirmedCards] = useState<SaleConfirmPreviewCard[]>([]);
+
+  useEffect(() => {
+    if (forcedQueue && activeQueue !== forcedQueue) {
+      setActiveQueue(forcedQueue);
+    }
+  }, [forcedQueue, activeQueue]);
+
   const currentPage = pageByQueue[activeQueue] ?? 1;
   const currentSkip = (currentPage - 1) * pageSize;
 
@@ -160,59 +173,64 @@ export default function SalesOrdersPage() {
     useConfirmCodPaymentMutation();
 
   const filteredPendingSaleConfirm = useMemo(() => {
-    const q = orderIdQuery.trim();
+    const q = saleConfirmOrderIdQuery.trim();
     return pendingSaleConfirm.filter((o) => {
-      const statusOk = statusFilter === "ALL" || o.status === statusFilter;
       const idOk = q === "" || String(o.orderId).includes(q);
-      return statusOk && idOk;
+      return idOk;
     });
-  }, [pendingSaleConfirm, statusFilter, orderIdQuery]);
+  }, [pendingSaleConfirm, saleConfirmOrderIdQuery]);
 
   const filteredPendingAllocation = useMemo(() => {
     const q = orderIdQuery.trim();
     return pendingAllocation.filter((o) => {
-      const statusOk = statusFilter === "ALL" || o.status === statusFilter;
       const idOk = q === "" || String(o.orderId).includes(q);
-      return statusOk && idOk;
+      return idOk;
     });
-  }, [pendingAllocation, statusFilter, orderIdQuery]);
+  }, [pendingAllocation, orderIdQuery]);
 
   const filteredBackorders = useMemo(() => {
     const q = orderIdQuery.trim();
     return overdueBackorders.filter((o) => {
-      const statusOk = statusFilter === "ALL" || o.status === statusFilter;
       const idOk = q === "" || String(o.orderId).includes(q);
-      return statusOk && idOk;
+      return idOk;
     });
-  }, [overdueBackorders, statusFilter, orderIdQuery]);
+  }, [overdueBackorders, orderIdQuery]);
 
   const filteredPendingWarehouseConfirm = useMemo(() => {
     const q = orderIdQuery.trim();
     return pendingWarehouseConfirm.filter((o) => {
-      const statusOk = statusFilter === "ALL" || o.status === statusFilter;
       const idOk = q === "" || String(o.orderId).includes(q);
-      return statusOk && idOk;
+      return idOk;
     });
-  }, [pendingWarehouseConfirm, statusFilter, orderIdQuery]);
+  }, [pendingWarehouseConfirm, orderIdQuery]);
 
   const filteredPendingCodPayments = useMemo(() => {
-    const q = orderIdQuery.trim();
+    const q = pendingCodOrderIdQuery.trim();
     return pendingCodPayments.filter((p) => {
       const idOk = q === "" || String(p.orderId).includes(q);
       return idOk;
     });
-  }, [pendingCodPayments, orderIdQuery]);
+  }, [pendingCodPayments, pendingCodOrderIdQuery]);
   const [allocateBackorderAsStaff, { isLoading: isAllocatingBackorder }] =
     useAllocateBackorderAsStaffMutation();
 
   const metricCards = isSalesOnly
-    ? ([{
-        key: "sale-confirm",
-        label: "Chờ xác nhận bán",
-        value: filteredPendingSaleConfirm.length,
-        icon: Sparkles,
-        tone: "text-sky-700 bg-sky-50 border-sky-200",
-      }] as const)
+    ? ([
+        {
+          key: "sale-confirm",
+          label: "Chờ xác nhận bán",
+          value: filteredPendingSaleConfirm.length,
+          icon: Sparkles,
+          tone: "text-sky-700 bg-sky-50 border-sky-200",
+        },
+        {
+          key: "pending-cod",
+          label: "Thanh toán COD chờ xử lý",
+          value: filteredPendingCodPayments.length,
+          icon: PackageSearch,
+          tone: "text-violet-700 bg-violet-50 border-violet-200",
+        },
+      ] as const)
     : isWarehouseOnly
       ? ([{
           key: "pending-warehouse-confirm",
@@ -254,7 +272,7 @@ export default function SalesOrdersPage() {
           },
           {
             key: "pending-cod",
-            label: "COD chờ xác nhận",
+            label: "Thanh toán COD chờ xử lý",
             value: filteredPendingCodPayments.length,
             icon: PackageSearch,
             tone: "text-violet-700 bg-violet-50 border-violet-200",
@@ -262,18 +280,24 @@ export default function SalesOrdersPage() {
         ] as const);
 
   const queueTabs = isSalesOnly
-    ? ([{ key: "saleConfirm", label: "Hàng đợi xác nhận bán", count: filteredPendingSaleConfirm.length }] as const)
+    ? ([
+        { key: "saleConfirm", label: "Đơn hàng chờ xác nhận bán", count: filteredPendingSaleConfirm.length },
+        { key: "pendingCod", label: "Thanh toán COD chờ xử lý", count: filteredPendingCodPayments.length },
+      ] as const)
     : isWarehouseOnly
       ? ([{ key: "warehouseConfirm", label: "Chờ kho xác nhận", count: filteredPendingWarehouseConfirm.length }] as const)
       : ([
           ...(canSaleConfirm
-            ? [{ key: "saleConfirm", label: "Hàng đợi xác nhận bán", count: filteredPendingSaleConfirm.length } as const]
+            ? [{ key: "saleConfirm", label: "Đơn hàng chờ xác nhận bán", count: filteredPendingSaleConfirm.length } as const]
             : []),
           { key: "allocation", label: "Hàng đợi giữ hàng", count: filteredPendingAllocation.length } as const,
           { key: "warehouseConfirm", label: "Hàng đợi kho xác nhận", count: filteredPendingWarehouseConfirm.length } as const,
-          { key: "pendingCod", label: "Hàng đợi COD", count: filteredPendingCodPayments.length } as const,
+          { key: "pendingCod", label: "Thanh toán COD chờ xử lý", count: filteredPendingCodPayments.length } as const,
           { key: "backorder", label: "Hàng đợi backorder", count: filteredBackorders.length } as const,
         ] as const);
+  const visibleQueueTabs = forcedQueue
+    ? queueTabs.filter((tab) => tab.key === forcedQueue)
+    : queueTabs;
 
   const setQueuePage = (page: number) => {
     setPageByQueue((prev) => ({ ...prev, [activeQueue]: Math.max(1, page) }));
@@ -364,87 +388,91 @@ export default function SalesOrdersPage() {
 
     return (
       <div className="mt-4 space-y-3">
-        {sortedRows.map((o) => {
-          const feedback = saleConfirmFeedbackByOrderId[o.orderId];
-          return (
-            <div key={o.orderId} className="rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-3">
-                <div>
-                  <p className="text-sm text-slate-500">Đơn hàng</p>
-                  <p className="text-2xl font-bold text-slate-900">#{o.orderId}</p>
-                </div>
-                <span
-                  className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${orderStatusTone(
-                    o.status,
-                  )}`}
-                >
-                  {orderStatusLabel(o.status)}
-                </span>
-              </div>
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          <p className="font-semibold">Sau khi xác nhận</p>
+          <p>Hệ thống tự động tạo đề xuất phân bổ FEFO và chuyển đơn sang trạng thái chờ kho duyệt.</p>
+        </div>
 
-              <div className="grid grid-cols-2 gap-4 py-3 text-sm md:grid-cols-4">
-                <div>
-                  <p className="text-slate-500">Tổng tiền</p>
-                  <p className="font-semibold text-slate-900">{vnd(o.totalAmount)} ₫</p>
-                </div>
-                <div>
-                  <p className="text-slate-500">Nguồn</p>
-                  <p className="font-semibold text-slate-900">{sourceLabel(o.source)}</p>
-                </div>
-                <div>
-                  <p className="text-slate-500">Số sản phẩm</p>
-                  <p className="font-semibold text-slate-900">{o.itemCount} loại</p>
-                </div>
-                <div>
-                  <p className="text-slate-500">Ngày tạo</p>
-                  <p className="font-semibold text-slate-900">
-                    {new Date(o.createdAt).toLocaleDateString("vi-VN")}
-                  </p>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-                <p className="font-semibold">Sau khi xác nhận</p>
-                <p>Hệ thống tự động tạo đề xuất phân bổ FEFO và chuyển đơn sang trạng thái chờ kho duyệt.</p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => handleSaleConfirm(o.orderId)}
-                disabled={isConfirming || !canSaleConfirm}
-                className="mt-3 w-full rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-60"
-              >
-                Xác nhận đơn & tạo đề xuất FEFO ↗
-              </button>
-
-              {feedback && (
-                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                  <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
-                    Đã xác nhận
-                  </span>
-                  <p className="mt-2 text-sm text-slate-600">Trạng thái mới</p>
-                  <p className="text-2xl font-bold text-slate-900">{feedback.order.status}</p>
-                  <div className="mt-3 border-t border-slate-200 pt-2">
-                    <p className="text-sm text-slate-700">{feedback.message}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+        <div className="border border-slate-200 rounded-xl overflow-auto max-h-[560px]">
+          <table className="w-full min-w-[980px] bg-white">
+            <thead className="sticky top-0 z-10 bg-slate-50">
+              <tr className="text-left text-xs text-slate-500 border-b border-slate-200">
+                <th className="py-2 px-3 w-10">
+                  <input
+                    type="checkbox"
+                    checked={sortedRows.length > 0 && sortedRows.every((r) => selectedMap[r.orderId])}
+                    onChange={() => toggleSelectAllForRows(sortedRows)}
+                    className="h-4 w-4 rounded border-slate-300 text-slate-900"
+                  />
+                </th>
+                <th className="py-2 pr-3">Đơn hàng</th>
+                <th className="py-2 pr-3">Trạng thái</th>
+                <th className="py-2 pr-3">Nguồn</th>
+                <th className="py-2 pr-3">Ngày tạo</th>
+                <th className="py-2 pr-3">Số mặt hàng</th>
+                <th className="py-2 pr-3">Tổng tiền</th>
+                <th className="py-2 pr-3 w-[220px]">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedRows.map((o) => {
+                const feedback = saleConfirmFeedbackByOrderId[o.orderId];
+                return (
+                  <tr key={o.orderId} className="border-b border-slate-100 text-sm">
+                    <td className="py-3 px-3">
+                      <input
+                        type="checkbox"
+                        checked={!!selectedMap[o.orderId]}
+                        onChange={() => toggleRowSelect(o.orderId)}
+                        className="h-4 w-4 rounded border-slate-300 text-slate-900"
+                      />
+                    </td>
+                    <td className="py-3 pr-3 font-semibold text-slate-900">Đơn hàng {o.orderId}</td>
+                    <td className="py-3 pr-3">
+                      <span className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-semibold ${orderStatusTone(o.status)}`}>
+                        {orderStatusLabel(o.status)}
+                      </span>
+                    </td>
+                    <td className="py-3 pr-3 text-slate-700">{sourceLabel(o.source)}</td>
+                    <td className="py-3 pr-3 text-slate-700">{new Date(o.createdAt).toLocaleString("vi-VN")}</td>
+                    <td className="py-3 pr-3 text-slate-700">{o.itemCount}</td>
+                    <td className="py-3 pr-3 font-semibold text-slate-900">{vnd(o.totalAmount)} ₫</td>
+                    <td className="py-3 pr-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSaleConfirm(o.orderId)}
+                          disabled={isConfirming || !canSaleConfirm}
+                          className="px-3 py-2 rounded-lg border border-slate-300 text-sm font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-60"
+                        >
+                          Xác nhận
+                        </button>
+                        {feedback && (
+                          <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
+                            Đã xác nhận
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   };
 
   const handleAllocate = async (id: number) => {
-    const t = toast.loading(`Đang allocate đơn #${id}...`);
+    const t = toast.loading(`Đang giữ hàng cho đơn #${id}...`);
     try {
       await allocateAsStaff(id).unwrap();
-      toast.success(`Allocate đơn #${id} thành công`, { id: t });
+      toast.success(`Giữ hàng đơn #${id} thành công`, { id: t });
       await refetchPendingAllocation();
       await refetchPendingSaleConfirm();
     } catch {
-      toast.error(`Allocate đơn #${id} thất bại`, { id: t });
+      toast.error(`Giữ hàng đơn #${id} thất bại`, { id: t });
     }
   };
 
@@ -546,7 +574,7 @@ export default function SalesOrdersPage() {
               <th className="py-2 pr-3">Trạng thái</th>
               {showSource && <th className="py-2 pr-3">Nguồn</th>}
               <th className="py-2 pr-3">Ngày tạo</th>
-              <th className="py-2 pr-3">Số dòng</th>
+              <th className="py-2 pr-3">Số mặt hàng</th>
               <th className="py-2 pr-3">Tổng tiền</th>
               <th className="py-2 pr-3 w-[180px]">Thao tác</th>
             </tr>
@@ -564,7 +592,7 @@ export default function SalesOrdersPage() {
                 </td>
                 <td className="py-3 pr-3 font-semibold text-slate-900">
                   <div className="flex items-center gap-2">
-                    <span>#{o.orderId}</span>
+                    <span>Đơn hàng {o.orderId}</span>
                     {showFefoBadge && (
                       <span className="inline-flex rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
                         FEFO
@@ -617,8 +645,8 @@ export default function SalesOrdersPage() {
             <tr className="text-left text-xs text-slate-500 border-b border-slate-200">
               <th className="py-2 pr-3">Thanh toán</th>
               <th className="py-2 pr-3">Đơn hàng</th>
-              <th className="py-2 pr-3">TT thanh toán</th>
-              <th className="py-2 pr-3">TT đơn hàng</th>
+              <th className="py-2 pr-3">Trạng thái thanh toán</th>
+              <th className="py-2 pr-3">Trạng thái đơn hàng</th>
               <th className="py-2 pr-3">Ngày tạo</th>
               <th className="py-2 pr-3">Số tiền</th>
               <th className="py-2 pr-3 w-[180px]">Thao tác</th>
@@ -627,9 +655,8 @@ export default function SalesOrdersPage() {
           <tbody>
             {rows.map((p) => (
               <tr key={p.paymentId} className="border-b border-slate-100 text-sm">
-                <td className="py-3 pr-3 font-semibold text-slate-900">#{p.paymentId}</td>
-                <td className="py-3 pr-3 font-semibold text-slate-900">#{p.orderId}</td>
-                <td className="py-3 pr-3 text-slate-700">{p.paymentStatus}</td>
+                <td className="py-3 pr-3 font-semibold text-slate-900">Thanh toán {p.paymentId}</td>
+                <td className="py-3 pr-3 font-semibold text-slate-900">Đơn hàng {p.orderId}</td>
                 <td className="py-3 pr-3 text-slate-700">{paymentStatusLabel(p.paymentStatus)}</td>
                 <td className="py-3 pr-3 text-slate-700">{orderStatusLabel(p.orderStatus)}</td>
                 <td className="py-3 pr-3 text-slate-700">{new Date(p.createdAt).toLocaleString("vi-VN")}</td>
@@ -639,7 +666,7 @@ export default function SalesOrdersPage() {
                     type="button"
                     onClick={() => handleConfirmCod(p.paymentId, p.orderId)}
                     disabled={isConfirmingCod || !canConfirmCod}
-                    className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                    className="px-3 py-2 rounded-lg border border-slate-300 text-sm font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-60"
                   >
                     Xác nhận COD
                   </button>
@@ -673,87 +700,168 @@ export default function SalesOrdersPage() {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">Bộ lọc đơn</h2>
-        <div className="mt-3 grid md:grid-cols-3 gap-3">
-          <div>
-            <label className="text-xs font-medium text-slate-600">Trạng thái</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            >
-              <option value="ALL">Tất cả</option>
-              <option value="PendingSaleConfirmation">Chờ xác nhận bán</option>
-              <option value="AwaitingAllocation">Chờ giữ hàng</option>
-              <option value="PendingWarehouseConfirm">Chờ kho xác nhận</option>
-              <option value="BackorderWaiting">Chờ backorder</option>
-              <option value="PartiallyAllocated">Giữ hàng một phần</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-600">Nguồn đơn</label>
-            <select
-              value={sourceFilter}
-              onChange={(e) => setSourceFilter(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            >
-              <option value="ALL">Tất cả</option>
-              <option value="Online">Trực tuyến</option>
-              <option value="POS">Tại quầy</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-600">Tìm theo Order ID</label>
-            <input
-              value={orderIdQuery}
-              onChange={(e) => setOrderIdQuery(e.target.value)}
-              placeholder="VD: 2023"
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-600">Sắp xếp</label>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            >
-              <option value="createdDesc">Mới nhất</option>
-              <option value="createdAsc">Cũ nhất</option>
-              <option value="totalDesc">Tổng tiền giảm dần</option>
-              <option value="totalAsc">Tổng tiền tăng dần</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-600">Số dòng/trang</label>
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                const next = Number(e.target.value) as 20 | 50 | 100;
-                setPageSize(next);
-                setQueuePage(1);
-              }}
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            >
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-          </div>
-          <div className="flex items-end">
-            <button
-              type="button"
-              onClick={() => {
-                setStatusFilter("ALL");
-                setSourceFilter("ALL");
-                setOrderIdQuery("");
-              }}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              Reset lọc
-            </button>
-          </div>
-        </div>
+        {activeQueue === "saleConfirm" ? (
+          <>
+            <h2 className="text-lg font-semibold text-slate-900">Bộ lọc đơn hàng chờ xác nhận bán</h2>
+            <div className="mt-3 grid md:grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-600">Tìm theo Order ID</label>
+                <input
+                  value={saleConfirmOrderIdQuery}
+                  onChange={(e) => setSaleConfirmOrderIdQuery(e.target.value)}
+                  placeholder="VD: 2023"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600">Sắp xếp</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value="createdDesc">Mới nhất</option>
+                  <option value="createdAsc">Cũ nhất</option>
+                  <option value="totalDesc">Tổng tiền giảm dần</option>
+                  <option value="totalAsc">Tổng tiền tăng dần</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600">Hiển thị mỗi trang</label>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    const next = Number(e.target.value) as 20 | 50 | 100;
+                    setPageSize(next);
+                    setQueuePage(1);
+                  }}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={() => setSaleConfirmOrderIdQuery("")}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Xóa bộ lọc
+                </button>
+              </div>
+            </div>
+          </>
+        ) : activeQueue === "pendingCod" ? (
+          <>
+            <h2 className="text-lg font-semibold text-slate-900">Bộ lọc thanh toán COD chờ xử lý</h2>
+            <div className="mt-3 grid md:grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-600">Tìm theo Order ID</label>
+                <input
+                  value={pendingCodOrderIdQuery}
+                  onChange={(e) => setPendingCodOrderIdQuery(e.target.value)}
+                  placeholder="VD: 2023"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600">Hiển thị mỗi trang</label>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    const next = Number(e.target.value) as 20 | 50 | 100;
+                    setPageSize(next);
+                    setQueuePage(1);
+                  }}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={() => setPendingCodOrderIdQuery("")}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Xóa bộ lọc
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <h2 className="text-lg font-semibold text-slate-900">Bộ lọc đơn</h2>
+            <div className="mt-3 grid md:grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-600">Nguồn đơn</label>
+                <select
+                  value={sourceFilter}
+                  onChange={(e) => setSourceFilter(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value="ALL">Tất cả</option>
+                  <option value="Online">Trực tuyến</option>
+                  <option value="POS">Tại quầy</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600">Tìm theo Order ID</label>
+                <input
+                  value={orderIdQuery}
+                  onChange={(e) => setOrderIdQuery(e.target.value)}
+                  placeholder="VD: 2023"
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600">Sắp xếp</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value="createdDesc">Mới nhất</option>
+                  <option value="createdAsc">Cũ nhất</option>
+                  <option value="totalDesc">Tổng tiền giảm dần</option>
+                  <option value="totalAsc">Tổng tiền tăng dần</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-600">Hiển thị mỗi trang</label>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    const next = Number(e.target.value) as 20 | 50 | 100;
+                    setPageSize(next);
+                    setQueuePage(1);
+                  }}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSourceFilter("ALL");
+                    setOrderIdQuery("");
+                  }}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Xóa bộ lọc
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
@@ -806,22 +914,24 @@ export default function SalesOrdersPage() {
           </div>
         )}
 
-        <div className="flex flex-wrap gap-2">
-          {queueTabs.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveQueue(tab.key as typeof activeQueue)}
-              className={`px-3 py-2 rounded-lg text-sm font-semibold border ${
-                activeQueue === tab.key
-                  ? "bg-slate-900 text-white border-slate-900"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-              }`}
-            >
-              {tab.label} ({tab.count})
-            </button>
-          ))}
-        </div>
+        {!hideQueueTabs && (
+          <div className="flex flex-wrap gap-2">
+            {visibleQueueTabs.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveQueue(tab.key as typeof activeQueue)}
+                className={`px-3 py-2 rounded-lg text-sm font-semibold border ${
+                  activeQueue === tab.key
+                    ? "bg-slate-900 text-white border-slate-900"
+                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                {tab.label} ({tab.count})
+              </button>
+            ))}
+          </div>
+        )}
         {((activeQueue === "allocation" && !canAllocateStaff) ||
           (activeQueue === "warehouseConfirm" && !canWarehouseConfirm) ||
           (activeQueue === "saleConfirm" && !canSaleConfirm) ||
@@ -853,7 +963,7 @@ export default function SalesOrdersPage() {
               {recentSaleConfirmedCards.map((c) => (
                 <div key={c.orderId} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-slate-900">Đơn #{c.orderId}</p>
+                    <p className="text-sm font-semibold text-slate-900">Đơn hàng {c.orderId}</p>
                     <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
                       Đã xác nhận
                     </span>
@@ -861,7 +971,7 @@ export default function SalesOrdersPage() {
                   <div className="mt-2 grid grid-cols-2 gap-3 text-xs text-slate-600 md:grid-cols-4">
                     <p>Tổng tiền: <span className="font-semibold text-slate-800">{vnd(c.totalAmount)} ₫</span></p>
                     <p>Nguồn: <span className="font-semibold text-slate-800">{sourceLabel(c.source)}</span></p>
-                    <p>Số sản phẩm: <span className="font-semibold text-slate-800">{c.itemCount} loại</span></p>
+                    <p>Số mặt hàng: <span className="font-semibold text-slate-800">{c.itemCount}</span></p>
                     <p>Ngày tạo: <span className="font-semibold text-slate-800">{new Date(c.createdAt).toLocaleDateString("vi-VN")}</span></p>
                   </div>
                   <p className="mt-2 text-xs text-slate-600">
@@ -881,7 +991,7 @@ export default function SalesOrdersPage() {
           (isLoadingPendingAllocation ? (
             <p className="text-sm text-slate-500 mt-3">Đang tải...</p>
           ) : filteredPendingAllocation.length === 0 ? (
-            <p className="text-sm text-slate-500 mt-3">Không có đơn chờ allocate.</p>
+            <p className="text-sm text-slate-500 mt-3">Không có đơn chờ giữ hàng.</p>
           ) : (
             <div className="mt-4 border border-slate-200 rounded-xl overflow-auto max-h-[560px]">
               <table className="w-full min-w-[980px] bg-white">
@@ -899,7 +1009,7 @@ export default function SalesOrdersPage() {
                     <th className="py-2 pr-3">Trạng thái</th>
                     <th className="py-2 pr-3">Nguồn</th>
                     <th className="py-2 pr-3">Ngày tạo</th>
-                    <th className="py-2 pr-3">Số dòng</th>
+                    <th className="py-2 pr-3">Số mặt hàng</th>
                     <th className="py-2 pr-3">Tổng tiền</th>
                     <th className="py-2 pr-3 w-[320px]">Thao tác</th>
                   </tr>
@@ -915,7 +1025,7 @@ export default function SalesOrdersPage() {
                           className="h-4 w-4 rounded border-slate-300 text-slate-900"
                         />
                       </td>
-                      <td className="py-3 pr-3 font-semibold text-slate-900">#{o.orderId}</td>
+                      <td className="py-3 pr-3 font-semibold text-slate-900">Đơn hàng {o.orderId}</td>
                       <td className="py-3 pr-3">
                         <span className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-semibold ${orderStatusTone(o.status)}`}>
                           {orderStatusLabel(o.status)}
@@ -941,7 +1051,7 @@ export default function SalesOrdersPage() {
                             disabled={isAllocating || !canAllocateStaff}
                             className="px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
                           >
-                            Giữ hàng (staff)
+                            Xác nhận giữ hàng
                           </button>
                         </div>
                       </td>
@@ -968,7 +1078,7 @@ export default function SalesOrdersPage() {
         {activeQueue === "pendingCod" &&
           renderPendingCodTable(
             filteredPendingCodPayments,
-            "Không có COD chờ xác nhận.",
+            "Không có thanh toán COD chờ xử lý.",
             isLoadingPendingCod,
           )}
 
@@ -993,7 +1103,7 @@ export default function SalesOrdersPage() {
                 <tbody>
                   {filteredBackorders.map((o) => (
                     <tr key={o.orderId} className="border-b border-slate-100 text-sm">
-                      <td className="py-3 pr-3 font-semibold text-slate-900">#{o.orderId}</td>
+                      <td className="py-3 pr-3 font-semibold text-slate-900">Đơn hàng {o.orderId}</td>
                       <td className="py-3 pr-3">
                         <span className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-semibold ${orderStatusTone(o.status)}`}>
                           {orderStatusLabel(o.status)}

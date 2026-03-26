@@ -1,5 +1,9 @@
 import { lazy } from "react";
 
+const ManagerLayout = lazy(() => import("./components/ManagerLayout"));
+const ManagerDashboard = lazy(() => import("./pages/ManagerDashboard"));
+const ManagerExportsPage = lazy(() => import("./pages/ManagerExportsPage"));
+const StaffComplaintsPage = lazy(() => import("../complaint/pages/StaffComplaintsPage"));
 // Manager layout/sidebar
 const ManagerLayout = lazy(
   () => import("./components/layouts/ManagerLayout")
@@ -110,6 +114,13 @@ export const managerRoutes = [
     path: "/manager",
     element: <ManagerLayout />,
     children: [
+      { index: true, element: <ManagerDashboard /> },
+      { path: "dashboard", element: <ManagerDashboard /> },
+      { path: "exports", element: <ManagerExportsPage /> },
+      { path: "complaints", element: <StaffComplaintsPage /> },
+    ],
+  },
+];
       { index: true, element: <ManagerDashboardPage /> },
       { path: "dashboard", element: <ManagerDashboardPage /> },
       { path: "profile", element: <ProfilePage /> },
