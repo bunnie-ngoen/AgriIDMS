@@ -72,7 +72,7 @@ export default function WarehouseStockCheckCreatePage() {
           Tạo phiếu kiểm kê (WarehouseStaff)
         </h2>
         <p className="mt-1 text-sm text-slate-600">
-          Full: tất cả box trong kho. Spot: bạn tự chọn danh sách BoxIds.
+          Toàn phần: tất cả box trong kho. Đột xuất: bạn tự chọn danh sách BoxIds.
         </p>
       </div>
 
@@ -108,9 +108,9 @@ export default function WarehouseStockCheckCreatePage() {
                 onChange={(e) => setCheckType(Number(e.target.value))}
                 className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
               >
-                <option value={CHECK_TYPE.Full}>Full</option>
-                <option value={CHECK_TYPE.Cycle}>Cycle</option>
-                <option value={CHECK_TYPE.Spot}>Spot</option>
+                <option value={CHECK_TYPE.Full}>Toàn phần</option>
+                <option value={CHECK_TYPE.Cycle}>Theo chu kỳ</option>
+                <option value={CHECK_TYPE.Spot}>Đột xuất</option>
               </select>
             </div>
 

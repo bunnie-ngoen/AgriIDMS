@@ -13,6 +13,12 @@ import {
 } from "../api/stock-check.api";
 import type { StockCheckDetailLine, UpdateCountedWeightPayload } from "../types/stock-check.type";
 import { Loader2, CheckCircle2, XCircle, Play, Save } from "lucide-react";
+import {
+  toVietnameseStockCheckStatus,
+  toVietnameseStockCheckType,
+  toVietnameseVarianceReason,
+  toVietnameseVarianceType,
+} from "../utils/stock-check-labels";
 
 function formatDateTime(input: string | Date) {
   const d = typeof input === "string" ? new Date(input) : input;
@@ -214,7 +220,9 @@ export default function StockCheckDetailsPage() {
               Phiếu kiểm kê #{data.stockCheckId}
             </h2>
             <div className="mt-1 text-sm text-slate-700">
-              {data.checkType} · {data.status} · Snapshot: {formatDateTime(data.snapshotAt)}
+              {toVietnameseStockCheckType(data.checkType)} ·{" "}
+              {toVietnameseStockCheckStatus(data.status)} · Snapshot:{" "}
+              {formatDateTime(data.snapshotAt)}
             </div>
           </div>
 
@@ -337,7 +345,10 @@ export default function StockCheckDetailsPage() {
                         {diff != null && Number.isFinite(diff) ? diff.toFixed(3) : "—"} kg
                       </div>
                       <div className="text-[11px] text-slate-600 mt-1">
-                        Trạng thái: {varianceType ?? "—"}
+                        Trạng thái:{" "}
+                        {toVietnameseVarianceType(
+                          typeof varianceType === "string" ? varianceType : null,
+                        )}
                       </div>
                     </div>
 
@@ -400,7 +411,7 @@ export default function StockCheckDetailsPage() {
                               {shortage ? (
                                 <span className="text-rose-600">Chưa chọn</span>
                               ) : (
-                                d.varianceReason ?? "—"
+                                toVietnameseVarianceReason(d.varianceReason)
                               )}
                             </div>
                           )}

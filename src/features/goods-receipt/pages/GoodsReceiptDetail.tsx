@@ -7,12 +7,38 @@ import {
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
+function toVietnameseReceiptStatus(status: string): string {
+  switch (status) {
+    case "Draft":
+      return "Nháp";
+    case "Received":
+      return "Đã nhận";
+    case "QCCompleted":
+      return "Đã hoàn tất QC";
+    case "PendingManagerApproval":
+      return "Chờ quản lý duyệt";
+    case "PendingManagerApprovalQc":
+      return "Chờ quản lý duyệt (QC)";
+    case "Approved":
+      return "Đã duyệt";
+    case "Rejected":
+      return "Đã từ chối";
+    default:
+      return status;
+  }
+}
+
 export default function GoodsReceiptDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const receiptId = id ? Number(id) : 0;
 
-  const { isAdmin, isManager } = useRoleGuard();
+  const { isAdmin, isManager, isWarehouseStaff } = useRoleGuard();
+  const basePath = isWarehouseStaff()
+    ? "/warehouse/goods-receipts"
+    : isManager()
+      ? "/manager/goods-receipts"
+      : "/admin/goods-receipts";
   const canViewPrice = isAdmin() || isManager();
 
   const {
@@ -40,7 +66,7 @@ export default function GoodsReceiptDetail() {
   );
 
   if (Number.isNaN(receiptId) || receiptId < 1) {
-    navigate("/admin/goods-receipts");
+    navigate(basePath);
     return null;
   }
 
@@ -72,7 +98,7 @@ export default function GoodsReceiptDetail() {
           <div className="flex items-center gap-4">
             <button
               type="button"
-              onClick={() => navigate("/admin/goods-receipts")}
+              onClick={() => navigate(basePath)}
               className="h-10 w-10 rounded-2xl border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:border-slate-300 shadow-sm"
             >
               <ArrowLeft size={16} />
@@ -84,16 +110,14 @@ export default function GoodsReceiptDetail() {
               <p className="text-xs text-slate-400 mt-0.5">
                 {receipt.supplierName} · {receipt.warehouseName} ·{" "}
                 <span className={statusClass(receipt.status)}>
-                  {receipt.status}
+                  {toVietnameseReceiptStatus(receipt.status)}
                 </span>
               </p>
             </div>
           </div>
           <button
             type="button"
-            onClick={() =>
-              navigate(`/admin/goods-receipts/${receipt.id}/qc`)
-            }
+            onClick={() => navigate(`${basePath}/${receipt.id}/qc`)}
             className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
           >
             Mở màn QC
@@ -133,7 +157,7 @@ export default function GoodsReceiptDetail() {
               </span>
               <p className="font-medium text-slate-900 mt-1">
                 <span className={statusClass(receipt.status)}>
-                  {receipt.status}
+                  {toVietnameseReceiptStatus(receipt.status)}
                 </span>
               </p>
             </div>
@@ -167,22 +191,13 @@ export default function GoodsReceiptDetail() {
                   <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                     KL nhận
                   </th>
-                  <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    KL dùng được
-                  </th>
-                  <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    KL loại
-                  </th>
-                  <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    Kết quả QC
-                  </th>
                 </tr>
               </thead>
               <tbody>
                 {detailsForTable.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={canViewPrice ? 7 : 5}
+                      colSpan={canViewPrice ? 4 : 2}
                       className="px-5 py-6 text-center text-slate-500 text-sm"
                     >
                       Phiếu hiện chưa có dòng chi tiết nào.
@@ -224,15 +239,6 @@ export default function GoodsReceiptDetail() {
                       )}
                       <td className="px-5 py-3 text-right text-slate-700">
                         {d.receivedWeight}
-                      </td>
-                      <td className="px-5 py-3 text-right text-slate-700">
-                        {d.usableWeight}
-                      </td>
-                      <td className="px-5 py-3 text-right text-slate-700">
-                        {d.rejectWeight}
-                      </td>
-                      <td className="px-5 py-3 text-slate-700">
-                        {d.qcResult || "Chưa QC"}
                       </td>
                     </tr>
                   ))

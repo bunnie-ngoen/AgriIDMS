@@ -2,6 +2,7 @@ import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   ChevronRight,
   ClipboardList,
+  FileText,
   LogOut,
   PackageCheck,
   ShieldCheck,
@@ -61,23 +62,40 @@ export default function WarehouseStaffLayout() {
                 Đơn hàng & COD
               </NavLink>
             </li>
-                        <li>
-                          <NavLink
-                            to="/warehouse/exports"
-                            className={({ isActive }) =>
-                              `w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                                isActive
-                                  ? "bg-slate-800 text-white border border-slate-700"
-                                  : "text-slate-300 hover:bg-slate-800/70"
-                              }`
-                            }
-                          >
-                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-800 text-slate-200">
-                              <PackageCheck size={15} />
-                            </span>
-                            Xuất hàng
-                          </NavLink>
-                        </li>
+            <li>
+              <NavLink
+                to="/warehouse/exports"
+                className={({ isActive }) =>
+                  `w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-slate-800 text-white border border-slate-700"
+                      : "text-slate-300 hover:bg-slate-800/70"
+                  }`
+                }
+              >
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-800 text-slate-200">
+                  <PackageCheck size={15} />
+                </span>
+                Xuất hàng
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/warehouse/goods-receipts"
+                className={({ isActive }) =>
+                  `w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-slate-800 text-white border border-slate-700"
+                      : "text-slate-300 hover:bg-slate-800/70"
+                  }`
+                }
+              >
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-800 text-slate-200">
+                  <FileText size={15} />
+                </span>
+                Nhập kho
+              </NavLink>
+            </li>
 
             <li>
               <button
@@ -89,10 +107,12 @@ export default function WarehouseStaffLayout() {
                     : "text-slate-300 hover:bg-slate-800/70"
                 }`}
               >
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-800 text-slate-200">
-                  <ShieldCheck size={15} />
+                <span className="flex items-center min-w-0">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-800 text-slate-200">
+                    <ShieldCheck size={15} />
+                  </span>
+                  <span className="truncate">Kiểm kê</span>
                 </span>
-                Kiểm kê
                 <ChevronRight
                   size={16}
                   className={`transition-transform ${isStockCheckOpen ? "rotate-90" : ""}`}

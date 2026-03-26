@@ -11,6 +11,7 @@ import {
 import toast from "react-hot-toast";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { decodeQrFromImageFile } from "../../../shared/lib/decodeQrFromImage";
+import QrCameraScannerModal from "../../../shared/components/QrCameraScannerModal";
 import {
   useLazyGetBoxByQrQuery,
   useLazyGetSlotByQrQuery,
@@ -39,9 +40,9 @@ export default function PutBoxIntoSlot() {
   const boxInputRef = useRef<HTMLInputElement | null>(null);
   const slotInputRef = useRef<HTMLInputElement | null>(null);
   const boxQrFileGalleryRef = useRef<HTMLInputElement | null>(null);
-  const boxQrFileCameraRef = useRef<HTMLInputElement | null>(null);
   const slotQrFileGalleryRef = useRef<HTMLInputElement | null>(null);
-  const slotQrFileCameraRef = useRef<HTMLInputElement | null>(null);
+  const [isBoxCameraOpen, setIsBoxCameraOpen] = useState(false);
+  const [isSlotCameraOpen, setIsSlotCameraOpen] = useState(false);
 
   const [triggerBoxByQr, boxByQr] = useLazyGetBoxByQrQuery();
   const [triggerSlotByQr, slotByQr] = useLazyGetSlotByQrQuery();
@@ -356,14 +357,6 @@ export default function PutBoxIntoSlot() {
                 className="hidden"
                 onChange={handleBoxQrFromImage}
               />
-              <input
-                ref={boxQrFileCameraRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={handleBoxQrFromImage}
-              />
               <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-3 py-3">
                 <p className="text-[11px] font-medium text-slate-600 mb-2">
                   Ảnh có mã QR box
@@ -380,7 +373,7 @@ export default function PutBoxIntoSlot() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => boxQrFileCameraRef.current?.click()}
+                    onClick={() => setIsBoxCameraOpen(true)}
                     disabled={boxByQr.isFetching}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
                   >
@@ -389,10 +382,19 @@ export default function PutBoxIntoSlot() {
                   </button>
                 </div>
                 <p className="text-[10px] text-slate-400 mt-2">
-                  Hỗ trợ ảnh chụp tem nhãn / màn hình có QR. Trên điện thoại, nút
-                  chụp sẽ mở camera sau.
+                  Hỗ trợ ảnh chụp tem nhãn / màn hình có QR hoặc quét camera trực tiếp.
                 </p>
               </div>
+
+              <QrCameraScannerModal
+                open={isBoxCameraOpen}
+                title="Quét QR box bằng camera"
+                onClose={() => setIsBoxCameraOpen(false)}
+                onDetected={(value) => {
+                  setBoxQrInput(value);
+                  void handleLoadBox(value);
+                }}
+              />
 
               <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-sm">
                 {!box ? (
@@ -515,14 +517,6 @@ export default function PutBoxIntoSlot() {
                 className="hidden"
                 onChange={handleSlotQrFromImage}
               />
-              <input
-                ref={slotQrFileCameraRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={handleSlotQrFromImage}
-              />
               <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-3 py-3">
                 <p className="text-[11px] font-medium text-slate-600 mb-2">
                   Ảnh có mã QR slot
@@ -539,7 +533,7 @@ export default function PutBoxIntoSlot() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => slotQrFileCameraRef.current?.click()}
+                    onClick={() => setIsSlotCameraOpen(true)}
                     disabled={slotByQr.isFetching}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
                   >
@@ -548,6 +542,16 @@ export default function PutBoxIntoSlot() {
                   </button>
                 </div>
               </div>
+
+              <QrCameraScannerModal
+                open={isSlotCameraOpen}
+                title="Quét QR slot bằng camera"
+                onClose={() => setIsSlotCameraOpen(false)}
+                onDetected={(value) => {
+                  setSlotQrInput(value);
+                  void handleLoadSlot(value);
+                }}
+              />
 
               <div className="flex items-center gap-3">
                 <div className="h-px flex-1 bg-slate-100" />

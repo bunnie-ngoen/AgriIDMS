@@ -9,6 +9,7 @@ import { useGetWarehousesQuery } from "../../admin/api/create-user.api";
 import { useGetPurchaseOrdersQuery } from "../../purchase-order/api/purchase-order.api";
 import { useGetPurchaseOrderByIdQuery } from "../../purchase-order/api/purchase-order.api";
 import { useCreateGoodsReceiptMutation } from "../api/goods-receipt.api";
+import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 const Schema = z
   .object({
@@ -36,6 +37,12 @@ type FormValues = z.infer<typeof Schema>;
 
 export default function CreateGoodsReceipt() {
   const navigate = useNavigate();
+  const { isManager, isWarehouseStaff } = useRoleGuard();
+  const basePath = isWarehouseStaff()
+    ? "/warehouse/goods-receipts"
+    : isManager()
+      ? "/manager/goods-receipts"
+      : "/admin/goods-receipts";
   const {
     data: warehouses = [],
     isLoading: isLoadingWarehouses,
@@ -124,9 +131,9 @@ export default function CreateGoodsReceipt() {
 
       setTimeout(() => {
         if (result?.receiptId) {
-          navigate(`/admin/goods-receipts/${result.receiptId}`);
+          navigate(`${basePath}/${result.receiptId}`);
         } else {
-          navigate("/admin/goods-receipts");
+          navigate(basePath);
         }
       }, 600);
     } catch (err: any) {
@@ -218,7 +225,7 @@ export default function CreateGoodsReceipt() {
         <div className="flex items-center gap-4 mb-6">
           <button
             type="button"
-            onClick={() => navigate("/admin/goods-receipts")}
+            onClick={() => navigate(basePath)}
             className="h-10 w-10 rounded-2xl border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:border-slate-300 shadow-sm"
           >
             <ArrowLeft size={16} />
@@ -583,7 +590,7 @@ export default function CreateGoodsReceipt() {
           <div className="flex gap-3 pt-1 pb-4">
             <button
               type="button"
-              onClick={() => navigate("/admin/goods-receipts")}
+              onClick={() => navigate(basePath)}
               className="flex-1 rounded-2xl border border-slate-200 py-3.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 bg-white shadow-sm"
             >
               Hủy bỏ

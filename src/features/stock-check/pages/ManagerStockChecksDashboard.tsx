@@ -9,6 +9,10 @@ import {
   useRejectStockCheckMutation,
 } from "../api/stock-check.api";
 import type { StockCheckDashboardItem } from "../types/stock-check.type";
+import {
+  toVietnameseStockCheckStatus,
+  toVietnameseStockCheckType,
+} from "../utils/stock-check-labels";
 
 function formatDateTime(input: string | Date) {
   const d = typeof input === "string" ? new Date(input) : input;
@@ -59,7 +63,9 @@ export default function ManagerStockChecksDashboard() {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-sm font-semibold text-slate-900">#{it.stockCheckId}</div>
-            <div className="text-xs text-slate-600 truncate">{it.checkType}</div>
+            <div className="text-xs text-slate-600 truncate">
+              {toVietnameseStockCheckType(it.checkType)}
+            </div>
             <div className="text-xs text-slate-500 mt-1">
               Snapshot: {formatDateTime(it.snapshotAt)}
             </div>
@@ -69,7 +75,7 @@ export default function ManagerStockChecksDashboard() {
           </div>
           <div className="flex flex-col gap-2 items-end shrink-0">
             <div className={`text-[11px] px-2 py-1 rounded-lg border ${badgeTone}`}>
-              {it.status}
+              {toVietnameseStockCheckStatus(it.status)}
             </div>
             {it.status === "Counted" && isManager ? (
               <div className="flex gap-2">

@@ -13,7 +13,9 @@ import {
   useLazyGetBoxByQrQuery,
 } from "../../goods-receipt/api/goods-receipt.api";
 import { decodeQrFromImageFile } from "../../../shared/lib/decodeQrFromImage";
+import QrCameraScannerModal from "../../../shared/components/QrCameraScannerModal";
 import type { SlotBoxItem, SlotItem } from "../types/warehouse.type";
+import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 /** Panel chi tiết slot: thông tin + slot chứa gì (hiện tại chỉ có capacity, có thể bổ sung API sản phẩm sau) */
 const SlotDetailPanel = ({
@@ -502,6 +504,9 @@ const ZoneOverview = ({
 };
 
 const WarehouseMap = () => {
+  const { isManager } = useRoleGuard();
+  const warehouseBasePath = isManager() ? "/manager/warehouses" : "/admin/warehouses";
+  const putawayBasePath = isManager() ? "/manager/putaway" : "/admin/putaway";
   const { id } = useParams<{ id: string }>();
   const warehouseId = Number(id);
   const navigate = useNavigate();
@@ -536,6 +541,7 @@ const WarehouseMap = () => {
   } | null>(null);
   const [isBoxDetailDropdownOpen, setIsBoxDetailDropdownOpen] =
     useState(false);
+  const [isBoxQrCameraOpen, setIsBoxQrCameraOpen] = useState(false);
 
   const boxQrImageRef = useRef<HTMLInputElement | null>(null);
 
@@ -704,14 +710,14 @@ const WarehouseMap = () => {
               onTransferBox={(box) => {
                 const qr = box.qrCode || "";
                 if (!qr) {
-                  navigate("/admin/putaway");
+                  navigate(putawayBasePath);
                   toast(
                     "Box chưa có mã QR trên hệ thống. Tại trang xếp hàng, hãy chụp/chọn ảnh có QR box hoặc nhập mã.",
                     { icon: "📷", duration: 4500 },
                   );
                   return;
                 }
-                navigate(`/admin/putaway?boxQr=${encodeURIComponent(qr)}`);
+                navigate(`${putawayBasePath}?boxQr=${encodeURIComponent(qr)}`);
               }}
             />
           </div>
@@ -731,13 +737,13 @@ const WarehouseMap = () => {
           </div>
           <div className="flex items-center gap-2 text-xs">
             <Link
-              to={`/admin/warehouses/${warehouseId}/config`}
+              to={`${warehouseBasePath}/${warehouseId}/config`}
               className="inline-flex items-center rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 hover:bg-emerald-100"
             >
               Cấu hình kho
             </Link>
             <Link
-              to="/admin/warehouses"
+              to={warehouseBasePath}
               className="text-emerald-600 hover:underline"
             >
               ← Quay lại danh sách kho
@@ -809,6 +815,13 @@ const WarehouseMap = () => {
             >
               Import ảnh QR
             </button>
+            <button
+              type="button"
+              onClick={() => setIsBoxQrCameraOpen(true)}
+              className="rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs font-semibold px-3 py-2 hover:bg-emerald-100"
+            >
+              Quét bằng camera
+            </button>
             <input
               ref={boxQrImageRef}
               type="file"
@@ -817,6 +830,16 @@ const WarehouseMap = () => {
               onChange={handleDecodeBoxQrFromImage}
             />
           </div>
+
+          <QrCameraScannerModal
+            open={isBoxQrCameraOpen}
+            title="Quét QR box bằng camera"
+            onClose={() => setIsBoxQrCameraOpen(false)}
+            onDetected={(value) => {
+              setBoxQrInput(value);
+              void handleLoadBoxByQr(value);
+            }}
+          />
 
           {boxDetail ? (
             <div className="mt-2">
@@ -993,7 +1016,7 @@ const WarehouseMap = () => {
                   const qr = e.target.value;
                   setSelectedUnassignedBoxQr(qr);
                   if (qr) {
-                    navigate(`/admin/putaway?boxQr=${encodeURIComponent(qr)}`);
+                    navigate(`${putawayBasePath}?boxQr=${encodeURIComponent(qr)}`);
                   }
                 }}
                 className="min-w-[220px] rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"

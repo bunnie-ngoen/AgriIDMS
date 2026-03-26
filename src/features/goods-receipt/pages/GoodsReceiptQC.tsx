@@ -9,6 +9,7 @@ import {
   useManagerReviewMinWeightMutation,
   useManagerReviewToleranceMutation,
   useCreateBoxesMutation,
+  useGetBoxesByGoodsReceiptIdQuery,
   useGetLotsByGoodsReceiptIdQuery,
   useUpdateGoodsReceiptWarehouseMutation,
   useUpdateLotQrImageMutation,
@@ -32,11 +33,44 @@ type CreateBoxesForm = {
   boxType: BoxTypeEnum;
 };
 
+function toVietnameseReceiptStatus(status: string): string {
+  switch (status) {
+    case "Draft":
+      return "Nháp";
+    case "Received":
+      return "Đã nhận";
+    case "QCCompleted":
+      return "Đã hoàn tất QC";
+    case "PendingManagerApproval":
+      return "Chờ quản lý duyệt";
+    case "PendingManagerApprovalQc":
+      return "Chờ quản lý duyệt (QC)";
+    case "Approved":
+      return "Đã duyệt";
+    case "Rejected":
+      return "Đã từ chối";
+    default:
+      return status;
+  }
+}
+
+function toVietnameseQcResult(qcResult?: string | null): string {
+  if (!qcResult) return "Chưa QC";
+  if (qcResult === "Passed") return "Đạt";
+  if (qcResult === "Rejected") return "Loại";
+  return qcResult;
+}
+
 export default function GoodsReceiptQC() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const receiptId = id ? Number(id) : 0;
-  const { isAdmin, isManager } = useRoleGuard();
+  const { isAdmin, isManager, isWarehouseStaff } = useRoleGuard();
+  const basePath = isWarehouseStaff()
+    ? "/warehouse/goods-receipts"
+    : isManager()
+      ? "/manager/goods-receipts"
+      : "/admin/goods-receipts";
 
   const {
     data: receipt,
@@ -53,6 +87,13 @@ export default function GoodsReceiptQC() {
     error: lotsError,
     refetch: refetchLots,
   } = useGetLotsByGoodsReceiptIdQuery(receiptId, {
+    skip: !receiptId || Number.isNaN(receiptId),
+  });
+  const {
+    data: receiptBoxes = [],
+    isFetching: isFetchingReceiptBoxes,
+    refetch: refetchReceiptBoxes,
+  } = useGetBoxesByGoodsReceiptIdQuery(receiptId, {
     skip: !receiptId || Number.isNaN(receiptId),
   });
 
@@ -148,7 +189,7 @@ export default function GoodsReceiptQC() {
   }, [lotsSorted, createBoxesForm]);
 
   if (Number.isNaN(receiptId) || receiptId < 1) {
-    navigate("/admin/goods-receipts");
+    navigate(basePath);
     return null;
   }
 
@@ -442,9 +483,10 @@ export default function GoodsReceiptQC() {
           );
         }
       }
+      await refetchReceiptBoxes();
       // Sau khi tạo box thành công, quay về danh sách phiếu nhập
       setTimeout(() => {
-        navigate("/admin/goods-receipts");
+        navigate(basePath);
       }, 600);
     } catch (err: any) {
       const msg =
@@ -467,7 +509,7 @@ export default function GoodsReceiptQC() {
         <div className="flex items-center gap-4 mb-2">
           <button
             type="button"
-            onClick={() => navigate(`/admin/goods-receipts/${receipt.id}`)}
+            onClick={() => navigate(`${basePath}/${receipt.id}`)}
             className="h-10 w-10 rounded-2xl border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:border-slate-300 shadow-sm"
           >
             <ArrowLeft size={16} />
@@ -479,7 +521,7 @@ export default function GoodsReceiptQC() {
             <p className="text-xs text-slate-400 mt-0.5">
               {receipt.supplierName} · {receipt.warehouseName} ·{" "}
               <span className={statusClass(receipt.status)}>
-                {receipt.status}
+                {toVietnameseReceiptStatus(receipt.status)}
               </span>
             </p>
           </div>
@@ -524,7 +566,7 @@ export default function GoodsReceiptQC() {
               <p className="text-xs text-slate-500">
                 Trạng thái hiện tại:{" "}
                 <span className={statusClass(receipt.status)}>
-                  {receipt.status}
+                  {toVietnameseReceiptStatus(receipt.status)}
                 </span>
               </p>
               <div className="flex flex-wrap gap-2">
@@ -707,7 +749,7 @@ export default function GoodsReceiptQC() {
                         {d.rejectWeight}
                       </td>
                       <td className="px-5 py-3 text-slate-700">
-                        {d.qcResult || "Chưa QC"}
+                        {toVietnameseQcResult(d.qcResult)}
                       </td>
                       <td className="px-5 py-3 text-right">
                         {canQC ? (
@@ -876,6 +918,91 @@ export default function GoodsReceiptQC() {
                   </button>
                 </div>
               </form>
+
+              <div className="mt-4 rounded-2xl border border-emerald-100 bg-white p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="text-xs font-semibold text-slate-800">
+                    Danh sách QR box theo phiếu nhập
+                  </h4>
+                  {isFetchingReceiptBoxes ? (
+                    <span className="text-[11px] text-slate-500">
+                      Đang cập nhật...
+                    </span>
+                  ) : null}
+                </div>
+
+                {receiptBoxes.length === 0 ? (
+                  <p className="mt-2 text-xs text-slate-500">
+                    Chưa có box nào cho phiếu nhập này.
+                  </p>
+                ) : (
+                  <div className="mt-2 overflow-x-auto">
+                    <table className="min-w-full text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200">
+                          <th className="px-3 py-2 text-left font-semibold text-slate-500 uppercase tracking-wider">
+                            Box
+                          </th>
+                          <th className="px-3 py-2 text-left font-semibold text-slate-500 uppercase tracking-wider">
+                            Lot
+                          </th>
+                          <th className="px-3 py-2 text-right font-semibold text-slate-500 uppercase tracking-wider">
+                            KL (kg)
+                          </th>
+                          <th className="px-3 py-2 text-left font-semibold text-slate-500 uppercase tracking-wider">
+                            Vị trí
+                          </th>
+                          <th className="px-3 py-2 text-left font-semibold text-slate-500 uppercase tracking-wider">
+                            QR ảnh
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {receiptBoxes.map((b) => (
+                          <tr key={b.id} className="border-t border-slate-100">
+                            <td className="px-3 py-2 text-slate-800 font-medium">
+                              {b.boxCode}
+                            </td>
+                            <td className="px-3 py-2 text-slate-700">
+                              {b.lotCode ?? `#${b.lotId}`}
+                            </td>
+                            <td className="px-3 py-2 text-right text-slate-700">
+                              {b.weight}
+                            </td>
+                            <td className="px-3 py-2 text-slate-700">
+                              {b.slotCode ?? "Chưa xếp slot"}
+                            </td>
+                            <td className="px-3 py-2">
+                              {b.qrImageUrl ? (
+                                <a
+                                  href={b.qrImageUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-2"
+                                  title={`Mở QR ${b.boxCode}`}
+                                >
+                                  <img
+                                    src={b.qrImageUrl}
+                                    alt={`QR ${b.boxCode}`}
+                                    className="h-10 w-10 rounded border border-slate-200 bg-white object-contain"
+                                  />
+                                  <span className="text-[11px] font-medium text-emerald-700">
+                                    Xem QR
+                                  </span>
+                                </a>
+                              ) : (
+                                <span className="text-[11px] text-slate-400">
+                                  Chưa có ảnh QR
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

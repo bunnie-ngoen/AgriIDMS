@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { decodeQrFromImageFile } from "../../../../shared/lib/decodeQrFromImage";
+import QrCameraScannerModal from "../../../../shared/components/QrCameraScannerModal";
 import {
   useLazyGetBoxByQrQuery,
   useLazyGetLotByQrQuery,
@@ -32,6 +33,7 @@ export default function AdminQrScanPanel() {
   const [activeSlotId, setActiveSlotId] = useState<number | null>(null);
   const [slotBoxDetail, setSlotBoxDetail] = useState<any>(null);
   const [isLoadingSlotBoxDetail, setIsLoadingSlotBoxDetail] = useState(false);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
 
   const [triggerLot, lotState] = useLazyGetLotByQrQuery();
   const [triggerBox, boxState] = useLazyGetBoxByQrQuery();
@@ -435,7 +437,7 @@ export default function AdminQrScanPanel() {
           <button
             type="button"
             onClick={() => {
-              fileInputRef.current?.click();
+              setIsCameraOpen(true);
             }}
             className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-700 bg-[#1f2d3a] px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-[#1b2225]"
             title="Chụp ảnh QR"
@@ -448,7 +450,6 @@ export default function AdminQrScanPanel() {
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            capture="environment"
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -459,6 +460,16 @@ export default function AdminQrScanPanel() {
           />
         </div>
       </div>
+
+      <QrCameraScannerModal
+        open={isCameraOpen}
+        title="Quét QR bằng camera"
+        onClose={() => setIsCameraOpen(false)}
+        onDetected={(value) => {
+          setQrInput(value);
+          void runScan(value);
+        }}
+      />
 
       {renderResult()}
     </div>

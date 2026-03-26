@@ -19,6 +19,18 @@ const WarehouseAllocationProposalPage = lazy(
 const WarehouseExportsPage = lazy(
   () => import("./pages/WarehouseExportsPage"),
 );
+const GoodsReceiptListPage = lazy(
+  () => import("../goods-receipt/pages/GoodsReceiptList"),
+);
+const CreateGoodsReceiptPage = lazy(
+  () => import("../goods-receipt/pages/CreateGoodsReceipt"),
+);
+const GoodsReceiptDetailPage = lazy(
+  () => import("../goods-receipt/pages/GoodsReceiptDetail"),
+);
+const GoodsReceiptQCPage = lazy(
+  () => import("../goods-receipt/pages/GoodsReceiptQC"),
+);
 
 export const warehouseStaffRoutes = [
   {
@@ -36,6 +48,10 @@ export const warehouseStaffRoutes = [
       { path: "stock-checks/:id", element: <StockCheckDetailsPage /> },
       { path: "orders/:orderId/proposals", element: <WarehouseAllocationProposalPage /> },
       { path: "exports", element: <WarehouseExportsPage /> },
+      { path: "goods-receipts", element: <GoodsReceiptListPage /> },
+      { path: "goods-receipts/create", element: <CreateGoodsReceiptPage /> },
+      { path: "goods-receipts/:id", element: <GoodsReceiptDetailPage /> },
+      { path: "goods-receipts/:id/qc", element: <GoodsReceiptQCPage /> },
     ],
   },
 ];
