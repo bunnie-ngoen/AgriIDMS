@@ -13,6 +13,14 @@ export interface WarehouseItem {
    * BE field: MinReceiptWeight.
    */
   minReceiptWeight?: number | null;
+  /** Tổng khối lượng hàng trong kho (kg), gồm cả hàng chưa xếp slot. */
+  totalStockWeight?: number;
+  /** Tổng sức chứa của toàn bộ slot trong kho (kg). */
+  totalCapacity?: number;
+  /** Khối lượng hàng đang nằm trong slot (kg). */
+  storedInSlotsWeight?: number;
+  /** Khối lượng hàng chưa xếp vào slot (kg). */
+  unassignedStockWeight?: number;
 }
 
 export interface ZoneItem {

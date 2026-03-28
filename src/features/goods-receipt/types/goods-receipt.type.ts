@@ -47,6 +47,49 @@ export type LotSummary = {
   expiryDate: string;
 };
 
+export type LotListItem = {
+  lotId: number;
+  lotCode: string;
+  qrImageUrl?: string | null;
+  totalQuantity: number;
+  remainingQuantity: number;
+  receivedDate: string;
+  expiryDate: string;
+  status: string;
+  goodsReceiptId: number;
+  productName: string;
+  productVariantName: string;
+  warehouseName: string;
+};
+
+export type LotBoxItem = {
+  boxId: number;
+  boxCode: string;
+  weight: number;
+  status: string;
+  slotId?: number | null;
+  slotCode?: string | null;
+  qrCode?: string | null;
+  qrImageUrl?: string | null;
+  createdAt: string;
+};
+
+export type LotDetail = {
+  lotId: number;
+  lotCode: string;
+  qrImageUrl?: string | null;
+  totalQuantity: number;
+  remainingQuantity: number;
+  receivedDate: string;
+  expiryDate: string;
+  status: string;
+  goodsReceiptId: number;
+  productName: string;
+  productVariantName: string;
+  warehouseName: string;
+  boxes: LotBoxItem[];
+};
+
 export type LotByQrResponse = {
   id: number;
   lotCode: string;
@@ -85,6 +128,8 @@ export type BoxByQrResponse = {
   productVariantId?: number | null;
   productVariantName?: string | null;
   productName?: string | null;
+  receivedDate?: string | null;
+  expiryDate?: string | null;
   placedInColdAt: string | null;
 };
 
@@ -154,5 +199,61 @@ export type AssignBoxToSlotRequest = {
 export type TransferBoxToSlotRequest = {
   boxId: number;
   toSlotId: number;
+};
+
+export type AssignBoxesToSlotRequest = {
+  boxIds: number[];
+  slotId: number;
+};
+
+export type NearExpiryBoxItem = {
+  boxId: number;
+  boxCode: string;
+  weight: number;
+  isPartial: boolean;
+  status: string;
+  slotId?: number | null;
+  slotCode?: string | null;
+};
+
+export type NearExpiryLotItem = {
+  lotId: number;
+  lotCode: string;
+  productVariantId: number;
+  productName: string;
+  grade: string;
+  remainingQuantity: number;
+  expiryDate: string;
+  daysLeft: number;
+  nearExpiryBoxCount: number;
+  warehouseId: number;
+  warehouseName: string;
+  boxes: NearExpiryBoxItem[];
+  status: string;
+};
+
+export type NearExpiryDashboard = {
+  daysThreshold: number;
+  totalLots: number;
+  totalBoxes: number;
+  lots: NearExpiryLotItem[];
+};
+
+export type DisposeHistoryItem = {
+  transactionId: number;
+  boxId: number;
+  boxCode: string;
+  lotId?: number | null;
+  lotCode?: string | null;
+  productName?: string | null;
+  productVariantName?: string | null;
+  quantity: number;
+  fromSlotId?: number | null;
+  fromSlotCode?: string | null;
+  warehouseId?: number | null;
+  warehouseName?: string | null;
+  createdBy: string;
+  createdByName?: string | null;
+  createdAt: string;
 };
 

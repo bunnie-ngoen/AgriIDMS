@@ -66,7 +66,7 @@ const mainMenu: MenuItem[] = [
     children: [
       { name: "Danh sách kho", path: "warehouses", icon: List },
       { name: "Tạo kho", path: "warehouses/create", icon: CirclePlus },
-      { name: "Xếp box vào slot", path: "putaway", icon: Boxes },
+      { name: "Xếp hàng vào vị trí", path: "putaway", icon: Boxes },
     ],
   },
   {
@@ -90,6 +90,7 @@ const mainMenu: MenuItem[] = [
     children: [
       { name: "Danh sách phiếu nhập", path: "goods-receipts", icon: List },
       { name: "Tạo phiếu nhập", path: "goods-receipts/create", icon: CirclePlus },
+      { name: "Danh sách lot", path: "lots", icon: List },
     ],
   },
   {

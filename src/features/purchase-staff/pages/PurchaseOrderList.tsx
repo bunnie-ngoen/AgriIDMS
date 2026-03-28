@@ -38,6 +38,7 @@ export default function PurchaseOrderList() {
   const [detailModalId, setDetailModalId] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [supplierFilter, setSupplierFilter] = useState<number | 0>(0);
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [page, setPage] = useState(1);
@@ -51,6 +52,11 @@ export default function PurchaseOrderList() {
   });
   const [deletePo, { isLoading: isDeleting }] = useDeletePurchaseOrderMutation();
   const [approvePo, { isLoading: isApproving }] = useApprovePurchaseOrderMutation();
+
+  const statusOptions = useMemo(() => {
+    const values = Array.from(new Set(list.map((po) => po.status))).filter(Boolean);
+    return values.sort((a, b) => a.localeCompare(b));
+  }, [list]);
 
   const handleDelete = async () => {
     if (!order || !confirmDelete) return;
@@ -121,6 +127,7 @@ export default function PurchaseOrderList() {
   const filteredList = useMemo(() => {
     return list.filter((po) => {
       if (supplierFilter && po.supplierId !== supplierFilter) return false;
+      if (statusFilter !== "ALL" && po.status !== statusFilter) return false;
 
       // Nếu ngày lọc hợp lệ thì áp dụng filter theo ngày
       if (!dateValidation.invalid && (fromDate || toDate)) {
@@ -137,12 +144,12 @@ export default function PurchaseOrderList() {
 
       return true;
     });
-  }, [list, supplierFilter, fromDate, toDate, dateValidation]);
+  }, [list, supplierFilter, statusFilter, fromDate, toDate, dateValidation]);
 
   // Reset về trang 1 khi filter thay đổi
   useEffect(() => {
     setPage(1);
-  }, [supplierFilter, fromDate, toDate]);
+  }, [supplierFilter, statusFilter, fromDate, toDate]);
 
   const totalItems = filteredList.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
@@ -190,8 +197,8 @@ export default function PurchaseOrderList() {
         {/* Card nội dung */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
         {/* Bộ lọc trên FE */}
-        <div className="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center gap-3">
-          <div className="flex-1 min-w-[180px] max-w-xs">
+        <div className="px-6 py-4 border-b border-slate-100 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div>
             <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
               Nhà cung cấp
             </label>
@@ -208,7 +215,24 @@ export default function PurchaseOrderList() {
               ))}
             </select>
           </div>
-          <div className="flex flex-1 flex-wrap gap-3 md:justify-end">
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
+              Trạng thái
+            </label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
+            >
+              <option value="ALL">Tất cả trạng thái</option>
+              {statusOptions.map((status) => (
+                <option key={status} value={status}>
+                  {toVietnamesePoStatus(status)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
                 Từ ngày
@@ -220,6 +244,8 @@ export default function PurchaseOrderList() {
                 className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
               />
             </div>
+          </div>
+          <div>
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
                 Đến ngày
@@ -231,12 +257,12 @@ export default function PurchaseOrderList() {
                 className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
               />
             </div>
-            {dateError && (
-              <p className="w-full text-[11px] text-red-500 md:text-right">
-                {dateError}
-              </p>
-            )}
           </div>
+          {dateError && (
+            <p className="xl:col-span-4 text-[11px] text-red-500">
+              {dateError}
+            </p>
+          )}
         </div>
 
         {isLoading ? (

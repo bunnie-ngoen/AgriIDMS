@@ -39,6 +39,7 @@ export type StockCheckDetailLine = {
   varianceReason?: string | null;
 
   countedBy?: string | null;
+  countedByName?: string | null;
   countedAt?: string | null;
   note?: string | null;
 };
@@ -67,6 +68,9 @@ export type CreateStockCheckPayload = {
   // BE enum StockCheckType (Full=1, Cycle=2, Spot=3)
   checkType: number;
   boxIds?: number[] | null;
+  zoneId?: number | null;
+  rackId?: number | null;
+  slotId?: number | null;
 };
 
 export type CreateStockCheckResponse = {

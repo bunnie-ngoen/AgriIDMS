@@ -4,42 +4,48 @@ import type { UserRole } from "../constants/auth.constants";
 
 export const useRoleGuard = () => {
     const auth = useAuth();
+    const rawRoles = (auth.user as { roles?: unknown } | null)?.roles;
+    const roles = Array.isArray(rawRoles)
+        ? rawRoles.filter((r): r is string => typeof r === "string")
+        : typeof rawRoles === "string"
+            ? [rawRoles]
+            : [];
+    const currentRole = roles[0] as UserRole | undefined;
 
     const hasRole = (roles: UserRole[]): boolean => {
-        if (!auth.user) return false;
-        return roles.includes(auth.user.roles[0] as UserRole);
+        if (!currentRole) return false;
+        return roles.includes(currentRole);
     };
 
     const isAdmin = (): boolean => {
-        return auth.user?.roles[0] === AUTH_ROLE.ADMIN;
+        return currentRole === AUTH_ROLE.ADMIN;
     };
 
     const isManager = (): boolean => {
-        return auth.user?.roles[0] === AUTH_ROLE.MANAGER;
+        return currentRole === AUTH_ROLE.MANAGER;
     };
 
     const isWarehouseStaff = (): boolean => {
-        return auth.user?.roles[0] === AUTH_ROLE.WAREHOUSE_STAFF;
+        return currentRole === AUTH_ROLE.WAREHOUSE_STAFF;
     };
 
     const isSalesStaff = (): boolean => {
-        return auth.user?.roles[0] === AUTH_ROLE.SALES_STAFF;
+        return currentRole === AUTH_ROLE.SALES_STAFF;
     };
 
     const isCustomer = (): boolean => {
-        return auth.user?.roles[0] === AUTH_ROLE.CUSTOMER;
+        return currentRole === AUTH_ROLE.CUSTOMER;
     };
 
     const isPurchasingStaff = (): boolean => {
-        return auth.user?.roles[0] === AUTH_ROLE.PURCHASING_STAFF;
+        return currentRole === AUTH_ROLE.PURCHASING_STAFF;
     };
 
     const getDefaultRoute = (): string => {
-        if (!auth.user || !auth.user.roles || auth.user.roles.length === 0) {
+        if (!currentRole) {
             return '/login';
         }
-        const role = auth.user.roles[0] as UserRole;
-        return ROLE_DASHBOARD_MAP[role] || '/login';
+        return ROLE_DASHBOARD_MAP[currentRole] || '/login';
     };
 
     return {
@@ -50,7 +56,7 @@ export const useRoleGuard = () => {
         isSalesStaff,
         isPurchasingStaff,
         isCustomer,
-        currentRole: auth.user?.roles[0] as UserRole,
+        currentRole: currentRole as UserRole,
         getDefaultRoute,
     };
 };

@@ -75,8 +75,17 @@ const GoodsReceiptDetailPage = lazy(
 const GoodsReceiptQCPage = lazy(
   () => import("../goods-receipt/pages/GoodsReceiptQC"),
 );
+const LotListPage = lazy(
+  () => import("../goods-receipt/pages/LotListPage"),
+);
+const LotDetailPage = lazy(
+  () => import("../goods-receipt/pages/LotDetailPage"),
+);
 
 const PutBoxIntoSlotPage = lazy(() => import("../warehouse/pages/PutBoxIntoSlot"));
+const InventoryIssueManagementPage = lazy(
+  () => import("./pages/InventoryIssueManagementPage"),
+);
 
 export const managerRoutes = [
   {
@@ -102,6 +111,7 @@ export const managerRoutes = [
 
       // Xep box vao slot
       { path: "putaway", element: <PutBoxIntoSlotPage /> },
+      { path: "inventory-issues", element: <InventoryIssueManagementPage /> },
 
       // Nha cung cap
       { path: "suppliers", element: <SupplierListPage /> },
@@ -119,6 +129,8 @@ export const managerRoutes = [
       { path: "goods-receipts/create", element: <CreateGoodsReceiptPage /> },
       { path: "goods-receipts/:id", element: <GoodsReceiptDetailPage /> },
       { path: "goods-receipts/:id/qc", element: <GoodsReceiptQCPage /> },
+      { path: "lots", element: <LotListPage /> },
+      { path: "lots/:id", element: <LotDetailPage /> },
 
       // Danh muc san pham
       { path: "categories", element: <CategoryListPage /> },

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
@@ -7,13 +7,14 @@ import {
   useGetRacksQuery,
   useGetSlotsQuery,
   useGetSlotContentsQuery,
+  useSyncSlotCapacitiesByWarehouseMutation,
 } from "../api/create-user.api";
 import {
   useGetUnassignedBoxesByWarehouseQuery,
-  useLazyGetBoxByQrQuery,
+  useGetExpiredBoxesByWarehouseQuery,
+  useDisposeExpiredBoxesMutation,
+  useGetDisposeHistoryByWarehouseQuery,
 } from "../../goods-receipt/api/goods-receipt.api";
-import { decodeQrFromImageFile } from "../../../shared/lib/decodeQrFromImage";
-import QrCameraScannerModal from "../../../shared/components/QrCameraScannerModal";
 import type { SlotBoxItem, SlotItem } from "../types/warehouse.type";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
@@ -29,10 +30,12 @@ const SlotDetailPanel = ({
   onTransferBox: (box: SlotBoxItem) => void;
   className?: string;
 }) => {
-  const { data: contents, isLoading: isLoadingContents } =
+  const { data: contents, isLoading: isLoadingContents, refetch: refetchContents } =
     useGetSlotContentsQuery(slot.id);
   const [selectedBox, setSelectedBox] = useState<SlotBoxItem | null>(null);
   const [isBoxesModalOpen, setIsBoxesModalOpen] = useState(false);
+  const [disposeExpiredBoxes, disposeExpiredState] =
+    useDisposeExpiredBoxesMutation();
 
   const copyText = async (text: string) => {
     if (!text) return;
@@ -47,6 +50,38 @@ const SlotDetailPanel = ({
     slot.capacity > 0
       ? Math.min(1, (slot.currentCapacity || 0) / slot.capacity) * 100
       : 0;
+
+  const handleDisposeSingleBox = async (box: SlotBoxItem) => {
+    const isExpired =
+      !!box.expiryDate && new Date(box.expiryDate).getTime() <= Date.now();
+    if (!isExpired) {
+      toast.error("Chỉ tiêu hủy box đã hết hạn.");
+      return;
+    }
+
+    const ok = window.confirm(
+      `Xác nhận tiêu hủy box ${box.boxCode} (${box.weight} kg)? Hệ thống sẽ ghi transaction.`,
+    );
+    if (!ok) return;
+
+    try {
+      const res = await disposeExpiredBoxes({ boxIds: [box.id] }).unwrap();
+      toast.success(
+        `${res.message}. Đã tiêu hủy ${res.disposedCount}/${res.requestedCount} box.`,
+      );
+      await refetchContents();
+      if (selectedBox?.id === box.id) setSelectedBox(null);
+    } catch (err: any) {
+      const msg =
+        err?.data?.message ||
+        err?.data?.Message ||
+        err?.data?.error ||
+        err?.data?.Error ||
+        "Tiêu hủy box thất bại.";
+      toast.error(msg);
+    }
+  };
+
   return (
     <div
       className={`rounded-lg border border-slate-200 bg-white p-3 shadow-lg text-left ${className}`}
@@ -60,22 +95,22 @@ const SlotDetailPanel = ({
           aria-modal="true"
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white border border-slate-200 shadow-xl overflow-hidden"
+            className="w-full max-w-lg rounded-2xl bg-white border border-slate-200 shadow-xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <p className="text-xs font-semibold text-slate-900">
+                <p className="text-base font-semibold text-slate-900">
                   Chi tiết box
                 </p>
-                <p className="text-[10px] text-slate-500 mt-0.5">
+                <p className="text-xs text-slate-500 mt-0.5">
                   Slot {slot.code}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedBox(null)}
-                className="text-slate-400 hover:text-slate-600 text-lg leading-none"
+                className="h-8 w-8 rounded-lg border border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50 flex items-center justify-center text-lg leading-none"
                 aria-label="Đóng"
               >
                 ×
@@ -88,7 +123,7 @@ const SlotDetailPanel = ({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[10px] text-slate-500">QR</p>
-                      <p className="font-mono text-[11px] text-slate-900 break-all">
+                      <p className="font-mono text-[11px] text-slate-900 break-all mt-1">
                         {selectedBox.qrCode}
                       </p>
                     </div>
@@ -106,37 +141,37 @@ const SlotDetailPanel = ({
               <dl className="grid grid-cols-2 gap-2">
                 <div className="rounded-xl border border-slate-100 px-3 py-2">
                   <dt className="text-[10px] text-slate-500">Khối lượng</dt>
-                  <dd className="font-semibold text-slate-900 tabular-nums">
+                  <dd className="font-semibold text-slate-900 tabular-nums mt-1">
                     {selectedBox.weight} kg
                   </dd>
                 </div>
                 <div className="rounded-xl border border-slate-100 px-3 py-2">
                   <dt className="text-[10px] text-slate-500">Trạng thái</dt>
-                  <dd className="font-semibold text-slate-900">
+                  <dd className="font-semibold text-slate-900 mt-1">
                     {selectedBox.status || "—"}
                   </dd>
                 </div>
                 <div className="rounded-xl border border-slate-100 px-3 py-2">
                   <dt className="text-[10px] text-slate-500">Sản phẩm</dt>
-                  <dd className="font-semibold text-slate-900">
+                  <dd className="font-semibold text-slate-900 mt-1">
                     {contents?.productName || "—"}
                   </dd>
                 </div>
                 <div className="rounded-xl border border-slate-100 px-3 py-2">
                   <dt className="text-[10px] text-slate-500">Biến thể</dt>
-                  <dd className="font-semibold text-slate-900">
+                  <dd className="font-semibold text-slate-900 mt-1">
                     {contents?.variantName || "—"}
                   </dd>
                 </div>
                 <div className="rounded-xl border border-slate-100 px-3 py-2 col-span-2">
                   <dt className="text-[10px] text-slate-500">Lot</dt>
-                  <dd className="font-semibold text-slate-900">
+                  <dd className="font-semibold text-slate-900 mt-1">
                     {selectedBox.lotCode} (#{selectedBox.lotId})
                   </dd>
                 </div>
                 <div className="rounded-xl border border-slate-100 px-3 py-2">
                   <dt className="text-[10px] text-slate-500">Ngày nhận</dt>
-                  <dd className="font-semibold text-slate-900">
+                  <dd className="font-semibold text-slate-900 mt-1">
                     {selectedBox.receivedDate
                       ? new Date(selectedBox.receivedDate).toLocaleDateString(
                           "vi-VN",
@@ -146,7 +181,7 @@ const SlotDetailPanel = ({
                 </div>
                 <div className="rounded-xl border border-slate-100 px-3 py-2">
                   <dt className="text-[10px] text-slate-500">HSD</dt>
-                  <dd className="font-semibold text-slate-900">
+                  <dd className="font-semibold text-slate-900 mt-1">
                     {selectedBox.expiryDate
                       ? new Date(selectedBox.expiryDate).toLocaleDateString(
                           "vi-VN",
@@ -237,20 +272,42 @@ const SlotDetailPanel = ({
                               : "—"}
                           </div>
                         </td>
-                        <td
-                          className="px-3 py-2 text-right"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onTransferBox(b);
-                          }}
-                        >
-                          <button
-                            type="button"
-                            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-50"
-                            title="Chuyển box sang slot khác"
-                          >
-                            Chuyển
-                          </button>
+                        <td className="px-3 py-2 text-right">
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onTransferBox(b);
+                              }}
+                              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-50"
+                              title="Chuyển box sang slot khác"
+                            >
+                              Chuyển
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleDisposeSingleBox(b);
+                              }}
+                              disabled={
+                                disposeExpiredState.isLoading ||
+                                !b.expiryDate ||
+                                new Date(b.expiryDate).getTime() > Date.now()
+                              }
+                              className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                              title={
+                                !b.expiryDate
+                                  ? "Box chưa có HSD"
+                                  : new Date(b.expiryDate).getTime() > Date.now()
+                                    ? "Chỉ tiêu hủy box đã hết hạn"
+                                    : "Tiêu hủy box (ghi transaction)"
+                              }
+                            >
+                              Tiêu hủy
+                            </button>
+                          </div>
                         </td>
                         <td className="px-3 py-2 text-right tabular-nums">
                           {b.weight}
@@ -525,25 +582,14 @@ const WarehouseMap = () => {
   const [detailSlot, setDetailSlot] = useState<SlotItem | null>(null);
   const [selectedUnassignedBoxQr, setSelectedUnassignedBoxQr] = useState<string>("");
   const [selectedVariantFilterId, setSelectedVariantFilterId] = useState<number | null>(null);
-  const [boxQrInput, setBoxQrInput] = useState("");
-  const [boxDetail, setBoxDetail] = useState<{
-    id: number;
-    boxCode: string;
-    qrCode: string | null;
-    weight: number;
-    status: string;
-    slotId: number | null;
-    warehouseId: number | null;
-    lotId: number;
-    productName?: string | null;
-    productVariantName?: string | null;
-    qrImageUrl?: string | null;
-  } | null>(null);
-  const [isBoxDetailDropdownOpen, setIsBoxDetailDropdownOpen] =
-    useState(false);
-  const [isBoxQrCameraOpen, setIsBoxQrCameraOpen] = useState(false);
-
-  const boxQrImageRef = useRef<HTMLInputElement | null>(null);
+  const [isDisposeModalOpen, setIsDisposeModalOpen] = useState(false);
+  const [disposeTab, setDisposeTab] = useState<"expired" | "history">("expired");
+  const [selectedDisposeBoxIds, setSelectedDisposeBoxIds] = useState<number[]>(
+    [],
+  );
+  const [disposeFromDate, setDisposeFromDate] = useState("");
+  const [disposeToDate, setDisposeToDate] = useState("");
+  const [disposeCreatedBy, setDisposeCreatedBy] = useState("");
 
   const {
     data: unassignedBoxes = [],
@@ -551,8 +597,27 @@ const WarehouseMap = () => {
   } = useGetUnassignedBoxesByWarehouseQuery(warehouseId, {
     skip: Number.isNaN(warehouseId),
   });
-  const [triggerBoxByQr, boxByQr] = useLazyGetBoxByQrQuery();
-
+  const {
+    data: expiredBoxes = [],
+    isFetching: isFetchingExpiredBoxes,
+    refetch: refetchExpiredBoxes,
+  } = useGetExpiredBoxesByWarehouseQuery(warehouseId, {
+    skip: Number.isNaN(warehouseId),
+  });
+  const [disposeExpiredBoxes, disposingExpiredState] =
+    useDisposeExpiredBoxesMutation();
+  const [syncSlotCapacitiesByWarehouse, syncCapacitiesState] =
+    useSyncSlotCapacitiesByWarehouseMutation();
+  const { data: disposeHistory = [], isFetching: isFetchingDisposeHistory } =
+    useGetDisposeHistoryByWarehouseQuery(
+      {
+        warehouseId,
+        fromDate: disposeFromDate || undefined,
+        toDate: disposeToDate || undefined,
+        createdBy: disposeCreatedBy.trim() || undefined,
+      },
+      { skip: Number.isNaN(warehouseId) || !isDisposeModalOpen || disposeTab !== "history" },
+    );
   const { data: racks } = useGetRacksQuery(selectedZoneId ?? 0, {
     skip: !selectedZoneId,
   });
@@ -629,52 +694,81 @@ const WarehouseMap = () => {
   }, [variantOptionsInRack, selectedVariantFilterId]);
 
   const filteredUnassignedBoxes = useMemo(() => {
-    if (!selectedVariantFilterId) return unassignedBoxes;
-    return unassignedBoxes.filter(
-      (b) => b.productVariantId === selectedVariantFilterId,
+    const cleanBoxes = unassignedBoxes.filter(
+      (b) =>
+        Number(b.weight ?? 0) > 0 &&
+        (b.status ?? "").toLowerCase() === "stored" &&
+        (!b.expiryDate || new Date(b.expiryDate).getTime() > Date.now()),
     );
+
+    if (!selectedVariantFilterId) return cleanBoxes;
+    return cleanBoxes.filter((b) => b.productVariantId === selectedVariantFilterId);
   }, [unassignedBoxes, selectedVariantFilterId]);
 
-  const handleLoadBoxByQr = async (rawQr?: string) => {
-    const qr = (rawQr ?? boxQrInput).trim();
-    if (!qr) {
-      toast.error("Nhập mã QR box hoặc chọn ảnh có QR.");
-      return;
-    }
+  const handleSyncSlotCapacities = async () => {
+    if (Number.isNaN(warehouseId)) return;
     try {
-      const box = await triggerBoxByQr(qr).unwrap();
-      setBoxDetail(box);
-      setBoxQrInput(qr);
-      setIsBoxDetailDropdownOpen(true);
-      toast.success("Đã tải chi tiết box.");
+      const res = await syncSlotCapacitiesByWarehouse(warehouseId).unwrap();
+      toast.success(
+        `${res.message}. Đã đồng bộ ${res.affectedSlots} slot.`,
+      );
     } catch (err: any) {
       const msg =
         err?.data?.message ||
         err?.data?.Message ||
         err?.data?.error ||
         err?.data?.Error ||
-        "Không tìm thấy box theo QR.";
+        "Đồng bộ sức chứa thất bại.";
       toast.error(msg);
     }
   };
 
-  const handleDecodeBoxQrFromImage = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    const t = toast.loading("Đang đọc QR từ ảnh...");
+  const expiredBoxesInWarehouse = useMemo(() => {
+    return [...expiredBoxes].sort((a, b) => {
+      const ea = a.expiryDate ? new Date(a.expiryDate).getTime() : Number.POSITIVE_INFINITY;
+      const eb = b.expiryDate ? new Date(b.expiryDate).getTime() : Number.POSITIVE_INFINITY;
+      return ea - eb;
+    });
+  }, [expiredBoxes]);
+
+  useEffect(() => {
+    if (!expiredBoxesInWarehouse.length) {
+      setSelectedDisposeBoxIds([]);
+      return;
+    }
+    const idSet = new Set(expiredBoxesInWarehouse.map((b) => b.id));
+    setSelectedDisposeBoxIds((prev) => prev.filter((id) => idSet.has(id)));
+  }, [expiredBoxesInWarehouse]);
+
+  const toggleSelectDisposeBox = (boxId: number) => {
+    setSelectedDisposeBoxIds((prev) =>
+      prev.includes(boxId) ? prev.filter((id) => id !== boxId) : [...prev, boxId],
+    );
+  };
+
+  const handleDisposeExpiredBoxes = async () => {
+    if (!selectedDisposeBoxIds.length) {
+      toast.error("Chọn ít nhất 1 box để tiêu hủy.");
+      return;
+    }
+
     try {
-      const qr = await decodeQrFromImageFile(file);
-      if (!qr) {
-        toast.error("Không đọc được QR từ ảnh.", { id: t });
-        return;
-      }
-      await handleLoadBoxByQr(qr);
-      toast.success("Đã đọc ảnh QR và tải chi tiết box.", { id: t });
-    } catch {
-      toast.error("Đọc QR từ ảnh thất bại.", { id: t });
+      const result = await disposeExpiredBoxes({
+        boxIds: selectedDisposeBoxIds,
+      }).unwrap();
+      toast.success(
+        `${result.message}. Đã xử lý ${result.disposedCount}/${result.requestedCount} box.`,
+      );
+      setSelectedDisposeBoxIds([]);
+      await refetchExpiredBoxes();
+    } catch (err: any) {
+      const msg =
+        err?.data?.message ||
+        err?.data?.Message ||
+        err?.data?.error ||
+        err?.data?.Error ||
+        "Tiêu hủy box thất bại.";
+      toast.error(msg);
     }
   };
 
@@ -723,6 +817,243 @@ const WarehouseMap = () => {
           </div>
         </div>
       )}
+      {isDisposeModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={() => setIsDisposeModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="w-full max-w-4xl rounded-2xl bg-white border border-slate-200 shadow-xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  Danh sách box tiêu hủy (hàng hết hạn)
+                </p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Kho #{warehouseId} · {expiredBoxesInWarehouse.length} box có thể tiêu hủy
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDisposeModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 text-lg leading-none"
+                aria-label="Đóng"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-4">
+              <div className="mb-3 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+                <button
+                  type="button"
+                  onClick={() => setDisposeTab("expired")}
+                  className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+                    disposeTab === "expired"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Box hết hạn
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDisposeTab("history")}
+                  className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
+                    disposeTab === "history"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Lịch sử tiêu hủy
+                </button>
+              </div>
+
+              {disposeTab === "expired" ? (
+                <>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSelectedDisposeBoxIds(expiredBoxesInWarehouse.map((b) => b.id))
+                        }
+                        disabled={!expiredBoxesInWarehouse.length}
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                      >
+                        Chọn tất cả
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDisposeBoxIds([])}
+                        disabled={!selectedDisposeBoxIds.length}
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                      >
+                        Bỏ chọn
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void refetchExpiredBoxes()}
+                        disabled={isFetchingExpiredBoxes}
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                      >
+                        {isFetchingExpiredBoxes ? "Đang tải..." : "Làm mới"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDisposeExpiredBoxes()}
+                        disabled={
+                          disposingExpiredState.isLoading || !selectedDisposeBoxIds.length
+                        }
+                        className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
+                      >
+                        {disposingExpiredState.isLoading
+                          ? "Đang tiêu hủy..."
+                          : `Tiêu hủy đã chọn (${selectedDisposeBoxIds.length})`}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="max-h-[65vh] overflow-auto rounded-xl border border-slate-100 bg-slate-50">
+                    <table className="w-full text-[11px]">
+                      <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 text-slate-500">
+                        <tr>
+                          <th className="px-3 py-2 text-left w-[40px]">#</th>
+                          <th className="px-3 py-2 text-left">Box</th>
+                          <th className="px-3 py-2 text-left">Lot</th>
+                          <th className="px-3 py-2 text-left">HSD</th>
+                          <th className="px-3 py-2 text-left">Slot</th>
+                          <th className="px-3 py-2 text-right">Kg</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-slate-700">
+                        {expiredBoxesInWarehouse.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="px-3 py-6 text-center text-slate-500">
+                              Không có box hết hạn cần tiêu hủy.
+                            </td>
+                          </tr>
+                        ) : (
+                          expiredBoxesInWarehouse.map((b) => {
+                            const checked = selectedDisposeBoxIds.includes(b.id);
+                            return (
+                              <tr key={b.id} className="border-t border-slate-100 hover:bg-white">
+                                <td className="px-3 py-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleSelectDisposeBox(b.id)}
+                                  />
+                                </td>
+                                <td className="px-3 py-2">
+                                  <p className="font-mono text-[10px]">{b.boxCode}</p>
+                                  <p className="text-[10px] text-slate-500">
+                                    {b.productName || "—"}
+                                    {b.productVariantName ? ` · ${b.productVariantName}` : ""}
+                                  </p>
+                                </td>
+                                <td className="px-3 py-2">{b.lotCode || "—"}</td>
+                                <td className="px-3 py-2">
+                                  {b.expiryDate
+                                    ? new Date(b.expiryDate).toLocaleDateString("vi-VN")
+                                    : "—"}
+                                </td>
+                                <td className="px-3 py-2">{b.slotCode || "Chưa xếp"}</td>
+                                <td className="px-3 py-2 text-right tabular-nums">
+                                  {b.weight}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="mb-3 grid grid-cols-1 md:grid-cols-4 gap-2">
+                    <input
+                      type="date"
+                      value={disposeFromDate}
+                      onChange={(e) => setDisposeFromDate(e.target.value)}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"
+                    />
+                    <input
+                      type="date"
+                      value={disposeToDate}
+                      onChange={(e) => setDisposeToDate(e.target.value)}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"
+                    />
+                    <input
+                      type="text"
+                      value={disposeCreatedBy}
+                      onChange={(e) => setDisposeCreatedBy(e.target.value)}
+                      placeholder="Lọc theo người thao tác"
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs md:col-span-2"
+                    />
+                  </div>
+
+                  <div className="max-h-[65vh] overflow-auto rounded-xl border border-slate-100 bg-slate-50">
+                    <table className="w-full text-[11px]">
+                      <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 text-slate-500">
+                        <tr>
+                          <th className="px-3 py-2 text-left">Thời gian</th>
+                          <th className="px-3 py-2 text-left">Box / Lot</th>
+                          <th className="px-3 py-2 text-left">Sản phẩm</th>
+                          <th className="px-3 py-2 text-left">Người thao tác</th>
+                          <th className="px-3 py-2 text-right">Kg tiêu hủy</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-slate-700">
+                        {isFetchingDisposeHistory ? (
+                          <tr>
+                            <td colSpan={5} className="px-3 py-6 text-center text-slate-500">
+                              Đang tải lịch sử...
+                            </td>
+                          </tr>
+                        ) : disposeHistory.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-3 py-6 text-center text-slate-500">
+                              Chưa có lịch sử tiêu hủy theo bộ lọc.
+                            </td>
+                          </tr>
+                        ) : (
+                          disposeHistory.map((h) => (
+                            <tr key={h.transactionId} className="border-t border-slate-100 hover:bg-white">
+                              <td className="px-3 py-2">
+                                {h.createdAt
+                                  ? new Date(h.createdAt).toLocaleString("vi-VN")
+                                  : "—"}
+                              </td>
+                              <td className="px-3 py-2">
+                                <p className="font-mono text-[10px]">{h.boxCode || `#${h.boxId}`}</p>
+                                <p className="text-[10px] text-slate-500">{h.lotCode || "—"}</p>
+                              </td>
+                              <td className="px-3 py-2">
+                                {h.productName || "—"}
+                                {h.productVariantName ? ` · ${h.productVariantName}` : ""}
+                              </td>
+                              <td className="px-3 py-2">{h.createdByName || h.createdBy}</td>
+                              <td className="px-3 py-2 text-right tabular-nums">{h.quantity}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       <div className="bg-white/95 rounded-[18px] p-6 shadow-sm flex flex-col gap-4 border border-slate-100">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
@@ -736,6 +1067,13 @@ const WarehouseMap = () => {
             )}
           </div>
           <div className="flex items-center gap-2 text-xs">
+            <button
+              type="button"
+              onClick={() => setIsDisposeModalOpen(true)}
+              className="inline-flex items-center rounded-lg border border-rose-100 bg-rose-50 px-2.5 py-1 font-medium text-rose-700 hover:bg-rose-100"
+            >
+              List box tiêu hủy
+            </button>
             <Link
               to={`${warehouseBasePath}/${warehouseId}/config`}
               className="inline-flex items-center rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 hover:bg-emerald-100"
@@ -784,159 +1122,6 @@ const WarehouseMap = () => {
             </p>
           </div>
 
-          <p className="text-xs font-semibold text-slate-700 mt-3 mb-2">
-            Tra cứu nhanh chi tiết box bằng QR (scan/import ảnh)
-          </p>
-          <div className="flex flex-col md:flex-row gap-2">
-            <input
-              value={boxQrInput}
-              onChange={(e) => setBoxQrInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  void handleLoadBoxByQr();
-                }
-              }}
-              placeholder="Dán/scan mã QR box"
-              className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
-            />
-            <button
-              type="button"
-              onClick={() => void handleLoadBoxByQr()}
-              disabled={boxByQr.isFetching}
-              className="rounded-lg bg-slate-900 text-white text-xs font-semibold px-3 py-2 hover:bg-slate-700 disabled:opacity-60"
-            >
-              {boxByQr.isFetching ? "Đang tải..." : "Tải chi tiết"}
-            </button>
-            <button
-              type="button"
-              onClick={() => boxQrImageRef.current?.click()}
-              className="rounded-lg border border-slate-300 bg-white text-slate-700 text-xs font-semibold px-3 py-2 hover:bg-slate-50"
-            >
-              Import ảnh QR
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsBoxQrCameraOpen(true)}
-              className="rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 text-xs font-semibold px-3 py-2 hover:bg-emerald-100"
-            >
-              Quét bằng camera
-            </button>
-            <input
-              ref={boxQrImageRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleDecodeBoxQrFromImage}
-            />
-          </div>
-
-          <QrCameraScannerModal
-            open={isBoxQrCameraOpen}
-            title="Quét QR box bằng camera"
-            onClose={() => setIsBoxQrCameraOpen(false)}
-            onDetected={(value) => {
-              setBoxQrInput(value);
-              void handleLoadBoxByQr(value);
-            }}
-          />
-
-          {boxDetail ? (
-            <div className="mt-2">
-              <button
-                type="button"
-                onClick={() =>
-                  setIsBoxDetailDropdownOpen((prev) => !prev)
-                }
-                className="w-full text-left rounded-xl border border-slate-200 bg-white px-3 py-2 flex items-center justify-between gap-2"
-              >
-                <div className="min-w-0">
-                  <p className="text-[11px] text-slate-500">Box</p>
-                  <p className="text-[12px] font-semibold text-slate-900 truncate">
-                    #{boxDetail.id} · {boxDetail.boxCode}
-                  </p>
-                  <p className="text-[10px] text-slate-500 truncate">
-                    {boxDetail.productName || "—"}
-                    {boxDetail.productVariantName
-                      ? ` · ${boxDetail.productVariantName}`
-                      : ""}
-                  </p>
-                </div>
-                <span className="text-slate-400 font-semibold">
-                  {isBoxDetailDropdownOpen ? "▲" : "▼"}
-                </span>
-              </button>
-
-              {isBoxDetailDropdownOpen ? (
-                <div className="mt-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 text-[11px]">
-                  <p className="rounded-lg bg-white border border-slate-200 px-2 py-1.5">
-                    <span className="text-slate-500">Box:</span>{" "}
-                    <span className="font-semibold text-slate-900">
-                      #{boxDetail.id} · {boxDetail.boxCode}
-                    </span>
-                  </p>
-                  <p className="rounded-lg bg-white border border-slate-200 px-2 py-1.5">
-                    <span className="text-slate-500">Sản phẩm:</span>{" "}
-                    <span className="font-semibold text-slate-900">
-                      {boxDetail.productName || "—"}
-                    </span>
-                  </p>
-                  <p className="rounded-lg bg-white border border-slate-200 px-2 py-1.5">
-                    <span className="text-slate-500">Variant:</span>{" "}
-                    <span className="font-semibold text-slate-900">
-                      {boxDetail.productVariantName || "—"}
-                    </span>
-                  </p>
-                  <p className="rounded-lg bg-white border border-slate-200 px-2 py-1.5">
-                    <span className="text-slate-500">Trạng thái:</span>{" "}
-                    <span className="font-semibold text-slate-900">
-                      {boxDetail.status}
-                    </span>
-                  </p>
-                  <p className="rounded-lg bg-white border border-slate-200 px-2 py-1.5">
-                    <span className="text-slate-500">Khối lượng:</span>{" "}
-                    <span className="font-semibold text-slate-900">
-                      {boxDetail.weight} kg
-                    </span>
-                  </p>
-                  <p className="rounded-lg bg-white border border-slate-200 px-2 py-1.5">
-                    <span className="text-slate-500">Kho:</span>{" "}
-                    <span className="font-semibold text-slate-900">
-                      {boxDetail.warehouseId
-                        ? `#${boxDetail.warehouseId}`
-                        : "—"}
-                    </span>
-                  </p>
-                  <p className="rounded-lg bg-white border border-slate-200 px-2 py-1.5">
-                    <span className="text-slate-500">Slot:</span>{" "}
-                    <span className="font-semibold text-slate-900">
-                      {boxDetail.slotId
-                        ? `#${boxDetail.slotId}`
-                        : "Chưa xếp"}
-                    </span>
-                  </p>
-                  <p className="rounded-lg bg-white border border-slate-200 px-2 py-1.5">
-                    <span className="text-slate-500">Lot:</span>{" "}
-                    <span className="font-semibold text-slate-900">
-                      #{boxDetail.lotId}
-                    </span>
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setIsBoxDetailDropdownOpen(false)}
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-100 lg:col-span-4"
-                  >
-                    Thu gọn
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <p className="mt-2 text-[11px] text-slate-500">
-              Chưa có box nào được tra cứu. Bạn có thể scan trực tiếp hoặc
-              import ảnh QR.
-            </p>
-          )}
         </div>
 
         {zones && zones.length > 0 && (
@@ -1040,6 +1225,25 @@ const WarehouseMap = () => {
                 ))}
               </select>
             </div>
+            <button
+              type="button"
+              onClick={() => setIsDisposeModalOpen(true)}
+              className="inline-flex items-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+              title="Mở danh sách box hết hạn để tiêu hủy"
+            >
+              Tiêu hủy hàng hết hạn
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSyncSlotCapacities()}
+              disabled={syncCapacitiesState.isLoading}
+              className="inline-flex items-center rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-100 disabled:opacity-60"
+              title="Đồng bộ CurrentCapacity của slot theo tổng box thực tế"
+            >
+              {syncCapacitiesState.isLoading
+                ? "Đang đồng bộ..."
+                : "Đồng bộ sức chứa slot"}
+            </button>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-[11px] justify-end">

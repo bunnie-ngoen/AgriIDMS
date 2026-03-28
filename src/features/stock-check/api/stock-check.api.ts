@@ -52,6 +52,9 @@ export const stockCheckApi = api.injectEndpoints({
           warehouseId: body.warehouseId,
           checkType: body.checkType,
           boxIds: body.boxIds ?? null,
+          zoneId: body.zoneId ?? null,
+          rackId: body.rackId ?? null,
+          slotId: body.slotId ?? null,
         },
       }),
       invalidatesTags: ["StockCheck"],
@@ -86,7 +89,12 @@ export const stockCheckApi = api.injectEndpoints({
 
     approveStockCheck: builder.mutation<{ message?: string }, number>({
       query: (id) => ({ url: `StockChecks/${id}/approve`, method: "POST" }),
-      invalidatesTags: ["StockCheck"],
+      invalidatesTags: [
+        "StockCheck",
+        { type: "Warehouse", id: "LIST" },
+        { type: "Slot", id: "LIST" },
+        { type: "SlotContents", id: "LIST" },
+      ],
     }),
 
     rejectStockCheck: builder.mutation<{ message?: string }, number>({

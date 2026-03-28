@@ -114,27 +114,6 @@ function App() {
                         </Route>
                     ))}
 
-                    {/* Manager routes */}
-                    {managerRoutes.map((route) => (
-                        <Route
-                            key={route.path}
-                            path={route.path}
-                            element={
-                                <ProtectedRoute allowedRoles={[AUTH_ROLE.MANAGER]}>
-                                    {route.element}
-                                </ProtectedRoute>
-                            }
-                        >
-                            {route.children?.map((child, idx) => (
-                                <Route
-                                    key={idx}
-                                    {...(child.index ? { index: true } : { path: child.path })}
-                                    element={child.element}
-                                />
-                            ))}
-                        </Route>
-                    ))}
-
                     {/* Purchase staff routes */}
                     {purchaseStaffRoutes.map((route) => (
                         <Route

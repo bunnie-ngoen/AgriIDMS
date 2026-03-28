@@ -14,6 +14,12 @@ export default function ProtectedRoute({
 }: ProtectedRouteProps) {
     const auth = useAuth();
     const location = useLocation();
+    const rawRoles = (auth.user as { roles?: unknown } | null)?.roles;
+    const userRoles = Array.isArray(rawRoles)
+        ? rawRoles.filter((r): r is string => typeof r === "string")
+        : typeof rawRoles === "string"
+            ? [rawRoles]
+            : [];
 
     // Chưa đăng nhập
     if (!auth.accessToken || !auth.user) {
@@ -22,7 +28,10 @@ export default function ProtectedRoute({
 
     // Kiểm tra quyền nếu có allowedRoles
     if (allowedRoles && allowedRoles.length > 0) {
-        const userRole = auth.user.roles[0];
+        const userRole = userRoles[0];
+        if (!userRole) {
+            return <Navigate to={ROUTES.LOGIN} state={{ from: location }} replace />;
+        }
         const hasPermission = allowedRoles.includes(userRole as UserRole);
         
         if (!hasPermission) {
