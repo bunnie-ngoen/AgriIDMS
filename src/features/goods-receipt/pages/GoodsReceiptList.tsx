@@ -1,10 +1,17 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGetGoodsReceiptsQuery } from "../api/goods-receipt.api";
 import { useGetSuppliersQuery } from "../../supplier/api/supplier.api";
 import { useGetWarehousesQuery } from "../../admin/api/create-user.api";
 import { Loader2, FileText, FilePlus2, Eye } from "lucide-react";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
+
+function toDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 function toVietnameseReceiptStatus(status: string): string {
   switch (status) {
@@ -42,18 +49,67 @@ export default function GoodsReceiptList() {
 
   const [supplierFilter, setSupplierFilter] = useState<number | 0>(0);
   const [warehouseFilter, setWarehouseFilter] = useState<number | 0>(0);
+  const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [fromDateFilter, setFromDateFilter] = useState("");
+  const [toDateFilter, setToDateFilter] = useState("");
   const [pageIndex, setPageIndex] = useState(1);
   const pageSize = 10;
+  const todayDateInput = useMemo(() => toDateInputValue(new Date()), []);
+
+  const statusOptions = useMemo(() => {
+    const values = Array.from(new Set(receipts.map((r) => r.status))).filter(Boolean);
+    return values.sort((a, b) => a.localeCompare(b));
+  }, [receipts]);
 
   const filtered = useMemo(
     () =>
       receipts.filter((r) => {
         if (supplierFilter && r.supplierId !== supplierFilter) return false;
         if (warehouseFilter && r.warehouseId !== warehouseFilter) return false;
+        if (statusFilter !== "ALL" && r.status !== statusFilter) return false;
+
+        const safeFromDate =
+          fromDateFilter && fromDateFilter <= todayDateInput
+            ? fromDateFilter
+            : "";
+        const safeToDate =
+          toDateFilter && (!safeFromDate || toDateFilter >= safeFromDate)
+            ? toDateFilter
+            : "";
+
+        if (safeFromDate || safeToDate) {
+          const receivedAt = r.receivedDate ? new Date(r.receivedDate) : null;
+          if (!receivedAt || Number.isNaN(receivedAt.getTime())) return false;
+
+          if (safeFromDate) {
+            const fromDate = new Date(safeFromDate);
+            fromDate.setHours(0, 0, 0, 0);
+            if (receivedAt < fromDate) return false;
+          }
+
+          if (safeToDate) {
+            const toDate = new Date(safeToDate);
+            toDate.setHours(23, 59, 59, 999);
+            if (receivedAt > toDate) return false;
+          }
+        }
+
         return true;
       }),
-    [receipts, supplierFilter, warehouseFilter],
+    [
+      receipts,
+      supplierFilter,
+      warehouseFilter,
+      statusFilter,
+      fromDateFilter,
+      toDateFilter,
+      todayDateInput,
+    ],
   );
+
+  const isFromDateInvalid = !!fromDateFilter && fromDateFilter > todayDateInput;
+  const isToDateInvalid =
+    !!fromDateFilter && !!toDateFilter && toDateFilter < fromDateFilter;
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePageIndex = Math.min(Math.max(1, pageIndex), totalPages);
@@ -64,10 +120,16 @@ export default function GoodsReceiptList() {
   }, [filtered, safePageIndex]);
 
   // reset về trang 1 khi đổi filter / data
-  useMemo(() => {
+  useEffect(() => {
     setPageIndex(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [supplierFilter, warehouseFilter, receipts.length]);
+  }, [
+    supplierFilter,
+    warehouseFilter,
+    statusFilter,
+    fromDateFilter,
+    toDateFilter,
+    receipts.length,
+  ]);
 
   const statusClass = (status: string) => {
     if (status === "Approved") return "text-emerald-600";
@@ -106,8 +168,8 @@ export default function GoodsReceiptList() {
 
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
           {/* Bộ lọc */}
-          <div className="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row gap-3 md:items-center">
-            <div className="flex-1 min-w-[180px] max-w-xs">
+          <div className="px-6 py-4 border-b border-slate-100 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+            <div>
               <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
                 Nhà cung cấp
               </label>
@@ -126,7 +188,7 @@ export default function GoodsReceiptList() {
                 ))}
               </select>
             </div>
-            <div className="flex-1 min-w-[180px] max-w-xs">
+            <div>
               <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
                 Kho
               </label>
@@ -145,7 +207,73 @@ export default function GoodsReceiptList() {
                 ))}
               </select>
             </div>
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
+                Trạng thái
+              </label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
+              >
+                <option value="ALL">Tất cả trạng thái</option>
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {toVietnameseReceiptStatus(status)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
+                Từ ngày
+              </label>
+              <input
+                type="date"
+                value={fromDateFilter}
+                max={todayDateInput}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  const normalized = next && next > todayDateInput ? todayDateInput : next;
+                  setFromDateFilter(normalized);
+                  if (toDateFilter && normalized && toDateFilter < normalized) {
+                    setToDateFilter(normalized);
+                  }
+                }}
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
+                Đến ngày
+              </label>
+              <input
+                type="date"
+                value={toDateFilter}
+                min={fromDateFilter || undefined}
+                max={todayDateInput}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  const normalized = next && next > todayDateInput ? todayDateInput : next;
+                  if (fromDateFilter && normalized && normalized < fromDateFilter) {
+                    setToDateFilter(fromDateFilter);
+                    return;
+                  }
+                  setToDateFilter(normalized);
+                }}
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
+              />
+            </div>
           </div>
+          {(isFromDateInvalid || isToDateInvalid) && (
+            <div className="px-6 pb-3 -mt-1">
+              <p className="text-xs text-rose-600">
+                {isFromDateInvalid
+                  ? "Từ ngày phải nhỏ hơn hoặc bằng ngày hiện tại."
+                  : "Đến ngày phải lớn hơn hoặc bằng Từ ngày."}
+              </p>
+            </div>
+          )}
 
           {isLoading ? (
             <div className="flex justify-center py-12">
@@ -191,9 +319,6 @@ export default function GoodsReceiptList() {
                     </th>
                     <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                       Trạng thái
-                    </th>
-                    <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                      KL nhận / dùng được
                     </th>
                     <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                       Thao tác
@@ -242,15 +367,6 @@ export default function GoodsReceiptList() {
                           )}`}
                         >
                           {toVietnameseReceiptStatus(r.status)}
-                        </span>
-                      </td>
-                      <td
-                        className="px-5 py-3.5 text-right text-slate-700 cursor-pointer"
-                        onClick={() => navigate(`${basePath}/${r.id}`)}
-                      >
-                        {r.totalReceivedWeight} kg /{" "}
-                        <span className="font-semibold">
-                          {r.totalUsableWeight} kg
                         </span>
                       </td>
                       <td className="px-5 py-3.5 text-right">

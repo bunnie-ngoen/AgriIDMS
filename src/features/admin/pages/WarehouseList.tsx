@@ -10,6 +10,8 @@ import EditWarehouseModal from "../components/EditWarehouseModal";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 const PAGE_SIZE = 10;
+const formatKg = (value: number | undefined) =>
+  Number(value ?? 0).toLocaleString("vi-VN");
 
 const WarehouseList = () => {
   const { isManager } = useRoleGuard();
@@ -167,16 +169,19 @@ const WarehouseList = () => {
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-100">
-                  <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[160px]">
                     Tên kho
                   </th>
-                  <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[260px]">
                     Địa chỉ
                   </th>
-                  <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[120px]">
                     Loại kho
                   </th>
-                  <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                  <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[240px]">
+                    Tổng trong kho / Sức chứa
+                  </th>
+                  <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[220px]">
                     Thao tác
                   </th>
                 </tr>
@@ -185,7 +190,7 @@ const WarehouseList = () => {
                 {isLoading ? (
                   <tr>
                     <td
-                      colSpan={4}
+                      colSpan={5}
                       className="px-5 py-10 text-center text-slate-500"
                     >
                       Đang tải dữ liệu...
@@ -195,15 +200,17 @@ const WarehouseList = () => {
                   paged.map((warehouse) => (
                     <tr
                       key={warehouse.id}
-                      className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors"
+                      className="border-t border-slate-100 hover:bg-emerald-50/30 transition-colors"
                     >
-                      <td className="px-5 py-3.5 font-medium text-slate-900">
-                        {warehouse.name}
+                      <td className="px-5 py-4 align-top">
+                        <p className="font-semibold text-slate-900 leading-5">
+                          {warehouse.name}
+                        </p>
                       </td>
-                      <td className="px-5 py-3.5 text-slate-600 max-w-xs truncate">
-                        {warehouse.location}
+                      <td className="px-5 py-4 align-top text-slate-600 max-w-xs">
+                        <p className="line-clamp-2 leading-5">{warehouse.location}</p>
                       </td>
-                      <td className="px-5 py-3.5">
+                      <td className="px-5 py-4 align-top">
                         <span
                           className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ${
                             warehouse.titleWarehouse === "Cold"
@@ -216,25 +223,60 @@ const WarehouseList = () => {
                             : "Kho thường"}
                         </span>
                       </td>
-                      <td className="px-5 py-3.5 text-right">
-                        <div className="flex flex-wrap items-center justify-end gap-1.5">
+                      <td className="px-5 py-4 align-top text-right text-slate-700">
+                        {(() => {
+                          const storedInSlots = Number(warehouse.storedInSlotsWeight ?? 0);
+                          const unassigned = Number(warehouse.unassignedStockWeight ?? 0);
+                          const occupied = storedInSlots + unassigned;
+                          const capacity = Number(warehouse.totalCapacity ?? 0);
+                          const overflow = Math.max(0, occupied - capacity);
+                          const isOverflow = overflow > 0;
+
+                          return (
+                        <div className="flex flex-col items-end gap-1">
+                          <span
+                            className={`font-semibold tabular-nums ${
+                              isOverflow ? "text-rose-700" : "text-slate-800"
+                            }`}
+                          >
+                            {formatKg(occupied)} / {formatKg(capacity)} kg
+                          </span>
+                          <div className="flex flex-wrap justify-end gap-1">
+                            <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
+                              Trong slot: {formatKg(storedInSlots)} kg
+                            </span>
+                            <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700">
+                              Chưa xếp: {formatKg(unassigned)} kg
+                            </span>
+                          </div>
+                          {isOverflow && (
+                            <span className="inline-flex rounded-full bg-rose-50 px-2 py-0.5 text-[11px] text-rose-700 font-medium">
+                              Vượt sức chứa: {formatKg(overflow)} kg
+                            </span>
+                          )}
+                        </div>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-5 py-4 align-top text-right">
+                        <div className="flex flex-wrap items-center justify-end gap-2">
                           <button
                             type="button"
                             onClick={() => setEditingWarehouseId(warehouse.id)}
-                            className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                            className="inline-flex items-center gap-1 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                           >
                             <Pencil size={12} />
                             Sửa
                           </button>
                           <Link
                             to={`${warehouseBasePath}/${warehouse.id}/config`}
-                            className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                            className="inline-flex items-center whitespace-nowrap rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                           >
                             Cấu hình
                           </Link>
                           <Link
                             to={`${warehouseBasePath}/${warehouse.id}/map`}
-                            className="inline-flex items-center rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                            className="inline-flex items-center whitespace-nowrap rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                           >
                             Sơ đồ
                           </Link>
@@ -242,7 +284,7 @@ const WarehouseList = () => {
                             type="button"
                             disabled={isDeleting}
                             onClick={() => handleDelete(warehouse)}
-                            className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors"
+                            className="inline-flex items-center gap-1 whitespace-nowrap rounded-xl border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors"
                           >
                             <Trash2 size={12} />
                             Xóa
@@ -254,7 +296,7 @@ const WarehouseList = () => {
                 ) : (
                   <tr>
                     <td
-                      colSpan={4}
+                      colSpan={5}
                       className="px-5 py-10 text-center text-slate-500"
                     >
                       Không tìm thấy kho phù hợp.

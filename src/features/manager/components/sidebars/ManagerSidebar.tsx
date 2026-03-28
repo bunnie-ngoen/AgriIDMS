@@ -13,7 +13,7 @@ import {
   FileText,
   PackageSearch,
   ShieldCheck,
-  QrCode,
+  AlertTriangle,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
@@ -21,7 +21,6 @@ import { useAppDispatch } from "../../../../app/hook";
 import { logout } from "../../../auth/slices/auth.slice";
 import { persistor } from "../../../../app/store";
 import { api } from "../../../../shared/api";
-import AdminQrScanPanel from "../../../admin/components/qr/AdminQrScanPanel";
 
 type SubMenuItem = {
   name: string;
@@ -50,14 +49,14 @@ function isNestedMenuItem(
 
 // Giống AdminSidebar nhưng bỏ "User Management"
 const mainMenu: MenuItem[] = [
-  { name: "Dashboard", path: "dashboard", icon: Archive },
+  { name: "Bảng điều khiển", path: "dashboard", icon: Archive },
   {
     name: "Quản lý kho",
     icon: Boxes,
     children: [
       { name: "Danh sách kho", path: "warehouses", icon: List },
       { name: "Tạo kho", path: "warehouses/create", icon: CirclePlus },
-      { name: "Xếp box vào slot", path: "putaway", icon: Boxes },
+      { name: "Xếp hàng vào vị trí", path: "putaway", icon: Boxes },
     ],
   },
   {
@@ -84,12 +83,14 @@ const mainMenu: MenuItem[] = [
     children: [
       { name: "Danh sách phiếu nhập", path: "goods-receipts", icon: List },
       { name: "Tạo phiếu nhập", path: "goods-receipts/create", icon: CirclePlus },
+      { name: "Danh sách lot", path: "lots", icon: List },
+      { name: "Hàng hư hỏng / quá hạn", path: "inventory-issues", icon: AlertTriangle },
     ],
   },
   {
     name: "Kiểm kê",
     icon: ShieldCheck,
-    children: [{ name: "Dashboard", path: "stock-checks", icon: ShieldCheck }],
+    children: [{ name: "Bảng điều khiển", path: "stock-checks", icon: ShieldCheck }],
   },
   {
     name: "Danh mục sản phẩm",
@@ -106,7 +107,7 @@ const mainMenu: MenuItem[] = [
       { name: "Danh sách sản phẩm", path: "products", icon: List },
       { name: "Tạo sản phẩm", path: "products/create", icon: CirclePlus },
       {
-        name: "Product Variant",
+        name: "Biến thể sản phẩm",
         icon: Layers,
         children: [
           { name: "Danh sách biến thể", path: "product-variants", icon: List },
@@ -121,7 +122,7 @@ const mainMenu: MenuItem[] = [
   },
 ];
 
-const accountMenu: MenuItem[] = [{ name: "Profile", path: "profile", icon: Archive }];
+const accountMenu: MenuItem[] = [{ name: "Hồ sơ", path: "profile", icon: Archive }];
 
 export default function ManagerSidebar() {
   const dispatch = useAppDispatch();
@@ -129,7 +130,6 @@ export default function ManagerSidebar() {
   const location = useLocation();
 
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
-  const [isQrDropdownOpen, setIsQrDropdownOpen] = useState(false);
 
   const currentLastSegment =
     location.pathname.split("/").filter(Boolean).slice(-1)[0] ?? "";
@@ -335,25 +335,25 @@ export default function ManagerSidebar() {
           <LayoutDashboard size={18} />
         </div>
         <div>
-          <p className="text-sm font-semibold tracking-wide">AgriIDMS Manager</p>
-          <p className="text-[11px] text-slate-300">Dashboard</p>
+          <p className="text-sm font-semibold tracking-wide">AgriIDMS Quản lí kho</p>
+          <p className="text-[11px] text-slate-300">Bảng điều khiển</p>
         </div>
       </div>
 
       <div className="flex items-center gap-3 px-4 py-3 border-b border-[#1a2226] bg-[#222d32]">
         <div className="h-9 w-9 rounded-full bg-sky-500 flex items-center justify-center text-xs font-semibold">
-          MG
+          QL
         </div>
         <div className="flex-1">
-          <p className="text-sm font-semibold">Manager</p>
-          <p className="text-[11px] text-emerald-400">Online</p>
+          <p className="text-sm font-semibold">Quản lí kho</p>
+          <p className="text-[11px] text-emerald-400">Đang hoạt động</p>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
         <div>
           <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            Main navigation
+            Điều hướng chính
           </p>
           <ul className="space-y-1">
             {mainMenu.map((item) =>
@@ -364,44 +364,7 @@ export default function ManagerSidebar() {
 
         <div>
           <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            Quick tools
-          </p>
-          <ul className="space-y-1">
-            <li>
-              <button
-                type="button"
-                onClick={() => setIsQrDropdownOpen((v) => !v)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                  isQrDropdownOpen
-                    ? "bg-[#1e282c] text-white border-l-4 border-sky-400"
-                    : "text-slate-200 hover:bg-[#1b2225]"
-                }`}
-              >
-                <span className="flex items-center min-w-0">
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded mr-3 bg-[#1f2d3a] text-slate-200">
-                    <QrCode size={15} />
-                  </span>
-                  <span className="truncate">Scan QR</span>
-                </span>
-                <ChevronRight
-                  size={13}
-                  className={`ml-2 transition-transform ${
-                    isQrDropdownOpen ? "rotate-90" : ""
-                  }`}
-                />
-              </button>
-              {isQrDropdownOpen ? (
-                <div className="mt-2 pl-2">
-                  <AdminQrScanPanel />
-                </div>
-              ) : null}
-            </li>
-          </ul>
-        </div>
-
-        <div>
-          <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            Account
+            Tài khoản
           </p>
           <ul className="space-y-1">
             {accountMenu.map((item) =>

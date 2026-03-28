@@ -1,8 +1,10 @@
 import toast from "react-hot-toast";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../auth/hooks/useAuth";
 import { AUTH_ROLE } from "../../auth/constants/auth.constants";
+import { decodeQrFromImageFile } from "../../../shared/lib/decodeQrFromImage";
+import QrCameraScannerModal from "../../../shared/components/QrCameraScannerModal";
 import {
   useApproveStockCheckMutation,
   useCompleteStockCheckCountMutation,
@@ -11,8 +13,9 @@ import {
   useStartStockCheckMutation,
   useUpdateCountedWeightMutation,
 } from "../api/stock-check.api";
+import { useLazyGetBoxByQrQuery } from "../../goods-receipt/api/goods-receipt.api";
 import type { StockCheckDetailLine, UpdateCountedWeightPayload } from "../types/stock-check.type";
-import { Loader2, CheckCircle2, XCircle, Play, Save } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Play, Save, QrCode, ImageUp, Camera } from "lucide-react";
 import {
   toVietnameseStockCheckStatus,
   toVietnameseStockCheckType,
@@ -65,6 +68,8 @@ export default function StockCheckDetailsPage() {
     useApproveStockCheckMutation();
   const [rejectStockCheck, { isLoading: isRejecting }] =
     useRejectStockCheckMutation();
+  const [triggerBoxByQr, { isFetching: isFindingByQr }] =
+    useLazyGetBoxByQrQuery();
 
   // Local editable inputs per detail row
   const [inputs, setInputs] = useState<
@@ -73,6 +78,12 @@ export default function StockCheckDetailsPage() {
       { countedWeight: string; note: string; varianceReason: number | null }
     >
   >({});
+  const [detailQrInput, setDetailQrInput] = useState("");
+  const [isDetailQrCameraOpen, setIsDetailQrCameraOpen] = useState(false);
+  const [highlightDetailId, setHighlightDetailId] = useState<number | null>(null);
+  const detailQrImageRef = useRef<HTMLInputElement | null>(null);
+  const rowRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const countedInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
   useEffect(() => {
     if (!data?.details) return;
@@ -86,6 +97,10 @@ export default function StockCheckDetailsPage() {
     });
     setInputs(next);
   }, [data?.stockCheckId]); // only reset when switching phiếu
+
+  useEffect(() => {
+    setHighlightDetailId(null);
+  }, [data?.stockCheckId]);
 
   const stockStatus = data?.status ?? "";
   const isDraft = stockStatus === "Draft";
@@ -168,7 +183,7 @@ export default function StockCheckDetailsPage() {
     if (!inp) return;
     const counted = Number(inp.countedWeight);
     if (!Number.isFinite(counted) || counted < 0) {
-      toast.error("CountedWeight không hợp lệ");
+      toast.error("Khối lượng kiểm kê không hợp lệ");
       return;
     }
 
@@ -198,6 +213,65 @@ export default function StockCheckDetailsPage() {
     }
   };
 
+  const handleFocusDetailByQr = async (qrOverride?: string) => {
+    const qr = (qrOverride ?? detailQrInput).trim();
+    if (!qr) {
+      toast.error("Vui lòng nhập/quét QR thùng.");
+      return;
+    }
+    try {
+      const box = await triggerBoxByQr(qr).unwrap();
+      const matched = details.find(
+        (d) => d.boxId === box.id || d.boxCode === box.boxCode,
+      );
+
+      if (!matched) {
+        toast.error("Thùng này không thuộc phiếu kiểm kê hiện tại.");
+        return;
+      }
+
+      setDetailQrInput(qr);
+      setHighlightDetailId(matched.stockCheckDetailId);
+      const rowEl = rowRefs.current[matched.stockCheckDetailId];
+      rowEl?.scrollIntoView({ behavior: "smooth", block: "center" });
+
+      if (canWarehouseEdit) {
+        setTimeout(() => {
+          countedInputRefs.current[matched.stockCheckDetailId]?.focus();
+        }, 120);
+      }
+
+      toast.success(`Đã định vị thùng ${matched.boxCode}`);
+    } catch (err: any) {
+      const msg =
+        err?.data?.message ||
+        err?.data?.Message ||
+        err?.data?.error ||
+        err?.data?.Error ||
+        "Không tìm thấy thùng theo QR.";
+      toast.error(msg);
+    }
+  };
+
+  const handleDetailQrFromImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const loading = toast.loading("Đang đọc QR từ ảnh...");
+    try {
+      const text = await decodeQrFromImageFile(file);
+      if (!text) {
+        toast.error("Không tìm thấy QR trong ảnh.", { id: loading });
+        return;
+      }
+      setDetailQrInput(text);
+      await handleFocusDetailByQr(text);
+      toast.success("Đã đọc QR từ ảnh.", { id: loading });
+    } catch {
+      toast.error("Không đọc được QR từ ảnh.", { id: loading });
+    }
+  };
+
   if (isLoading) {
     return <div className="text-center text-slate-500 py-10">Đang tải...</div>;
   }
@@ -221,7 +295,7 @@ export default function StockCheckDetailsPage() {
             </h2>
             <div className="mt-1 text-sm text-slate-700">
               {toVietnameseStockCheckType(data.checkType)} ·{" "}
-              {toVietnameseStockCheckStatus(data.status)} · Snapshot:{" "}
+              {toVietnameseStockCheckStatus(data.status)} · Thời điểm snapshot:{" "}
               {formatDateTime(data.snapshotAt)}
             </div>
           </div>
@@ -292,10 +366,59 @@ export default function StockCheckDetailsPage() {
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="text-sm font-semibold text-slate-900">Danh sách box</div>
+        <div className="text-sm font-semibold text-slate-900">Danh sách thùng</div>
         <div className="mt-1 text-xs text-slate-500">
-          {details.length} dòng · Snapshot khóa: {data.isLockedSnapshot ? "Có" : "Không"}
+          {details.length} dòng · Đã khóa snapshot: {data.isLockedSnapshot ? "Có" : "Không"}
         </div>
+        {details.length > 0 ? (
+          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="text-xs font-semibold text-slate-700 inline-flex items-center gap-2">
+              <QrCode size={14} />
+              Tìm nhanh dòng thùng bằng QR
+            </div>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+              <input
+                type="text"
+                value={detailQrInput}
+                onChange={(e) => setDetailQrInput(e.target.value)}
+                placeholder="Dán hoặc quét QR thùng"
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
+              />
+              <button
+                type="button"
+                onClick={() => void handleFocusDetailByQr()}
+                disabled={isFindingByQr}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+              >
+                {isFindingByQr ? <Loader2 size={14} className="animate-spin" /> : null}
+                Tìm dòng
+              </button>
+              <button
+                type="button"
+                onClick={() => detailQrImageRef.current?.click()}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <ImageUp size={14} />
+                Ảnh QR
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsDetailQrCameraOpen(true)}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <Camera size={14} />
+                Camera
+              </button>
+              <input
+                ref={detailQrImageRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleDetailQrFromImage}
+              />
+            </div>
+          </div>
+        ) : null}
 
         <div className="mt-4 space-y-3">
           {details.length === 0 ? (
@@ -318,31 +441,41 @@ export default function StockCheckDetailsPage() {
               const shortage = varianceType === "Shortage";
 
               return (
-                <div key={d.stockCheckDetailId} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div
+                  key={d.stockCheckDetailId}
+                  ref={(el) => {
+                    rowRefs.current[d.stockCheckDetailId] = el;
+                  }}
+                  className={`rounded-xl border p-3 ${
+                    highlightDetailId === d.stockCheckDetailId
+                      ? "border-sky-300 bg-sky-50 ring-2 ring-sky-500/60"
+                      : "border-slate-200 bg-slate-50"
+                  }`}
+                >
                   <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                     <div className="min-w-0">
-                      <div className="text-xs text-slate-500">Box</div>
+                      <div className="text-xs text-slate-500">Thùng</div>
                       <div className="text-sm font-semibold text-slate-900 truncate">{d.boxCode}</div>
                       <div className="text-[11px] text-slate-600 truncate mt-1">
-                        Lot: {d.lotCode}
+                        Lô: {d.lotCode}
                       </div>
                       <div className="text-[11px] text-slate-600 truncate">
-                        Slot: {d.slotCode ?? "—"}
+                        Ô kệ: {d.slotCode ?? "—"}
                       </div>
                     </div>
 
                     <div>
-                      <div className="text-xs text-slate-500">Snapshot</div>
+                      <div className="text-xs text-slate-500">Tại snapshot</div>
                       <div className="text-sm font-semibold text-slate-900">{d.snapshotWeight} kg</div>
                       <div className="text-[11px] text-slate-600 mt-1">
-                        System: {d.currentSystemWeight ?? "—"} kg
+                        Hệ thống hiện tại: {d.currentSystemWeight ?? "—"} kg
                       </div>
                     </div>
 
                     <div>
                       <div className="text-xs text-slate-500">Chênh lệch</div>
                       <div className="text-sm font-semibold text-slate-900">
-                        {diff != null && Number.isFinite(diff) ? diff.toFixed(3) : "—"} kg
+                        {diff != null && Number.isFinite(diff) ? Math.abs(diff).toFixed(3) : "—"} kg
                       </div>
                       <div className="text-[11px] text-slate-600 mt-1">
                         Trạng thái:{" "}
@@ -355,9 +488,12 @@ export default function StockCheckDetailsPage() {
                     <div className="md:col-span-2">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
                         <div>
-                          <div className="text-xs text-slate-500">Counted (KG)</div>
+                          <div className="text-xs text-slate-500">Khối lượng kiểm kê (kg)</div>
                           {canWarehouseEdit ? (
                             <input
+                              ref={(el) => {
+                                countedInputRefs.current[d.stockCheckDetailId] = el;
+                              }}
                               type="number"
                               step="0.001"
                               min={0}
@@ -374,7 +510,7 @@ export default function StockCheckDetailsPage() {
                                 }));
                               }}
                               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
-                              placeholder="0.000"
+                              placeholder="0,000"
                             />
                           ) : (
                             <div className="text-sm font-semibold text-slate-900">
@@ -402,14 +538,18 @@ export default function StockCheckDetailsPage() {
                               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
                             >
                               <option value="">Chọn nguyên nhân</option>
-                              <option value={1}>Hỏng (Damaged)</option>
-                              <option value={2}>Mất (Loss)</option>
-                              <option value={3}>Sai số cân (MeasurementError)</option>
+                              <option value={1}>Hỏng</option>
+                              <option value={2}>Mất</option>
+                              <option value={3}>Sai số cân</option>
                             </select>
                           ) : (
                             <div className="text-sm text-slate-700">
                               {shortage ? (
-                                <span className="text-rose-600">Chưa chọn</span>
+                                d.varianceReason ? (
+                                  toVietnameseVarianceReason(d.varianceReason)
+                                ) : (
+                                  <span className="text-rose-600">Chưa chọn</span>
+                                )
                               ) : (
                                 toVietnameseVarianceReason(d.varianceReason)
                               )}
@@ -454,7 +594,7 @@ export default function StockCheckDetailsPage() {
 
                       {d.countedAt ? (
                         <div className="text-[11px] text-slate-500 mt-2">
-                          Nhập bởi: {d.countedBy ?? "—"} · {formatDateTime(d.countedAt)}
+                          Kiểm kê bởi: {d.countedByName ?? d.countedBy ?? "—"} · {formatDateTime(d.countedAt)}
                         </div>
                       ) : null}
                     </div>
@@ -465,6 +605,16 @@ export default function StockCheckDetailsPage() {
           )}
         </div>
       </div>
+
+      <QrCameraScannerModal
+        open={isDetailQrCameraOpen}
+        title="Quét QR để tìm dòng thùng"
+        onClose={() => setIsDetailQrCameraOpen(false)}
+        onDetected={(value) => {
+          setDetailQrInput(value);
+          void handleFocusDetailByQr(value);
+        }}
+      />
     </div>
   );
 }

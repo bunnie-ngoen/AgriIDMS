@@ -74,9 +74,24 @@ export const userApi = api.injectEndpoints({
               (w.minReceiptWeight as number | null | undefined) ??
               (w.MinReceiptWeight as number | null | undefined) ??
               null,
+            totalStockWeight:
+              Number(w.totalStockWeight ?? w.TotalStockWeight ?? 0),
+            totalCapacity:
+              Number(w.totalCapacity ?? w.TotalCapacity ?? 0),
+            storedInSlotsWeight:
+              Number(w.storedInSlotsWeight ?? w.StoredInSlotsWeight ?? 0),
+            unassignedStockWeight:
+              Number(w.unassignedStockWeight ?? w.UnassignedStockWeight ?? 0),
           } satisfies WarehouseItem;
         });
       },
+      providesTags: (result) =>
+        result && result.length > 0
+          ? [
+              ...result.map((w) => ({ type: "Warehouse" as const, id: w.id })),
+              { type: "Warehouse" as const, id: "LIST" },
+            ]
+          : [{ type: "Warehouse" as const, id: "LIST" }],
     }),
 
     getWarehouse: builder.query<WarehouseItem, number>({
@@ -102,8 +117,19 @@ export const userApi = api.injectEndpoints({
             (item.minReceiptWeight as number | null | undefined) ??
             (item.MinReceiptWeight as number | null | undefined) ??
             null,
+          totalStockWeight:
+            Number(item.totalStockWeight ?? item.TotalStockWeight ?? 0),
+          totalCapacity:
+            Number(item.totalCapacity ?? item.TotalCapacity ?? 0),
+          storedInSlotsWeight:
+            Number(item.storedInSlotsWeight ?? item.StoredInSlotsWeight ?? 0),
+          unassignedStockWeight:
+            Number(item.unassignedStockWeight ?? item.UnassignedStockWeight ?? 0),
         } as WarehouseItem;
       },
+      providesTags: (_result, _error, id) => [
+        { type: "Warehouse" as const, id },
+      ],
     }),
 
     updateWarehouse: builder.mutation<
@@ -327,6 +353,29 @@ export const userApi = api.injectEndpoints({
       ],
     }),
 
+    syncSlotCapacitiesByWarehouse: builder.mutation<
+      { message: string; affectedSlots: number },
+      number
+    >({
+      query: (warehouseId) => ({
+        url: `slots/sync-capacity/${warehouseId}`,
+        method: "POST",
+      }),
+      transformResponse: (raw: unknown) => {
+        const res = (raw as Record<string, unknown>) ?? {};
+        return {
+          message: String(res.message ?? res.Message ?? "Đồng bộ thành công"),
+          affectedSlots: Number(res.affectedSlots ?? res.AffectedSlots ?? 0),
+        };
+      },
+      invalidatesTags: (_res, _err, warehouseId) => [
+        { type: "Warehouse" as const, id: warehouseId },
+        { type: "Warehouse" as const, id: "LIST" },
+        { type: "Slot" as const, id: "LIST" },
+        { type: "SlotContents" as const, id: "LIST" },
+      ],
+    }),
+
     getUsers: builder.query<
       PaginationResult<UserListItem>,
       { pageIndex?: number; pageSize?: number; search?: string } | void
@@ -412,4 +461,5 @@ export const {
   useUpdateSlotMutation,
   useDeleteSlotMutation,
   useGetSlotContentsQuery,
+  useSyncSlotCapacitiesByWarehouseMutation,
 } = userApi;

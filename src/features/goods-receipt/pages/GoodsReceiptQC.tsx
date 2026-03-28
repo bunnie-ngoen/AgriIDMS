@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { Navigate, useParams, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import {
   useGetGoodsReceiptByIdQuery,
@@ -32,6 +32,34 @@ type CreateBoxesForm = {
   boxSize: number;
   boxType: BoxTypeEnum;
 };
+
+async function runWithConcurrency<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<void>,
+): Promise<{ success: number; failed: number }> {
+  if (items.length === 0) return { success: 0, failed: 0 };
+  const limit = Math.max(1, Math.min(concurrency, items.length));
+  let cursor = 0;
+  let success = 0;
+  let failed = 0;
+
+  const runners = Array.from({ length: limit }, async () => {
+    while (true) {
+      const index = cursor++;
+      if (index >= items.length) break;
+      try {
+        await worker(items[index]);
+        success++;
+      } catch {
+        failed++;
+      }
+    }
+  });
+
+  await Promise.all(runners);
+  return { success, failed };
+}
 
 function toVietnameseReceiptStatus(status: string): string {
   switch (status) {
@@ -153,13 +181,16 @@ export default function GoodsReceiptQC() {
   const syncMissingLotQrImages = async () => {
     const lotsRes = await refetchLots();
     const lotList = lotsRes.data ?? [];
-    const needQr = lotList.filter((l) => l.lotCode && !l.qrImageUrl);
+    let needQr = lotList.filter((l) => l.lotCode && !l.qrImageUrl);
+    const totalNeedQr = needQr.length;
     if (needQr.length === 0) return;
     const qrToast = toast.loading(
       `Đang tạo & lưu ảnh QR cho ${needQr.length} lot...`,
     );
-    try {
-      for (const lot of needQr) {
+    let { success, failed } = await runWithConcurrency(
+      needQr,
+      4,
+      async (lot) => {
         const url = await uploadQrPayloadToCloudinary(lot.lotCode, {
           folder: "products/lots",
         });
@@ -167,15 +198,41 @@ export default function GoodsReceiptQC() {
           lotId: lot.id,
           qrImageUrl: url,
         }).unwrap();
+      },
+    );
+    if (failed > 0) {
+      const retryRes = await refetchLots();
+      needQr = (retryRes.data ?? []).filter((l) => l.lotCode && !l.qrImageUrl);
+      if (needQr.length > 0) {
+        const retry = await runWithConcurrency(needQr, 2, async (lot) => {
+          const url = await uploadQrPayloadToCloudinary(lot.lotCode, {
+            folder: "products/lots",
+          });
+          await updateLotQrImage({
+            lotId: lot.id,
+            qrImageUrl: url,
+          }).unwrap();
+        });
+        success += retry.success;
+        failed = retry.failed;
       }
-      toast.success("Đã lưu ảnh QR lot lên Cloudinary.", { id: qrToast });
-      await refetchLots();
-    } catch {
+    }
+    if (failed === 0) {
+      toast.success(`Đã lưu ảnh QR lot: ${success}/${totalNeedQr}.`, {
+        id: qrToast,
+      });
+    } else if (success > 0) {
+      toast.error(
+        `Đã lưu ảnh QR lot: ${success}/${totalNeedQr}. ${failed} lot lỗi, vui lòng thử lại.`,
+        { id: qrToast },
+      );
+    } else {
       toast.error(
         "Lưu ảnh QR lot thất bại. Kiểm tra .env Cloudinary (VITE_CLOUDINARY_*).",
         { id: qrToast },
       );
     }
+    await refetchLots();
   };
 
   useEffect(() => {
@@ -187,23 +244,6 @@ export default function GoodsReceiptQC() {
       createBoxesForm.setValue("lotId", lotsSorted[0].id);
     }
   }, [lotsSorted, createBoxesForm]);
-
-  if (Number.isNaN(receiptId) || receiptId < 1) {
-    navigate(basePath);
-    return null;
-  }
-
-  if (isLoading || !receipt) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-slate-500">
-        {isLoading ? (
-          <Loader2 size={32} className="animate-spin text-slate-400" />
-        ) : error ? (
-          <p>Không tải được phiếu nhập.</p>
-        ) : null}
-      </div>
-    );
-  }
 
   const statusClass = (status: string) => {
     if (status === "Approved") return "text-emerald-600";
@@ -235,6 +275,22 @@ export default function GoodsReceiptQC() {
   } = useGetGoodsReceiptForApprovalByIdQuery(receiptId, {
     skip: !canViewPrice || !receiptId || Number.isNaN(receiptId),
   });
+
+  if (Number.isNaN(receiptId) || receiptId < 1) {
+    return <Navigate to={basePath} replace />;
+  }
+
+  if (isLoading || !receipt) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-slate-500">
+        {isLoading ? (
+          <Loader2 size={32} className="animate-spin text-slate-400" />
+        ) : error ? (
+          <p>Không tải được phiếu nhập.</p>
+        ) : null}
+      </div>
+    );
+  }
 
   const detailsForTable =
     canViewPrice && receiptForApproval?.details?.length
@@ -464,8 +520,10 @@ export default function GoodsReceiptQC() {
         const qrToast = toast.loading(
           `Đang tạo & lưu ảnh QR cho ${created.boxes.length} box...`,
         );
-        try {
-          for (const b of created.boxes) {
+        const { success, failed } = await runWithConcurrency(
+          created.boxes,
+          6,
+          async (b) => {
             const payload = b.qrPayload || b.boxCode;
             const url = await uploadQrPayloadToCloudinary(payload, {
               folder: "products/boxes",
@@ -474,9 +532,18 @@ export default function GoodsReceiptQC() {
               boxId: b.id,
               qrImageUrl: url,
             }).unwrap();
-          }
-          toast.success("Đã lưu ảnh QR box lên Cloudinary.", { id: qrToast });
-        } catch {
+          },
+        );
+        if (failed === 0) {
+          toast.success(`Đã lưu ảnh QR box: ${success}/${created.boxes.length}.`, {
+            id: qrToast,
+          });
+        } else if (success > 0) {
+          toast.error(
+            `Đã lưu ảnh QR box: ${success}/${created.boxes.length}. ${failed} box lỗi, vui lòng thử lại.`,
+            { id: qrToast },
+          );
+        } else {
           toast.error(
             "Tạo box xong nhưng lưu ảnh QR thất bại. Kiểm tra .env Cloudinary.",
             { id: qrToast },
@@ -484,6 +551,7 @@ export default function GoodsReceiptQC() {
         }
       }
       await refetchReceiptBoxes();
+      await syncMissingLotQrImages();
       // Sau khi tạo box thành công, quay về danh sách phiếu nhập
       setTimeout(() => {
         navigate(basePath);
@@ -548,12 +616,12 @@ export default function GoodsReceiptQC() {
             </div>
             <div>
               <span className="text-slate-500 block text-xs font-medium">
-                Khối lượng nhận / dùng được
+                Khối lượng dùng được / nhận
               </span>
               <p className="font-medium text-slate-900 mt-1">
-                {receipt.totalReceivedWeight} kg /{" "}
+                {receipt.totalUsableWeight} kg /{" "}
                 <span className="font-semibold">
-                  {receipt.totalUsableWeight} kg
+                  {receipt.totalReceivedWeight} kg
                 </span>
               </p>
             </div>

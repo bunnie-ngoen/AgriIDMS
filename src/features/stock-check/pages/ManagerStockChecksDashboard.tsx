@@ -67,7 +67,7 @@ export default function ManagerStockChecksDashboard() {
               {toVietnameseStockCheckType(it.checkType)}
             </div>
             <div className="text-xs text-slate-500 mt-1">
-              Snapshot: {formatDateTime(it.snapshotAt)}
+              Thời điểm snapshot: {formatDateTime(it.snapshotAt)}
             </div>
             <div className="text-xs text-slate-500 mt-1">
               Đã đếm: {it.countedLines}/{it.totalLines}
@@ -130,10 +130,10 @@ export default function ManagerStockChecksDashboard() {
           </div>
           <div>
             <h2 className="text-lg font-semibold text-slate-900">
-              Kiểm kê (Manager)
+              Kiểm kê (Quản lý)
             </h2>
             <p className="mt-1 text-sm text-slate-600">
-              Chỉ duyệt khi phiếu ở trạng thái Counted.
+              Chỉ duyệt khi phiếu ở trạng thái Chờ duyệt.
             </p>
           </div>
         </div>

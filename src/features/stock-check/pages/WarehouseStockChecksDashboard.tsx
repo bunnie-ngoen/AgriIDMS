@@ -84,7 +84,7 @@ export default function WarehouseStockChecksDashboard() {
                     {toVietnameseStockCheckStatus(it.status)}
                   </div>
                   <div className="text-xs text-slate-500 mt-1">
-                    Snapshot: {formatDateTime(it.snapshotAt)}
+                    Thời điểm snapshot: {formatDateTime(it.snapshotAt)}
                   </div>
                   <div className="text-xs text-slate-500 mt-1">
                     Đã đếm: {it.countedLines}/{it.totalLines}
@@ -143,10 +143,10 @@ export default function WarehouseStockChecksDashboard() {
           </div>
           <div>
             <h2 className="text-lg font-semibold text-slate-900">
-              Kiểm kê (WarehouseStaff)
+              Kiểm kê (Nhân viên kho)
             </h2>
             <p className="mt-1 text-sm text-slate-600">
-              Draft: chuẩn bị · InProgress: nhập số đếm · Counted: chờ duyệt
+              Nháp: chuẩn bị · Đang đếm: nhập số đếm · Chờ duyệt: đợi quản lý xử lý
             </p>
           </div>
         </div>

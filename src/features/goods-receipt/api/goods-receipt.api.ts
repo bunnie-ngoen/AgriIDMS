@@ -4,6 +4,9 @@ import type {
   GoodsReceiptResponse,
   GoodsReceiptForApprovalResponse,
   LotSummary,
+  LotListItem,
+  LotDetail,
+  LotBoxItem,
   LotByQrResponse,
   BoxByQrResponse,
   BoxCreatedItem,
@@ -14,7 +17,10 @@ import type {
   QCInspectionRequest,
   CreateBoxesRequest,
   AssignBoxToSlotRequest,
+  AssignBoxesToSlotRequest,
   TransferBoxToSlotRequest,
+  NearExpiryDashboard,
+  DisposeHistoryItem,
 } from "../types/goods-receipt.type";
 
 type RawObject = Record<string, unknown>;
@@ -98,6 +104,96 @@ const mapDetail = (row: RawObject) => ({
     (row.LineTotal as number | null | undefined) ??
     null,
 });
+
+const mapLotListItem = (row: RawObject): LotListItem => ({
+  lotId: (row.lotId as number) ?? (row.LotId as number) ?? 0,
+  lotCode: (row.lotCode as string) ?? (row.LotCode as string) ?? "",
+  qrImageUrl:
+    (row.qrImageUrl as string | null | undefined) ??
+    (row.QrImageUrl as string | null | undefined) ??
+    null,
+  totalQuantity:
+    (row.totalQuantity as number) ?? (row.TotalQuantity as number) ?? 0,
+  remainingQuantity:
+    (row.remainingQuantity as number) ??
+    (row.RemainingQuantity as number) ??
+    0,
+  receivedDate:
+    ((row.receivedDate as string) ?? (row.ReceivedDate as string) ?? "") || "",
+  expiryDate:
+    ((row.expiryDate as string) ?? (row.ExpiryDate as string) ?? "") || "",
+  status: (row.status as string) ?? (row.Status as string) ?? "",
+  goodsReceiptId:
+    (row.goodsReceiptId as number) ?? (row.GoodsReceiptId as number) ?? 0,
+  productName: (row.productName as string) ?? (row.ProductName as string) ?? "",
+  productVariantName:
+    (row.productVariantName as string) ??
+    (row.ProductVariantName as string) ??
+    "",
+  warehouseName:
+    (row.warehouseName as string) ?? (row.WarehouseName as string) ?? "",
+});
+
+const mapLotBoxItem = (row: RawObject): LotBoxItem => ({
+  boxId: (row.boxId as number) ?? (row.BoxId as number) ?? 0,
+  boxCode: (row.boxCode as string) ?? (row.BoxCode as string) ?? "",
+  weight: (row.weight as number) ?? (row.Weight as number) ?? 0,
+  status: (row.status as string) ?? (row.Status as string) ?? "",
+  slotId:
+    (row.slotId as number | null | undefined) ??
+    (row.SlotId as number | null | undefined) ??
+    null,
+  slotCode:
+    (row.slotCode as string | null | undefined) ??
+    (row.SlotCode as string | null | undefined) ??
+    null,
+  qrCode:
+    (row.qrCode as string | null | undefined) ??
+    (row.QrCode as string | null | undefined) ??
+    null,
+  qrImageUrl:
+    (row.qrImageUrl as string | null | undefined) ??
+    (row.QrImageUrl as string | null | undefined) ??
+    null,
+  createdAt:
+    ((row.createdAt as string) ?? (row.CreatedAt as string) ?? "") || "",
+});
+
+const mapLotDetail = (row: RawObject): LotDetail => {
+  const boxesRaw = (row.boxes as unknown[]) ?? (row.Boxes as unknown[]) ?? [];
+
+  return {
+    lotId: (row.lotId as number) ?? (row.LotId as number) ?? 0,
+    lotCode: (row.lotCode as string) ?? (row.LotCode as string) ?? "",
+    qrImageUrl:
+      (row.qrImageUrl as string | null | undefined) ??
+      (row.QrImageUrl as string | null | undefined) ??
+      null,
+    totalQuantity:
+      (row.totalQuantity as number) ?? (row.TotalQuantity as number) ?? 0,
+    remainingQuantity:
+      (row.remainingQuantity as number) ??
+      (row.RemainingQuantity as number) ??
+      0,
+    receivedDate:
+      ((row.receivedDate as string) ?? (row.ReceivedDate as string) ?? "") || "",
+    expiryDate:
+      ((row.expiryDate as string) ?? (row.ExpiryDate as string) ?? "") || "",
+    status: (row.status as string) ?? (row.Status as string) ?? "",
+    goodsReceiptId:
+      (row.goodsReceiptId as number) ?? (row.GoodsReceiptId as number) ?? 0,
+    productName: (row.productName as string) ?? (row.ProductName as string) ?? "",
+    productVariantName:
+      (row.productVariantName as string) ??
+      (row.ProductVariantName as string) ??
+      "",
+    warehouseName:
+      (row.warehouseName as string) ?? (row.WarehouseName as string) ?? "",
+    boxes: Array.isArray(boxesRaw)
+      ? boxesRaw.map((b) => mapLotBoxItem((b ?? {}) as RawObject))
+      : [],
+  };
+};
 
 export const goodsReceiptApi = api.injectEndpoints({
   endpoints: (builder) => ({
@@ -211,6 +307,20 @@ export const goodsReceiptApi = api.injectEndpoints({
           };
         });
       },
+    }),
+
+    getAllLots: builder.query<LotListItem[], void>({
+      query: () => ({ url: "Lots" }),
+      transformResponse: (raw: unknown): LotListItem[] => {
+        const arr = Array.isArray(raw) ? raw : [];
+        return arr.map((item) => mapLotListItem((item ?? {}) as RawObject));
+      },
+    }),
+
+    getLotDetailById: builder.query<LotDetail, number>({
+      query: (lotId) => ({ url: `Lots/${lotId}` }),
+      transformResponse: (raw: unknown): LotDetail =>
+        mapLotDetail((raw ?? {}) as RawObject),
     }),
 
     getLotByQr: builder.query<LotByQrResponse, string>({
@@ -418,6 +528,14 @@ export const goodsReceiptApi = api.injectEndpoints({
               (row.productName as string | null | undefined) ??
               (row.ProductName as string | null | undefined) ??
               null,
+            receivedDate:
+              (row.receivedDate as string | null | undefined) ??
+              (row.ReceivedDate as string | null | undefined) ??
+              null,
+            expiryDate:
+              (row.expiryDate as string | null | undefined) ??
+              (row.ExpiryDate as string | null | undefined) ??
+              null,
             placedInColdAt:
               placed != null
                 ? typeof placed === "string"
@@ -492,6 +610,14 @@ export const goodsReceiptApi = api.injectEndpoints({
               (row.productName as string | null | undefined) ??
               (row.ProductName as string | null | undefined) ??
               null,
+            receivedDate:
+              (row.receivedDate as string | null | undefined) ??
+              (row.ReceivedDate as string | null | undefined) ??
+              null,
+            expiryDate:
+              (row.expiryDate as string | null | undefined) ??
+              (row.ExpiryDate as string | null | undefined) ??
+              null,
             placedInColdAt:
               placed != null
                 ? typeof placed === "string"
@@ -500,6 +626,383 @@ export const goodsReceiptApi = api.injectEndpoints({
                 : null,
           };
         });
+      },
+    }),
+
+    getDamagedBoxes: builder.query<BoxByQrResponse[], number | void>({
+      query: (warehouseId) => ({
+        url:
+          typeof warehouseId === "number" && warehouseId > 0
+            ? `Boxes/damaged?warehouseId=${warehouseId}`
+            : "Boxes/damaged",
+      }),
+      transformResponse: (raw: unknown): BoxByQrResponse[] => {
+        const arr = (raw as unknown as RawObject[]) ?? [];
+        if (!Array.isArray(arr)) return [];
+
+        return arr.map((row) => {
+          const placed = row.placedInColdAt ?? row.PlacedInColdAt;
+          return {
+            id: (row.id as number) ?? (row.Id as number) ?? 0,
+            boxCode:
+              (row.boxCode as string) ??
+              (row.BoxCode as string) ??
+              "",
+            qrCode:
+              (row.qrCode as string | null | undefined) ??
+              (row.QRCode as string | null | undefined) ??
+              (row.QrCode as string | null | undefined) ??
+              null,
+            qrImageUrl:
+              (row.qrImageUrl as string | null | undefined) ??
+              (row.QrImageUrl as string | null | undefined) ??
+              null,
+            weight: (row.weight as number) ?? (row.Weight as number) ?? 0,
+            status:
+              (row.status as string) ??
+              (row.Status as string) ??
+              "",
+            slotId:
+              (row.slotId as number | null | undefined) ??
+              (row.SlotId as number | null | undefined) ??
+              null,
+            warehouseId:
+              (row.warehouseId as number | null | undefined) ??
+              (row.WarehouseId as number | null | undefined) ??
+              null,
+            warehouseName:
+              (row.warehouseName as string | null | undefined) ??
+              (row.WarehouseName as string | null | undefined) ??
+              null,
+            lotId: (row.lotId as number) ?? (row.LotId as number) ?? 0,
+            lotCode:
+              (row.lotCode as string | null | undefined) ??
+              (row.LotCode as string | null | undefined) ??
+              null,
+            slotCode:
+              (row.slotCode as string | null | undefined) ??
+              (row.SlotCode as string | null | undefined) ??
+              null,
+            productVariantId:
+              (row.productVariantId as number | null | undefined) ??
+              (row.ProductVariantId as number | null | undefined) ??
+              null,
+            productVariantName:
+              (row.productVariantName as string | null | undefined) ??
+              (row.ProductVariantName as string | null | undefined) ??
+              null,
+            productName:
+              (row.productName as string | null | undefined) ??
+              (row.ProductName as string | null | undefined) ??
+              null,
+            receivedDate:
+              (row.receivedDate as string | null | undefined) ??
+              (row.ReceivedDate as string | null | undefined) ??
+              null,
+            expiryDate:
+              (row.expiryDate as string | null | undefined) ??
+              (row.ExpiryDate as string | null | undefined) ??
+              null,
+            placedInColdAt:
+              placed != null
+                ? typeof placed === "string"
+                  ? placed
+                  : new Date(placed as string | number).toISOString()
+                : null,
+          };
+        });
+      },
+    }),
+
+    getExpiredBoxesByWarehouse: builder.query<BoxByQrResponse[], number>({
+      query: (warehouseId) => ({
+        url: `Boxes/expired?warehouseId=${warehouseId}`,
+      }),
+      transformResponse: (raw: unknown): BoxByQrResponse[] => {
+        const arr = (raw as unknown as RawObject[]) ?? [];
+        if (!Array.isArray(arr)) return [];
+
+        return arr.map((row) => {
+          const placed = row.placedInColdAt ?? row.PlacedInColdAt;
+          return {
+            id: (row.id as number) ?? (row.Id as number) ?? 0,
+            boxCode:
+              (row.boxCode as string) ??
+              (row.BoxCode as string) ??
+              "",
+            qrCode:
+              (row.qrCode as string | null | undefined) ??
+              (row.QRCode as string | null | undefined) ??
+              (row.QrCode as string | null | undefined) ??
+              null,
+            qrImageUrl:
+              (row.qrImageUrl as string | null | undefined) ??
+              (row.QrImageUrl as string | null | undefined) ??
+              null,
+            weight: (row.weight as number) ?? (row.Weight as number) ?? 0,
+            status:
+              (row.status as string) ??
+              (row.Status as string) ??
+              "",
+            slotId:
+              (row.slotId as number | null | undefined) ??
+              (row.SlotId as number | null | undefined) ??
+              null,
+            warehouseId:
+              (row.warehouseId as number | null | undefined) ??
+              (row.WarehouseId as number | null | undefined) ??
+              null,
+            warehouseName:
+              (row.warehouseName as string | null | undefined) ??
+              (row.WarehouseName as string | null | undefined) ??
+              null,
+            lotId: (row.lotId as number) ?? (row.LotId as number) ?? 0,
+            lotCode:
+              (row.lotCode as string | null | undefined) ??
+              (row.LotCode as string | null | undefined) ??
+              null,
+            slotCode:
+              (row.slotCode as string | null | undefined) ??
+              (row.SlotCode as string | null | undefined) ??
+              null,
+            productVariantId:
+              (row.productVariantId as number | null | undefined) ??
+              (row.ProductVariantId as number | null | undefined) ??
+              null,
+            productVariantName:
+              (row.productVariantName as string | null | undefined) ??
+              (row.ProductVariantName as string | null | undefined) ??
+              null,
+            productName:
+              (row.productName as string | null | undefined) ??
+              (row.ProductName as string | null | undefined) ??
+              null,
+            receivedDate:
+              (row.receivedDate as string | null | undefined) ??
+              (row.ReceivedDate as string | null | undefined) ??
+              null,
+            expiryDate:
+              (row.expiryDate as string | null | undefined) ??
+              (row.ExpiryDate as string | null | undefined) ??
+              null,
+            placedInColdAt:
+              placed != null
+                ? typeof placed === "string"
+                  ? placed
+                  : new Date(placed as string | number).toISOString()
+                : null,
+          };
+        });
+      },
+    }),
+
+    disposeExpiredBoxes: builder.mutation<
+      {
+        message: string;
+        requestedCount: number;
+        disposedCount: number;
+        skippedCount: number;
+      },
+      { boxIds: number[] }
+    >({
+      query: (body) => ({
+        url: "Boxes/dispose-expired",
+        method: "POST",
+        body,
+      }),
+      transformResponse: (raw: unknown) => {
+        const obj = (raw ?? {}) as RawObject;
+        return {
+          message:
+            (obj.message as string) ??
+            (obj.Message as string) ??
+            "Đã tiêu hủy box hết hạn",
+          requestedCount:
+            (obj.requestedCount as number) ??
+            (obj.RequestedCount as number) ??
+            0,
+          disposedCount:
+            (obj.disposedCount as number) ??
+            (obj.DisposedCount as number) ??
+            0,
+          skippedCount:
+            (obj.skippedCount as number) ??
+            (obj.SkippedCount as number) ??
+            0,
+        };
+      },
+      invalidatesTags: [
+        { type: "Slot" as const },
+        { type: "SlotContents" as const, id: "LIST" },
+        { type: "Warehouse" as const, id: "LIST" },
+      ],
+    }),
+
+    getDisposeHistoryByWarehouse: builder.query<
+      DisposeHistoryItem[],
+      { warehouseId: number; fromDate?: string; toDate?: string; createdBy?: string }
+    >({
+      query: ({ warehouseId, fromDate, toDate, createdBy }) => {
+        const q: string[] = [`warehouseId=${warehouseId}`];
+        if (fromDate) q.push(`fromDate=${encodeURIComponent(fromDate)}`);
+        if (toDate) q.push(`toDate=${encodeURIComponent(toDate)}`);
+        if (createdBy) q.push(`createdBy=${encodeURIComponent(createdBy)}`);
+        return { url: `Boxes/dispose-history?${q.join("&")}` };
+      },
+      transformResponse: (raw: unknown): DisposeHistoryItem[] => {
+        const arr = (raw as unknown as RawObject[]) ?? [];
+        if (!Array.isArray(arr)) return [];
+        return arr.map((row) => ({
+          transactionId:
+            (row.transactionId as number) ?? (row.TransactionId as number) ?? 0,
+          boxId: (row.boxId as number) ?? (row.BoxId as number) ?? 0,
+          boxCode: (row.boxCode as string) ?? (row.BoxCode as string) ?? "",
+          lotId:
+            (row.lotId as number | null | undefined) ??
+            (row.LotId as number | null | undefined) ??
+            null,
+          lotCode:
+            (row.lotCode as string | null | undefined) ??
+            (row.LotCode as string | null | undefined) ??
+            null,
+          productName:
+            (row.productName as string | null | undefined) ??
+            (row.ProductName as string | null | undefined) ??
+            null,
+          productVariantName:
+            (row.productVariantName as string | null | undefined) ??
+            (row.ProductVariantName as string | null | undefined) ??
+            null,
+          quantity: (row.quantity as number) ?? (row.Quantity as number) ?? 0,
+          fromSlotId:
+            (row.fromSlotId as number | null | undefined) ??
+            (row.FromSlotId as number | null | undefined) ??
+            null,
+          fromSlotCode:
+            (row.fromSlotCode as string | null | undefined) ??
+            (row.FromSlotCode as string | null | undefined) ??
+            null,
+          warehouseId:
+            (row.warehouseId as number | null | undefined) ??
+            (row.WarehouseId as number | null | undefined) ??
+            null,
+          warehouseName:
+            (row.warehouseName as string | null | undefined) ??
+            (row.WarehouseName as string | null | undefined) ??
+            null,
+          createdBy:
+            (row.createdBy as string) ?? (row.CreatedBy as string) ?? "",
+          createdByName:
+            (row.createdByName as string | null | undefined) ??
+            (row.CreatedByName as string | null | undefined) ??
+            null,
+          createdAt:
+            (row.createdAt as string) ?? (row.CreatedAt as string) ?? "",
+        }));
+      },
+    }),
+
+    getNearExpiryDashboard: builder.query<
+      NearExpiryDashboard,
+      { days?: number; warehouseId?: number } | void
+    >({
+      query: (arg) => {
+        const days =
+          typeof arg === "object" && arg && typeof arg.days === "number"
+            ? arg.days
+            : undefined;
+        const warehouseId =
+          typeof arg === "object" && arg && typeof arg.warehouseId === "number"
+            ? arg.warehouseId
+            : undefined;
+        const q: string[] = [];
+        if (days && days > 0) q.push(`days=${days}`);
+        if (warehouseId && warehouseId > 0) q.push(`warehouseId=${warehouseId}`);
+        return {
+          url: q.length > 0 ? `Lots/near-expiry-dashboard?${q.join("&")}` : "Lots/near-expiry-dashboard",
+        };
+      },
+      transformResponse: (raw: unknown): NearExpiryDashboard => {
+        const obj = (raw ?? {}) as RawObject;
+        const lotsRaw = Array.isArray(obj.lots)
+          ? (obj.lots as RawObject[])
+          : Array.isArray(obj.Lots)
+            ? (obj.Lots as RawObject[])
+            : [];
+
+        return {
+          daysThreshold:
+            (obj.daysThreshold as number) ??
+            (obj.DaysThreshold as number) ??
+            3,
+          totalLots: (obj.totalLots as number) ?? (obj.TotalLots as number) ?? 0,
+          totalBoxes:
+            (obj.totalBoxes as number) ?? (obj.TotalBoxes as number) ?? 0,
+          lots: lotsRaw.map((row) => {
+            const boxesRaw = Array.isArray(row.boxes)
+              ? (row.boxes as RawObject[])
+              : Array.isArray(row.Boxes)
+                ? (row.Boxes as RawObject[])
+                : [];
+
+            return {
+              lotId: (row.lotId as number) ?? (row.LotId as number) ?? 0,
+              lotCode:
+                (row.lotCode as string) ?? (row.LotCode as string) ?? "",
+              productVariantId:
+                (row.productVariantId as number) ??
+                (row.ProductVariantId as number) ??
+                0,
+              productName:
+                (row.productName as string) ??
+                (row.ProductName as string) ??
+                "",
+              grade: (row.grade as string) ?? (row.Grade as string) ?? "",
+              remainingQuantity:
+                (row.remainingQuantity as number) ??
+                (row.RemainingQuantity as number) ??
+                0,
+              expiryDate:
+                (row.expiryDate as string) ??
+                (row.ExpiryDate as string) ??
+                "",
+              daysLeft:
+                (row.daysLeft as number) ?? (row.DaysLeft as number) ?? 0,
+              nearExpiryBoxCount:
+                (row.nearExpiryBoxCount as number) ??
+                (row.NearExpiryBoxCount as number) ??
+                0,
+              warehouseId:
+                (row.warehouseId as number) ??
+                (row.WarehouseId as number) ??
+                0,
+              warehouseName:
+                (row.warehouseName as string) ??
+                (row.WarehouseName as string) ??
+                "",
+              status: (row.status as string) ?? (row.Status as string) ?? "",
+              boxes: boxesRaw.map((b) => ({
+                boxId: (b.boxId as number) ?? (b.BoxId as number) ?? 0,
+                boxCode:
+                  (b.boxCode as string) ?? (b.BoxCode as string) ?? "",
+                weight: (b.weight as number) ?? (b.Weight as number) ?? 0,
+                isPartial:
+                  (b.isPartial as boolean) ??
+                  (b.IsPartial as boolean) ??
+                  false,
+                status: (b.status as string) ?? (b.Status as string) ?? "",
+                slotId:
+                  (b.slotId as number | null | undefined) ??
+                  (b.SlotId as number | null | undefined) ??
+                  null,
+                slotCode:
+                  (b.slotCode as string | null | undefined) ??
+                  (b.SlotCode as string | null | undefined) ??
+                  null,
+              })),
+            };
+          }),
+        };
       },
     }),
 
@@ -761,6 +1264,38 @@ export const goodsReceiptApi = api.injectEndpoints({
       ],
     }),
 
+    assignBoxesToSlot: builder.mutation<
+      { message: string; assignedCount?: number },
+      AssignBoxesToSlotRequest
+    >({
+      query: (body) => ({
+        url: "Boxes/assign-slot-batch",
+        method: "POST",
+        body,
+      }),
+      transformResponse: (raw: unknown): { message: string; assignedCount?: number } => {
+        if (raw && typeof raw === "object") {
+          const obj = raw as RawObject;
+          return {
+            message:
+              (obj.message as string) ??
+              (obj.Message as string) ??
+              "Đã gán nhiều box vào slot thành công",
+            assignedCount:
+              (obj.assignedCount as number | undefined) ??
+              (obj.AssignedCount as number | undefined),
+          };
+        }
+        return { message: "Đã gán nhiều box vào slot thành công" };
+      },
+      invalidatesTags: (_res, _err, arg) => [
+        { type: "Slot" as const },
+        { type: "Warehouse" as const, id: "LIST" },
+        { type: "SlotContents" as const, id: "LIST" },
+        { type: "SlotContents" as const, id: arg.slotId },
+      ],
+    }),
+
     transferBoxToSlot: builder.mutation<
       { message: string },
       TransferBoxToSlotRequest
@@ -808,12 +1343,20 @@ export const {
   useManagerReviewToleranceMutation,
   useUpdateGoodsReceiptWarehouseMutation,
   useGetLotsByGoodsReceiptIdQuery,
+  useGetAllLotsQuery,
+  useGetLotDetailByIdQuery,
   useLazyGetLotByQrQuery,
   useGetUnassignedBoxesByWarehouseQuery,
   useGetBoxesByGoodsReceiptIdQuery,
+  useGetDamagedBoxesQuery,
+  useGetExpiredBoxesByWarehouseQuery,
+  useDisposeExpiredBoxesMutation,
+  useGetDisposeHistoryByWarehouseQuery,
+  useGetNearExpiryDashboardQuery,
   useLazyGetBoxByQrQuery,
   useLazyGetSlotByQrQuery,
   useAssignBoxToSlotMutation,
+  useAssignBoxesToSlotMutation,
   useTransferBoxToSlotMutation,
   useUpdateLotQrImageMutation,
   useUpdateBoxQrImageMutation,

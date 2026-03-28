@@ -65,6 +65,7 @@ export default function CreateGoodsReceipt() {
   });
 
   const watchedPurchaseOrderId = form.watch("purchaseOrderId");
+  const watchedWarehouseId = form.watch("warehouseId");
 
   const selectedPo = purchaseOrders.find((po) => po.id === watchedPurchaseOrderId);
   const selectedSupplierName =
@@ -102,6 +103,28 @@ export default function CreateGoodsReceipt() {
     return purchaseOrderForDetails?.details ?? [];
   }, [purchaseOrderForDetails]);
 
+  const selectedWarehouse = useMemo(
+    () => warehouses.find((w) => w.id === watchedWarehouseId),
+    [warehouses, watchedWarehouseId],
+  );
+
+  const occupiedWeightOfWarehouse = useMemo(() => {
+    if (!selectedWarehouse) return 0;
+    return Number(selectedWarehouse.storedInSlotsWeight ?? 0) +
+      Number(selectedWarehouse.unassignedStockWeight ?? 0);
+  }, [selectedWarehouse]);
+
+  const totalCapacityOfWarehouse = Number(selectedWarehouse?.totalCapacity ?? 0);
+  const remainingCapacityOfWarehouse = Math.max(
+    0,
+    totalCapacityOfWarehouse - occupiedWeightOfWarehouse,
+  );
+
+  const totalIncomingWeight = useMemo(
+    () => detailLines.reduce((sum, line) => sum + Number(line.receivedWeight ?? 0), 0),
+    [detailLines],
+  );
+
   const onSubmit = async (values: FormValues) => {
     setServerMessage(null);
     const toastId = toast.loading("Đang tạo phiếu nhập kho...");
@@ -109,6 +132,26 @@ export default function CreateGoodsReceipt() {
       if (detailLines.length === 0) {
         toast.error("Vui lòng thêm ít nhất 1 dòng chi tiết trước khi lưu phiếu.");
         return;
+      }
+
+      const warehouse = warehouses.find((w) => w.id === values.warehouseId);
+      if (warehouse) {
+        const occupied =
+          Number(warehouse.storedInSlotsWeight ?? 0) +
+          Number(warehouse.unassignedStockWeight ?? 0);
+        const capacity = Number(warehouse.totalCapacity ?? 0);
+        const remaining = Math.max(0, capacity - occupied);
+        const incoming = detailLines.reduce(
+          (sum, line) => sum + Number(line.receivedWeight ?? 0),
+          0,
+        );
+
+        if (incoming > remaining + 0.0001) {
+          const msg = `Khối lượng phiếu (${incoming.toLocaleString("vi-VN")} kg) vượt sức chứa còn trống của kho (${remaining.toLocaleString("vi-VN")} kg).`;
+          form.setError("warehouseId", { type: "manual", message: msg });
+          toast.error(msg);
+          return;
+        }
       }
 
       const result = await createReceipt({
@@ -176,6 +219,24 @@ export default function CreateGoodsReceipt() {
     if (receivedWeight > matched.remainingWeight) {
       toast.error(
         `Khối lượng nhận không được vượt quá còn lại của dòng PO (còn lại ${matched.remainingWeight} kg).`,
+      );
+      return;
+    }
+
+    const existing = detailLines.find((x) => x.purchaseOrderDetailId === matched.id);
+    const currentIncoming = detailLines.reduce(
+      (sum, line) => sum + Number(line.receivedWeight ?? 0),
+      0,
+    );
+    const nextIncoming =
+      currentIncoming - Number(existing?.receivedWeight ?? 0) + receivedWeight;
+
+    if (
+      selectedWarehouse &&
+      nextIncoming > remainingCapacityOfWarehouse + 0.0001
+    ) {
+      toast.error(
+        `Tổng KL nhận (${nextIncoming.toLocaleString("vi-VN")} kg) vượt sức chứa còn trống của kho (${remainingCapacityOfWarehouse.toLocaleString("vi-VN")} kg).`,
       );
       return;
     }
@@ -520,6 +581,23 @@ export default function CreateGoodsReceipt() {
                       {(warehousesError as { status?: number })?.status === 401 &&
                         "Vui lòng đăng nhập lại với tài khoản Admin/Manager."}
                     </p>
+                  )}
+                  {!isWarehousesError && selectedWarehouse && (
+                    <div className="mt-2 space-y-1">
+                      <p className="text-[11px] text-slate-500">
+                        Đang chứa: {occupiedWeightOfWarehouse.toLocaleString("vi-VN")} /{" "}
+                        {totalCapacityOfWarehouse.toLocaleString("vi-VN")} kg
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        Còn trống: {remainingCapacityOfWarehouse.toLocaleString("vi-VN")} kg ·
+                        Phiếu này: {totalIncomingWeight.toLocaleString("vi-VN")} kg
+                      </p>
+                      {totalIncomingWeight > remainingCapacityOfWarehouse + 0.0001 && (
+                        <p className="text-[11px] text-red-500 font-medium">
+                          Khối lượng phiếu đang vượt sức chứa còn trống của kho.
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
