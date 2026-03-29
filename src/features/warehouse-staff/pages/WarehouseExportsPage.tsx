@@ -31,8 +31,8 @@ function exportStatusTone(status: string) {
 }
 
 function sourceLabel(source: string) {
-  if (source === "Online") return "Trực tuyến";
-  if (source === "POS") return "Tại quầy";
+  if (source === "Online") return "Mua online";
+  if (source === "POS") return "Mua tại quầy";
   return source;
 }
 
@@ -311,7 +311,7 @@ export default function WarehouseExportsPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-600">Nguồn</label>
+              <label className="text-xs font-medium text-slate-600">Hình thức mua</label>
               <select
                 value={sourceFilter}
                 onChange={(e) => {
@@ -372,10 +372,10 @@ export default function WarehouseExportsPage() {
                 <thead className="sticky top-0 z-10 bg-slate-50">
                   <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
                     <th className="py-2 px-3">Đơn</th>
-                    <th className="py-2 px-3">Nguồn</th>
+                    <th className="py-2 px-3">Hình thức mua</th>
                     <th className="py-2 px-3">Thanh toán lúc</th>
                     <th className="py-2 px-3">Tạo đơn</th>
-                    <th className="py-2 px-3 text-right">Tổng</th>
+                    <th className="py-2 px-3 text-right">Thành tiền (VNĐ)</th>
                     <th className="py-2 px-3">Phiếu xuất</th>
                     <th className="py-2 px-3 w-[220px]">Thao tác</th>
                   </tr>

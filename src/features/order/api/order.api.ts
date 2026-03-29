@@ -155,6 +155,28 @@ export const orderApi = api.injectEndpoints({
             },
         }),
 
+        getPendingCustomerDecisionOrders: builder.query<
+            OrderListItem[],
+            { customerUserId?: string; source?: string; skip?: number; take?: number } | void
+        >({
+            query: (arg) => ({
+                url: "Orders/staff/pending-customer-decision",
+                method: "GET",
+                params: {
+                    customerUserId: arg?.customerUserId,
+                    source: arg?.source,
+                    skip: arg?.skip ?? 0,
+                    take: arg?.take ?? 50,
+                },
+            }),
+            transformResponse: (raw: unknown) => {
+                const normalized = toCamelCase(raw);
+                const parsed = orderListSchema.safeParse(normalized);
+                if (!parsed.success) return [];
+                return parsed.data;
+            },
+        }),
+
         saleConfirmOrder: builder.mutation<SaleConfirmResponse, number>({
             query: (id) => ({
                 url: `Orders/${id}/sale-confirm`,
@@ -165,6 +187,39 @@ export const orderApi = api.injectEndpoints({
                 const parsed = saleConfirmResponseSchema.safeParse(normalized);
                 if (!parsed.success) throw new Error("Invalid sale confirm response");
                 return parsed.data;
+            },
+        }),
+
+        createPosOrder: builder.mutation<
+            {
+                orderId: number;
+                totalAmount: number;
+            },
+            {
+                customerUserId?: string;
+                items: Array<{
+                    productVariantId: number;
+                    boxWeight: number;
+                    isPartial: boolean;
+                    quantity: number;
+                    unitPrice?: number;
+                }>;
+            }
+        >({
+            query: (body) => ({
+                url: "Orders/pos",
+                method: "POST",
+                body,
+            }),
+            transformResponse: (raw: unknown) => {
+                const normalized = toCamelCase(raw) as {
+                    orderId?: unknown;
+                    totalAmount?: unknown;
+                };
+                return {
+                    orderId: Number(normalized.orderId ?? 0),
+                    totalAmount: Number(normalized.totalAmount ?? 0),
+                };
             },
         }),
 
@@ -235,6 +290,20 @@ export const orderApi = api.injectEndpoints({
             }),
         }),
 
+        waitBackorderAsStaff: builder.mutation<void, number>({
+            query: (id) => ({
+                url: `Orders/${id}/backorder/wait/staff`,
+                method: "PATCH",
+            }),
+        }),
+
+        cancelShortageAsStaff: builder.mutation<void, number>({
+            query: (id) => ({
+                url: `Orders/${id}/backorder/cancel-shortage/staff`,
+                method: "PATCH",
+            }),
+        }),
+
         allocateBackorderAsStaff: builder.mutation<
             void,
             { id: number; expiredAction: 0 | 1 }
@@ -275,6 +344,8 @@ export const {
     useGetPendingAllocationOrdersQuery,
     useGetPaidPendingExportOrdersQuery,
     useGetPendingWarehouseConfirmOrdersQuery,
+    useGetPendingCustomerDecisionOrdersQuery,
+    useCreatePosOrderMutation,
     useSaleConfirmOrderMutation,
     useConfirmOrderMutation,
     useAllocateAsStaffMutation,
@@ -283,6 +354,8 @@ export const {
     useConfirmAllocationAsStaffMutation,
     useWaitBackorderMutation,
     useCancelShortageMutation,
+    useWaitBackorderAsStaffMutation,
+    useCancelShortageAsStaffMutation,
     useAllocateBackorderAsStaffMutation,
     useCancelOrderMutation,
     useGetOverdueBackordersQuery,

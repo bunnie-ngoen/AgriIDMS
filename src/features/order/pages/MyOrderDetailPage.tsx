@@ -42,6 +42,13 @@ function paymentStatusLabel(status?: string | null) {
     return status;
 }
 
+function sourceLabel(source?: string | null) {
+    if (!source) return "—";
+    if (source === "Online") return "Mua online";
+    if (source === "POS") return "Mua tại quầy";
+    return source;
+}
+
 function getApiErrorMessage(err: unknown, fallback: string) {
     const e = err as {
         data?: { message?: string; error?: string; detail?: string };
@@ -197,7 +204,7 @@ export default function MyOrderDetailPage() {
                             <h1 className="text-xl font-bold text-slate-900">Đơn #{order.orderId}</h1>
                             <div className="mt-2 text-sm text-slate-700 flex flex-wrap gap-4">
                                 <p>Trạng thái: <span className="font-semibold">{orderStatusLabel(order.status)}</span></p>
-                                <p>Nguồn: <span className="font-semibold">{order.source}</span></p>
+                                <p>Hình thức mua: <span className="font-semibold">{sourceLabel(order.source)}</span></p>
                                 <p>Tạo lúc: <span className="font-semibold">{new Date(order.createdAt).toLocaleString("vi-VN")}</span></p>
                                 <p>Thanh toán gần nhất: <span className="font-semibold">{paymentStatusLabel(order.latestPaymentStatus)}</span></p>
                             </div>
@@ -215,7 +222,7 @@ export default function MyOrderDetailPage() {
 
                     <div className="rounded-xl border border-slate-200 bg-white p-4 h-fit">
                         <h2 className="text-lg font-bold text-slate-900">Thanh toán & xử lý đơn</h2>
-                        <p className="mt-1 text-sm text-slate-600">Tổng đơn: <span className="font-semibold">{vnd(total)} ₫</span></p>
+                        <p className="mt-1 text-sm text-slate-600">Thành tiền (VNĐ): <span className="font-semibold">{vnd(total)} ₫</span></p>
                         {(order.status === "Shipping" || order.status === "Completed") && (
                             <Link
                                 to={`${ROUTES.CUSTOMER_COMPLAINTS}?orderId=${order.orderId}`}

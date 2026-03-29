@@ -201,9 +201,9 @@ export default function ProductDetailPage() {
                     <h2 className="text-xl font-bold text-[#1a5f2a]">
                         {product.productName}
                     </h2>
-                    <p className="mt-1 text-sm text-slate-500">
-                        {gradeLabel} · ID biến thể: #{product.id}
-                    </p>
+                    <div className="mt-1 text-sm text-slate-500 space-y-0.5">
+                        <p>Hạng: {gradeLabel}</p>
+                    </div>
 
                     <div className="mt-6 border-t border-slate-200 pt-4">
                         <p className="text-[#c0392b] text-2xl font-bold">
