@@ -1,6 +1,6 @@
 import toast from "react-hot-toast";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Boxes, Clock3, PackageSearch, ShieldAlert, Sparkles } from "lucide-react";
 import {
   useAllocateAsStaffMutation,
@@ -8,9 +8,12 @@ import {
   useAutoProposeAllocationAsStaffMutation,
   useGetOverdueBackordersQuery,
   useGetPendingAllocationOrdersQuery,
+  useGetPendingCustomerDecisionOrdersQuery,
   useGetPendingSaleConfirmOrdersQuery,
   useGetPendingWarehouseConfirmOrdersQuery,
+  useCancelShortageAsStaffMutation,
   useSaleConfirmOrderMutation,
+  useWaitBackorderAsStaffMutation,
 } from "../../order/api/order.api";
 import {
   useConfirmCodPaymentMutation,
@@ -65,12 +68,19 @@ function paymentStatusLabel(status: string) {
 }
 
 function sourceLabel(source: string) {
-  if (source === "Online") return "Trực tuyến";
-  if (source === "POS") return "Tại quầy";
+  if (source === "Online") return "Mua online";
+  if (source === "POS") return "Mua tại quầy";
   return source;
 }
 
-type QueueKey = "saleConfirm" | "allocation" | "warehouseConfirm" | "pendingCod" | "backorder";
+type QueueKey =
+  | "saleConfirm"
+  | "allocation"
+  | "warehouseConfirm"
+  | "pendingCod"
+  | "posNoProposal"
+  | "pendingCustomerDecision"
+  | "backorder";
 
 type SalesOrdersPageProps = {
   forcedQueue?: QueueKey;
@@ -89,6 +99,7 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
   };
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const auth = useAuth();
   const userRoles = auth.user?.roles ?? [];
   const hasAnyRole = (...roles: string[]) => roles.some((role) => userRoles.includes(role));
@@ -124,18 +135,27 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
     allocation: 1,
     warehouseConfirm: 1,
     pendingCod: 1,
+    posNoProposal: 1,
+    pendingCustomerDecision: 1,
     backorder: 1,
   });
   const [saleConfirmFeedbackByOrderId, setSaleConfirmFeedbackByOrderId] = useState<
     Record<number, SaleConfirmResponse>
   >({});
   const [recentSaleConfirmedCards, setRecentSaleConfirmedCards] = useState<SaleConfirmPreviewCard[]>([]);
+  const prefilledOrderId = searchParams.get("orderId")?.trim() ?? "";
 
   useEffect(() => {
     if (forcedQueue && activeQueue !== forcedQueue) {
       setActiveQueue(forcedQueue);
     }
   }, [forcedQueue, activeQueue]);
+
+  useEffect(() => {
+    if (forcedQueue !== "pendingCustomerDecision" && forcedQueue !== "posNoProposal") return;
+    if (!prefilledOrderId) return;
+    setOrderIdQuery(prefilledOrderId);
+  }, [forcedQueue, prefilledOrderId]);
 
   const currentPage = pageByQueue[activeQueue] ?? 1;
   const currentSkip = (currentPage - 1) * pageSize;
@@ -158,6 +178,14 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
         take: pageSize,
       },
     );
+  const { data: pendingCustomerDecision = [], isLoading: isLoadingPendingCustomerDecision, refetch: refetchPendingCustomerDecision } =
+    useGetPendingCustomerDecisionOrdersQuery(
+      {
+        source: sourceFilter === "ALL" ? undefined : sourceFilter,
+        skip: currentSkip,
+        take: pageSize,
+      },
+    );
   const { data: overdueBackorders = [], isLoading: isLoadingBackorders, refetch: refetchBackorders } =
     useGetOverdueBackordersQuery();
   const { data: pendingCodPayments = [], isLoading: isLoadingPendingCod, refetch: refetchPendingCod } =
@@ -171,6 +199,10 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
     useAutoProposeAllocationAsStaffMutation();
   const [confirmCodPayment, { isLoading: isConfirmingCod }] =
     useConfirmCodPaymentMutation();
+  const [waitBackorderAsStaff, { isLoading: isWaitingBackorderAsStaff }] =
+    useWaitBackorderAsStaffMutation();
+  const [cancelShortageAsStaff, { isLoading: isCancellingShortageAsStaff }] =
+    useCancelShortageAsStaffMutation();
 
   const filteredPendingSaleConfirm = useMemo(() => {
     const q = saleConfirmOrderIdQuery.trim();
@@ -188,6 +220,12 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
     });
   }, [pendingAllocation, orderIdQuery]);
 
+  const filteredPosNoProposal = useMemo(() => {
+    return filteredPendingAllocation.filter(
+      (o) => o.source === "POS" && o.status === "AwaitingAllocation",
+    );
+  }, [filteredPendingAllocation]);
+
   const filteredBackorders = useMemo(() => {
     const q = orderIdQuery.trim();
     return overdueBackorders.filter((o) => {
@@ -203,6 +241,14 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
       return idOk;
     });
   }, [pendingWarehouseConfirm, orderIdQuery]);
+
+  const filteredPendingCustomerDecision = useMemo(() => {
+    const q = orderIdQuery.trim();
+    return pendingCustomerDecision.filter((o) => {
+      const idOk = q === "" || String(o.orderId).includes(q);
+      return idOk;
+    });
+  }, [pendingCustomerDecision, orderIdQuery]);
 
   const filteredPendingCodPayments = useMemo(() => {
     const q = pendingCodOrderIdQuery.trim();
@@ -229,6 +275,20 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
           value: filteredPendingCodPayments.length,
           icon: PackageSearch,
           tone: "text-violet-700 bg-violet-50 border-violet-200",
+        },
+        {
+          key: "pending-customer-decision",
+          label: "Thiếu hàng chờ chốt với khách",
+          value: filteredPendingCustomerDecision.length,
+          icon: ShieldAlert,
+          tone: "text-amber-700 bg-amber-50 border-amber-200",
+        },
+        {
+          key: "pos-no-proposal",
+          label: "POS chưa có đề xuất FEFO",
+          value: filteredPosNoProposal.length,
+          icon: Boxes,
+          tone: "text-orange-700 bg-orange-50 border-orange-200",
         },
       ] as const)
     : isWarehouseOnly
@@ -277,12 +337,21 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
             icon: PackageSearch,
             tone: "text-violet-700 bg-violet-50 border-violet-200",
           },
+          {
+            key: "pending-customer-decision",
+            label: "Thiếu hàng chờ chốt với khách",
+            value: filteredPendingCustomerDecision.length,
+            icon: ShieldAlert,
+            tone: "text-amber-700 bg-amber-50 border-amber-200",
+          },
         ] as const);
 
   const queueTabs = isSalesOnly
     ? ([
         { key: "saleConfirm", label: "Đơn hàng chờ xác nhận bán", count: filteredPendingSaleConfirm.length },
         { key: "pendingCod", label: "Thanh toán COD chờ xử lý", count: filteredPendingCodPayments.length },
+        { key: "posNoProposal", label: "POS chưa có đề xuất FEFO", count: filteredPosNoProposal.length },
+        { key: "pendingCustomerDecision", label: "Thiếu hàng chờ chốt với khách", count: filteredPendingCustomerDecision.length },
       ] as const)
     : isWarehouseOnly
       ? ([{ key: "warehouseConfirm", label: "Chờ kho xác nhận", count: filteredPendingWarehouseConfirm.length }] as const)
@@ -293,6 +362,7 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
           { key: "allocation", label: "Hàng đợi giữ hàng", count: filteredPendingAllocation.length } as const,
           { key: "warehouseConfirm", label: "Hàng đợi kho xác nhận", count: filteredPendingWarehouseConfirm.length } as const,
           { key: "pendingCod", label: "Thanh toán COD chờ xử lý", count: filteredPendingCodPayments.length } as const,
+          { key: "pendingCustomerDecision", label: "Thiếu hàng chờ chốt với khách", count: filteredPendingCustomerDecision.length } as const,
           { key: "backorder", label: "Hàng đợi backorder", count: filteredBackorders.length } as const,
         ] as const);
   const visibleQueueTabs = forcedQueue
@@ -407,10 +477,10 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
                 </th>
                 <th className="py-2 pr-3">Đơn hàng</th>
                 <th className="py-2 pr-3">Trạng thái</th>
-                <th className="py-2 pr-3">Nguồn</th>
+                <th className="py-2 pr-3">Hình thức mua</th>
                 <th className="py-2 pr-3">Ngày tạo</th>
-                <th className="py-2 pr-3">Số mặt hàng</th>
-                <th className="py-2 pr-3">Tổng tiền</th>
+                <th className="py-2 pr-3">Số loại sản phẩm</th>
+                <th className="py-2 pr-3">Thành tiền (VNĐ)</th>
                 <th className="py-2 pr-3 w-[220px]">Thao tác</th>
               </tr>
             </thead>
@@ -486,6 +556,30 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
       await refetchPendingSaleConfirm();
     } catch {
       toast.error(`Xử lý backorder đơn #${id} thất bại`, { id: t });
+    }
+  };
+
+  const handleWaitBackorderAsStaff = async (id: number) => {
+    const t = toast.loading(`Đang chuyển đơn hàng ${id} sang chờ backorder...`);
+    try {
+      await waitBackorderAsStaff(id).unwrap();
+      toast.success(`Đã chọn chờ backorder cho đơn hàng ${id} (thao tác nhân sự)`, { id: t });
+      await refetchPendingCustomerDecision();
+      await refetchBackorders();
+    } catch {
+      toast.error(`Không thể chuyển đơn hàng ${id} sang chờ backorder`, { id: t });
+    }
+  };
+
+  const handleCancelShortageAsStaff = async (id: number) => {
+    const t = toast.loading(`Đang chốt hủy phần thiếu cho đơn hàng ${id}...`);
+    try {
+      await cancelShortageAsStaff(id).unwrap();
+      toast.success(`Đã hủy phần thiếu cho đơn hàng ${id} (thao tác nhân sự)`, { id: t });
+      await refetchPendingCustomerDecision();
+      await refetchPendingWarehouseConfirm();
+    } catch {
+      toast.error(`Không thể hủy phần thiếu cho đơn hàng ${id}`, { id: t });
     }
   };
 
@@ -572,10 +666,10 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
               </th>
               <th className="py-2 pr-3">Đơn hàng</th>
               <th className="py-2 pr-3">Trạng thái</th>
-              {showSource && <th className="py-2 pr-3">Nguồn</th>}
+              {showSource && <th className="py-2 pr-3">Hình thức mua</th>}
               <th className="py-2 pr-3">Ngày tạo</th>
-              <th className="py-2 pr-3">Số mặt hàng</th>
-              <th className="py-2 pr-3">Tổng tiền</th>
+              <th className="py-2 pr-3">Số loại sản phẩm</th>
+              <th className="py-2 pr-3">Thành tiền (VNĐ)</th>
               <th className="py-2 pr-3 w-[180px]">Thao tác</th>
             </tr>
           </thead>
@@ -722,8 +816,8 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
                 >
                   <option value="createdDesc">Mới nhất</option>
                   <option value="createdAsc">Cũ nhất</option>
-                  <option value="totalDesc">Tổng tiền giảm dần</option>
-                  <option value="totalAsc">Tổng tiền tăng dần</option>
+                  <option value="totalDesc">Thành tiền giảm dần</option>
+                  <option value="totalAsc">Thành tiền tăng dần</option>
                 </select>
               </div>
               <div>
@@ -798,7 +892,7 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
             <h2 className="text-lg font-semibold text-slate-900">Bộ lọc đơn</h2>
             <div className="mt-3 grid md:grid-cols-3 gap-3">
               <div>
-                <label className="text-xs font-medium text-slate-600">Nguồn đơn</label>
+                <label className="text-xs font-medium text-slate-600">Hình thức mua</label>
                 <select
                   value={sourceFilter}
                   onChange={(e) => setSourceFilter(e.target.value)}
@@ -827,8 +921,8 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
                 >
                   <option value="createdDesc">Mới nhất</option>
                   <option value="createdAsc">Cũ nhất</option>
-                  <option value="totalDesc">Tổng tiền giảm dần</option>
-                  <option value="totalAsc">Tổng tiền tăng dần</option>
+                  <option value="totalDesc">Thành tiền giảm dần</option>
+                  <option value="totalAsc">Thành tiền tăng dần</option>
                 </select>
               </div>
               <div>
@@ -969,9 +1063,9 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
                     </span>
                   </div>
                   <div className="mt-2 grid grid-cols-2 gap-3 text-xs text-slate-600 md:grid-cols-4">
-                    <p>Tổng tiền: <span className="font-semibold text-slate-800">{vnd(c.totalAmount)} ₫</span></p>
-                    <p>Nguồn: <span className="font-semibold text-slate-800">{sourceLabel(c.source)}</span></p>
-                    <p>Số mặt hàng: <span className="font-semibold text-slate-800">{c.itemCount}</span></p>
+                    <p>Thành tiền (VNĐ): <span className="font-semibold text-slate-800">{vnd(c.totalAmount)} ₫</span></p>
+                    <p>Hình thức mua: <span className="font-semibold text-slate-800">{sourceLabel(c.source)}</span></p>
+                    <p>Số loại sản phẩm: <span className="font-semibold text-slate-800">{c.itemCount}</span></p>
                     <p>Ngày tạo: <span className="font-semibold text-slate-800">{new Date(c.createdAt).toLocaleDateString("vi-VN")}</span></p>
                   </div>
                   <p className="mt-2 text-xs text-slate-600">
@@ -1007,10 +1101,10 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
                     </th>
                     <th className="py-2 pr-3">Đơn hàng</th>
                     <th className="py-2 pr-3">Trạng thái</th>
-                    <th className="py-2 pr-3">Nguồn</th>
+                    <th className="py-2 pr-3">Hình thức mua</th>
                     <th className="py-2 pr-3">Ngày tạo</th>
-                    <th className="py-2 pr-3">Số mặt hàng</th>
-                    <th className="py-2 pr-3">Tổng tiền</th>
+                    <th className="py-2 pr-3">Số loại sản phẩm</th>
+                    <th className="py-2 pr-3">Thành tiền (VNĐ)</th>
                     <th className="py-2 pr-3 w-[320px]">Thao tác</th>
                   </tr>
                 </thead>
@@ -1082,6 +1176,78 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
             isLoadingPendingCod,
           )}
 
+        {activeQueue === "posNoProposal" &&
+          renderOrderTable(
+            filteredPosNoProposal,
+            "Không có đơn POS nào đang chờ đề xuất FEFO.",
+            isLoadingPendingAllocation,
+            handleAutoPropose,
+            "Thử đề xuất FEFO",
+            isAutoProposing || !canAutoPropose,
+            "px-3 py-2 rounded-lg border border-orange-300 text-orange-700 text-sm font-semibold hover:bg-orange-50 disabled:opacity-60",
+            true,
+            false,
+          )}
+
+        {activeQueue === "pendingCustomerDecision" &&
+          (isLoadingPendingCustomerDecision ? (
+            <p className="text-sm text-slate-500 mt-3">Đang tải...</p>
+          ) : filteredPendingCustomerDecision.length === 0 ? (
+            <p className="text-sm text-slate-500 mt-3">Không có đơn thiếu hàng đang chờ chốt với khách.</p>
+          ) : (
+            <div className="mt-4 border border-slate-200 rounded-xl overflow-auto max-h-[560px]">
+              <table className="w-full min-w-[980px] bg-white">
+                <thead className="sticky top-0 z-10 bg-slate-50">
+                  <tr className="text-left text-xs text-slate-500 border-b border-slate-200">
+                    <th className="py-2 pr-3">Đơn hàng</th>
+                    <th className="py-2 pr-3">Trạng thái</th>
+                    <th className="py-2 pr-3">Hình thức mua</th>
+                    <th className="py-2 pr-3">Ngày tạo</th>
+                    <th className="py-2 pr-3">Số loại sản phẩm</th>
+                    <th className="py-2 pr-3">Thành tiền (VNĐ)</th>
+                    <th className="py-2 pr-3 w-[340px]">Thao tác duyệt hộ khách</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredPendingCustomerDecision.map((o) => (
+                    <tr key={o.orderId} className="border-b border-slate-100 text-sm">
+                      <td className="py-3 pr-3 font-semibold text-slate-900">Đơn hàng {o.orderId}</td>
+                      <td className="py-3 pr-3">
+                        <span className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-semibold ${orderStatusTone(o.status)}`}>
+                          {orderStatusLabel(o.status)}
+                        </span>
+                      </td>
+                      <td className="py-3 pr-3 text-slate-700">{sourceLabel(o.source)}</td>
+                      <td className="py-3 pr-3 text-slate-700">{new Date(o.createdAt).toLocaleString("vi-VN")}</td>
+                      <td className="py-3 pr-3 text-slate-700">{o.itemCount}</td>
+                      <td className="py-3 pr-3 font-semibold text-slate-900">{vnd(o.totalAmount)} ₫</td>
+                      <td className="py-3 pr-3">
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleWaitBackorderAsStaff(o.orderId)}
+                            disabled={isWaitingBackorderAsStaff || isCancellingShortageAsStaff}
+                            className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60"
+                          >
+                            Chờ backorder (duyệt hộ)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleCancelShortageAsStaff(o.orderId)}
+                            disabled={isWaitingBackorderAsStaff || isCancellingShortageAsStaff}
+                            className="px-3 py-2 rounded-lg bg-amber-600 text-white text-sm font-semibold hover:bg-amber-700 disabled:opacity-60"
+                          >
+                            Hủy phần thiếu (duyệt hộ)
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+
         {activeQueue === "backorder" &&
           (isLoadingBackorders ? (
             <p className="text-sm text-slate-500 mt-3">Đang tải...</p>
@@ -1096,7 +1262,7 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
                     <th className="py-2 pr-3">Trạng thái</th>
                     <th className="py-2 pr-3">Thiếu hụt</th>
                     <th className="py-2 pr-3">Ngày tạo</th>
-                    <th className="py-2 pr-3">Tổng tiền</th>
+                    <th className="py-2 pr-3">Thành tiền (VNĐ)</th>
                     <th className="py-2 pr-3 w-[280px]">Thao tác</th>
                   </tr>
                 </thead>

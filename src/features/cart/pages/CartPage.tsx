@@ -378,11 +378,11 @@ export default function CartPage() {
                         <div className="rounded-xl border border-slate-200 bg-white p-5 sticky top-[90px]">
                             <h2 className="text-lg font-bold text-slate-900 mb-2">Tóm tắt</h2>
                             <div className="flex items-center justify-between gap-4 text-slate-700">
-                                <span className="font-medium">Tổng tiền</span>
+                                <span className="font-medium">Thành tiền (VNĐ)</span>
                                 <span className="text-slate-900 font-bold">{vnd(totalAmount)} ₫</span>
                             </div>
                             <div className="mt-2 flex items-center justify-between gap-4 text-slate-700">
-                                <span className="font-medium">Tổng đã chọn</span>
+                                <span className="font-medium">Thành tiền đã chọn (VNĐ)</span>
                                 <span className="text-slate-900 font-bold">{vnd(selectedTotal)} ₫</span>
                             </div>
 

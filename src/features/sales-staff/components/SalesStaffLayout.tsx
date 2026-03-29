@@ -1,10 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ClipboardList, LogOut, ShieldCheck, MessageCircleWarning, ChevronDown } from "lucide-react";
+import { LayoutDashboard, ClipboardList, LogOut, ShieldCheck, MessageCircleWarning, ChevronDown, Bell, PlusCircle } from "lucide-react";
 import { useAppDispatch } from "../../../app/hook";
 import { logout } from "../../auth/slices/auth.slice";
 import { persistor } from "../../../app/store";
 import { api } from "../../../shared/api";
+import {
+  useGetMyNotificationsQuery,
+  useGetUnreadNotificationCountQuery,
+  useMarkAllNotificationsAsReadMutation,
+  useMarkNotificationAsReadMutation,
+} from "../../notification/api/notification.api";
 
 export default function SalesStaffLayout() {
   const dispatch = useAppDispatch();
@@ -14,6 +20,16 @@ export default function SalesStaffLayout() {
   const isComplaintsRouteActive = location.pathname.startsWith("/sales/complaints");
   const [isOrdersOpen, setIsOrdersOpen] = useState<boolean>(isOrdersRouteActive);
   const [isComplaintsOpen, setIsComplaintsOpen] = useState<boolean>(isComplaintsRouteActive);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const notificationRef = useRef<HTMLDivElement>(null);
+  const { data: notificationData, refetch: refetchNotifications } = useGetMyNotificationsQuery({
+    page: 1,
+    pageSize: 10,
+  });
+  const { data: unreadCountData, refetch: refetchUnreadCount } = useGetUnreadNotificationCountQuery();
+  const [markAsRead] = useMarkNotificationAsReadMutation();
+  const [markAllAsRead, { isLoading: isMarkingAllAsRead }] = useMarkAllNotificationsAsReadMutation();
+  const unreadCount = unreadCountData?.unreadCount ?? 0;
 
   useEffect(() => {
     if (isOrdersRouteActive) {
@@ -26,6 +42,56 @@ export default function SalesStaffLayout() {
       setIsComplaintsOpen(true);
     }
   }, [isComplaintsRouteActive]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (notificationRef.current && !notificationRef.current.contains(e.target as Node)) {
+        setNotificationOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const formatNotificationTime = (iso: string) => {
+    const dt = new Date(iso);
+    if (Number.isNaN(dt.getTime())) return "";
+    return dt.toLocaleString("vi-VN");
+  };
+
+  const handleNotificationClick = async (
+    userNotificationId: number,
+    isRead: boolean,
+    referenceId?: number | null,
+    referenceType?: string | null,
+  ) => {
+    if (!isRead) {
+      try {
+        await markAsRead(userNotificationId).unwrap();
+        await Promise.all([refetchNotifications(), refetchUnreadCount()]);
+      } catch {
+        // Keep navigation responsive even if marking read fails.
+      }
+    }
+
+    if (referenceType === "OrderAllocationShortage" && referenceId) {
+      navigate(`/sales/orders/pending-customer-decision?orderId=${referenceId}`);
+      setNotificationOpen(false);
+      return;
+    }
+
+    navigate(referenceId ? `/sales/orders/sale-confirm?orderId=${referenceId}` : "/sales/orders/sale-confirm");
+    setNotificationOpen(false);
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await markAllAsRead().unwrap();
+      await Promise.all([refetchNotifications(), refetchUnreadCount()]);
+    } catch {
+      // Ignore and allow user to continue.
+    }
+  };
 
   const handleLogout = () => {
     dispatch(logout());
@@ -85,6 +151,21 @@ export default function SalesStaffLayout() {
                 <ul className="overflow-hidden space-y-1 pl-4">
                   <li>
                     <NavLink
+                      to="/sales/orders/pos-create"
+                      className={({ isActive }) =>
+                        `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                          isActive
+                            ? "bg-emerald-900/30 text-emerald-200 border border-emerald-700/60"
+                            : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                        }`
+                      }
+                    >
+                      <PlusCircle size={14} />
+                      Tạo đơn tại quầy (POS)
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink
                       to="/sales/orders/sale-confirm"
                       className={({ isActive }) =>
                         `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
@@ -111,6 +192,36 @@ export default function SalesStaffLayout() {
                     >
                       <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
                       Thanh toán COD chờ xử lý
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink
+                      to="/sales/orders/pos-no-proposal"
+                      className={({ isActive }) =>
+                        `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                          isActive
+                            ? "bg-orange-900/30 text-orange-200 border border-orange-700/60"
+                            : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                        }`
+                      }
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
+                      POS chưa có đề xuất FEFO
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink
+                      to="/sales/orders/pending-customer-decision"
+                      className={({ isActive }) =>
+                        `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                          isActive
+                            ? "bg-amber-900/30 text-amber-200 border border-amber-700/60"
+                            : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                        }`
+                      }
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                      Thiếu hàng chờ chốt với khách
                     </NavLink>
                   </li>
                 </ul>
@@ -187,10 +298,77 @@ export default function SalesStaffLayout() {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 border-b border-slate-200 bg-white/90 backdrop-blur flex items-center px-6 shrink-0">
+        <header className="h-16 border-b border-slate-200 bg-white/90 backdrop-blur flex items-center justify-between px-6 shrink-0">
           <div>
             <p className="text-sm text-slate-500">Không gian bán hàng</p>
             <span className="text-slate-800 font-semibold">Hệ thống xử lý đơn bán</span>
+          </div>
+          <div className="relative" ref={notificationRef}>
+            <button
+              type="button"
+              onClick={() => setNotificationOpen((v) => !v)}
+              className="relative p-2 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100"
+              aria-label="Thông báo"
+            >
+              <Bell size={20} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-amber-600 text-white text-[11px] font-bold h-5 min-w-5 px-1 rounded-full flex items-center justify-center border border-white">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {notificationOpen && (
+              <div className="absolute right-0 mt-2 w-[360px] max-w-[90vw] bg-white rounded-xl shadow-lg border border-slate-100 z-30 overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                  <p className="text-sm font-semibold text-slate-800">Thông báo của bạn</p>
+                  <button
+                    type="button"
+                    onClick={handleMarkAllAsRead}
+                    disabled={isMarkingAllAsRead || unreadCount === 0}
+                    className="text-xs font-semibold text-amber-700 disabled:text-slate-400 hover:underline"
+                  >
+                    Đánh dấu tất cả đã đọc
+                  </button>
+                </div>
+
+                <div className="max-h-[380px] overflow-auto">
+                  {!notificationData?.items?.length ? (
+                    <p className="px-4 py-5 text-sm text-slate-500">Chưa có thông báo nào.</p>
+                  ) : (
+                    <div className="divide-y divide-slate-100">
+                      {notificationData.items.map((item) => (
+                        <button
+                          key={item.userNotificationId}
+                          type="button"
+                          onClick={() =>
+                            handleNotificationClick(
+                              item.userNotificationId,
+                              item.isRead,
+                              item.referenceId,
+                              item.referenceType,
+                            )
+                          }
+                          className={`w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors ${
+                            item.isRead ? "bg-white" : "bg-amber-50/40"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="text-sm text-slate-800 leading-5">{item.message}</p>
+                            {!item.isRead && (
+                              <span className="mt-1 h-2 w-2 rounded-full bg-amber-500 shrink-0" />
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-1">
+                            {formatNotificationTime(item.createdAt)}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </header>
         <main className="flex-1 overflow-y-auto px-6 pt-6 pb-10">

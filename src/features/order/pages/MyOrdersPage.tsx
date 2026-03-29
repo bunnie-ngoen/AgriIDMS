@@ -159,8 +159,8 @@ export default function MyOrdersPage() {
                                 >
                                     <option value="createdDesc">Mới nhất</option>
                                     <option value="createdAsc">Cũ nhất</option>
-                                    <option value="totalDesc">Tổng tiền giảm dần</option>
-                                    <option value="totalAsc">Tổng tiền tăng dần</option>
+                                    <option value="totalDesc">Thành tiền giảm dần</option>
+                                    <option value="totalAsc">Thành tiền tăng dần</option>
                                 </select>
                             </div>
                             <div>
@@ -202,8 +202,8 @@ export default function MyOrdersPage() {
                                         <th className="py-3 px-4">Mã đơn</th>
                                         <th className="py-3 px-4">Ngày tạo</th>
                                         <th className="py-3 px-4">Trạng thái</th>
-                                        <th className="py-3 px-4">Số dòng</th>
-                                        <th className="py-3 px-4">Tổng tiền</th>
+                                        <th className="py-3 px-4">Số loại sản phẩm</th>
+                                        <th className="py-3 px-4">Thành tiền (VNĐ)</th>
                                         <th className="py-3 px-4">Thanh toán</th>
                                         <th className="py-3 px-4">Chi tiết</th>
                                     </tr>
