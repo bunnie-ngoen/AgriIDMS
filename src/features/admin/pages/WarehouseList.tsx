@@ -14,8 +14,13 @@ const formatKg = (value: number | undefined) =>
   Number(value ?? 0).toLocaleString("vi-VN");
 
 const WarehouseList = () => {
-  const { isManager } = useRoleGuard();
-  const warehouseBasePath = isManager() ? "/manager/warehouses" : "/admin/warehouses";
+  const { isManager, isWarehouseStaff } = useRoleGuard();
+  const warehouseBasePath = isWarehouseStaff()
+    ? "/warehouse/warehouses"
+    : isManager()
+      ? "/manager/warehouses"
+      : "/admin/warehouses";
+  const readOnlyActions = isWarehouseStaff();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialPage = Number(searchParams.get("page") ?? "1") || 1;
 
@@ -109,13 +114,15 @@ const WarehouseList = () => {
               </p>
             </div>
           </div>
-          <Link
-            to={`${warehouseBasePath}/create`}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl py-3 px-5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
-          >
-            <Plus size={16} />
-            Thêm kho
-          </Link>
+          {!readOnlyActions ? (
+            <Link
+              to={`${warehouseBasePath}/create`}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl py-3 px-5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+            >
+              <Plus size={16} />
+              Thêm kho
+            </Link>
+          ) : null}
         </div>
 
         {/* Card nội dung */}
@@ -260,35 +267,41 @@ const WarehouseList = () => {
                       </td>
                       <td className="px-5 py-4 align-top text-right">
                         <div className="flex flex-wrap items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setEditingWarehouseId(warehouse.id)}
-                            className="inline-flex items-center gap-1 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                          >
-                            <Pencil size={12} />
-                            Sửa
-                          </button>
-                          <Link
-                            to={`${warehouseBasePath}/${warehouse.id}/config`}
-                            className="inline-flex items-center whitespace-nowrap rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-                          >
-                            Cấu hình
-                          </Link>
+                          {!readOnlyActions ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setEditingWarehouseId(warehouse.id)}
+                                className="inline-flex items-center gap-1 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                              >
+                                <Pencil size={12} />
+                                Sửa
+                              </button>
+                              <Link
+                                to={`${warehouseBasePath}/${warehouse.id}/config`}
+                                className="inline-flex items-center whitespace-nowrap rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                              >
+                                Cấu hình
+                              </Link>
+                            </>
+                          ) : null}
                           <Link
                             to={`${warehouseBasePath}/${warehouse.id}/map`}
                             className="inline-flex items-center whitespace-nowrap rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                           >
                             Sơ đồ
                           </Link>
-                          <button
-                            type="button"
-                            disabled={isDeleting}
-                            onClick={() => handleDelete(warehouse)}
-                            className="inline-flex items-center gap-1 whitespace-nowrap rounded-xl border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors"
-                          >
-                            <Trash2 size={12} />
-                            Xóa
-                          </button>
+                          {!readOnlyActions ? (
+                            <button
+                              type="button"
+                              disabled={isDeleting}
+                              onClick={() => handleDelete(warehouse)}
+                              className="inline-flex items-center gap-1 whitespace-nowrap rounded-xl border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors"
+                            >
+                              <Trash2 size={12} />
+                              Xóa
+                            </button>
+                          ) : null}
                         </div>
                       </td>
                     </tr>

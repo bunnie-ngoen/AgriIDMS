@@ -14,6 +14,8 @@ import {
   PackageSearch,
   ShieldCheck,
   AlertTriangle,
+  BadgePercent,
+  Trash2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
@@ -57,6 +59,13 @@ const mainMenu: MenuItem[] = [
       { name: "Danh sách kho", path: "warehouses", icon: List },
       { name: "Tạo kho", path: "warehouses/create", icon: CirclePlus },
       { name: "Xếp hàng vào vị trí", path: "putaway", icon: Boxes },
+      { name: "Hàng hư hỏng / quá hạn", path: "inventory-issues", icon: AlertTriangle },
+      { name: "Duyệt yêu cầu tiêu hủy", path: "disposal-requests", icon: Trash2 },
+      {
+        name: "Cấu hình giảm giá (gần hết hạn)",
+        path: "near-expiry-discount-config",
+        icon: BadgePercent,
+      },
     ],
   },
   {
@@ -89,7 +98,6 @@ const mainMenu: MenuItem[] = [
       { name: "Danh sách phiếu nhập", path: "goods-receipts", icon: List },
       { name: "Tạo phiếu nhập", path: "goods-receipts/create", icon: CirclePlus },
       { name: "Danh sách lot", path: "lots", icon: List },
-      { name: "Hàng hư hỏng / quá hạn", path: "inventory-issues", icon: AlertTriangle },
     ],
   },
   {

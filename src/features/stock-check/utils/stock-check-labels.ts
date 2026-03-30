@@ -49,6 +49,8 @@ export function toVietnameseVarianceReason(reason?: string | null): string {
       return "Mất";
     case "MeasurementError":
       return "Sai số cân";
+    case "Other":
+      return "Khác";
     default:
       return reason ?? "—";
   }

@@ -14,11 +14,11 @@ function toVietnameseReceiptStatus(status: string): string {
     case "Received":
       return "Đã nhận";
     case "QCCompleted":
-      return "Đã hoàn tất QC";
+      return "Đã hoàn tất kiểm tra chất lượng";
     case "PendingManagerApproval":
       return "Chờ quản lý duyệt";
     case "PendingManagerApprovalQc":
-      return "Chờ quản lý duyệt (QC)";
+      return "Chờ quản lý duyệt (kiểm tra chất lượng)";
     case "Approved":
       return "Đã duyệt";
     case "Rejected":
@@ -120,7 +120,7 @@ export default function GoodsReceiptDetail() {
             onClick={() => navigate(`${basePath}/${receipt.id}/qc`)}
             className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
           >
-            Mở màn QC
+            Mở màn kiểm tra chất lượng
           </button>
         </div>
 
@@ -181,10 +181,10 @@ export default function GoodsReceiptDetail() {
                   {canViewPrice && (
                     <>
                       <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                        Đơn giá
+                        Đơn giá(VNĐ)
                       </th>
                       <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                        Thành tiền
+                        Thành tiền(VNĐ)
                       </th>
                     </>
                   )}
@@ -217,7 +217,7 @@ export default function GoodsReceiptDetail() {
                           <td className="px-5 py-3 text-right text-slate-700 tabular-nums">
                             {d.unitPrice != null ? (
                               <>
-                                {moneyFmt.format(Number(d.unitPrice))} ₫
+                                {moneyFmt.format(Number(d.unitPrice))}
                               </>
                             ) : (
                               "—"
@@ -228,8 +228,7 @@ export default function GoodsReceiptDetail() {
                               <>
                                 {moneyFmt.format(
                                   Number(d.unitPrice) * Number(d.receivedWeight),
-                                )}{" "}
-                                ₫
+                                )}
                               </>
                             ) : (
                               "—"

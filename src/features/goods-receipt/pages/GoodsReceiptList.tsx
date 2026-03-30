@@ -20,11 +20,11 @@ function toVietnameseReceiptStatus(status: string): string {
     case "Received":
       return "Đã nhận";
     case "QCCompleted":
-      return "Đã hoàn tất QC";
+      return "Đã hoàn tất kiểm tra chất lượng";
     case "PendingManagerApproval":
       return "Chờ quản lý duyệt";
     case "PendingManagerApprovalQc":
-      return "Chờ quản lý duyệt (QC)";
+      return "Chờ quản lý duyệt (kiểm tra chất lượng)";
     case "Approved":
       return "Đã duyệt";
     case "Rejected":

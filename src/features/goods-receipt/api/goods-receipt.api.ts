@@ -838,6 +838,241 @@ export const goodsReceiptApi = api.injectEndpoints({
       ],
     }),
 
+    createDisposalRequest: builder.mutation<
+      { id: number; message: string },
+      { warehouseId: number; boxIds: number[]; reason: string }
+    >({
+      query: (body) => ({
+        url: "DisposalRequests",
+        method: "POST",
+        body,
+      }),
+      transformResponse: (raw: unknown) => {
+        const obj = (raw ?? {}) as RawObject;
+        return {
+          id: (obj.id as number) ?? (obj.Id as number) ?? 0,
+          message:
+            (obj.message as string) ??
+            (obj.Message as string) ??
+            "Đã gửi yêu cầu tiêu hủy, chờ Quản lí duyệt.",
+        };
+      },
+      invalidatesTags: [{ type: "Notification" as const, id: "LIST" }],
+    }),
+
+    directDisposeBoxes: builder.mutation<
+      { message: string },
+      { warehouseId: number; boxIds: number[]; reason: string }
+    >({
+      query: (body) => ({
+        url: "DisposalRequests/direct-dispose",
+        method: "POST",
+        body,
+      }),
+      transformResponse: (raw: unknown) => {
+        const obj = (raw ?? {}) as RawObject;
+        return {
+          message:
+            (obj.message as string) ??
+            (obj.Message as string) ??
+            "Đã tiêu hủy hàng hóa thành công.",
+        };
+      },
+      invalidatesTags: [
+        { type: "Slot" as const },
+        { type: "SlotContents" as const, id: "LIST" },
+        { type: "Warehouse" as const, id: "LIST" },
+        { type: "Notification" as const, id: "LIST" },
+      ],
+    }),
+
+    getDisposalRequests: builder.query<
+      Array<{
+        id: number;
+        status: string;
+        warehouseId: number;
+        warehouseName: string;
+        reason: string;
+        requestedBy: string;
+        requestedByName?: string | null;
+        requestedAt: string;
+        reviewedBy?: string | null;
+        reviewedByName?: string | null;
+        reviewedAt?: string | null;
+        reviewNote?: string | null;
+        boxCount: number;
+      }>,
+      { status?: string; warehouseId?: number } | void
+    >({
+      query: (arg) => {
+        const q: string[] = [];
+        if (arg && arg.status) q.push(`status=${encodeURIComponent(arg.status)}`);
+        if (arg && typeof arg.warehouseId === "number" && arg.warehouseId > 0) {
+          q.push(`warehouseId=${arg.warehouseId}`);
+        }
+        return { url: q.length ? `DisposalRequests?${q.join("&")}` : "DisposalRequests" };
+      },
+      transformResponse: (raw: unknown) => {
+        const arr = Array.isArray(raw) ? (raw as RawObject[]) : [];
+        return arr.map((row) => ({
+          id: (row.id as number) ?? (row.Id as number) ?? 0,
+          status: (row.status as string) ?? (row.Status as string) ?? "",
+          warehouseId:
+            (row.warehouseId as number) ?? (row.WarehouseId as number) ?? 0,
+          warehouseName:
+            (row.warehouseName as string) ??
+            (row.WarehouseName as string) ??
+            "",
+          reason: (row.reason as string) ?? (row.Reason as string) ?? "",
+          requestedBy:
+            (row.requestedBy as string) ?? (row.RequestedBy as string) ?? "",
+          requestedByName:
+            (row.requestedByName as string | null | undefined) ??
+            (row.RequestedByName as string | null | undefined) ??
+            null,
+          requestedAt:
+            (row.requestedAt as string) ?? (row.RequestedAt as string) ?? "",
+          reviewedBy:
+            (row.reviewedBy as string | null | undefined) ??
+            (row.ReviewedBy as string | null | undefined) ??
+            null,
+          reviewedByName:
+            (row.reviewedByName as string | null | undefined) ??
+            (row.ReviewedByName as string | null | undefined) ??
+            null,
+          reviewedAt:
+            (row.reviewedAt as string | null | undefined) ??
+            (row.ReviewedAt as string | null | undefined) ??
+            null,
+          reviewNote:
+            (row.reviewNote as string | null | undefined) ??
+            (row.ReviewNote as string | null | undefined) ??
+            null,
+          boxCount: (row.boxCount as number) ?? (row.BoxCount as number) ?? 0,
+        }));
+      },
+      providesTags: [{ type: "Notification" as const, id: "LIST" }],
+    }),
+
+    getDisposalRequestById: builder.query<
+      {
+        id: number;
+        status: string;
+        warehouseId: number;
+        warehouseName: string;
+        reason: string;
+        requestedBy: string;
+        requestedByName?: string | null;
+        requestedAt: string;
+        reviewedBy?: string | null;
+        reviewedByName?: string | null;
+        reviewedAt?: string | null;
+        reviewNote?: string | null;
+        boxCount: number;
+        items: Array<{
+          boxId: number;
+          boxCode: string;
+          weight: number;
+          lotCode?: string | null;
+          expiryDate?: string | null;
+          slotCode?: string | null;
+          productName?: string | null;
+          productVariantName?: string | null;
+        }>;
+      },
+      number
+    >({
+      query: (id) => ({ url: `DisposalRequests/${id}` }),
+      transformResponse: (raw: unknown) => {
+        const row = (raw ?? {}) as RawObject;
+        const items = Array.isArray(row.items)
+          ? (row.items as RawObject[])
+          : Array.isArray(row.Items)
+            ? (row.Items as RawObject[])
+            : [];
+        return {
+          id: (row.id as number) ?? (row.Id as number) ?? 0,
+          status: (row.status as string) ?? (row.Status as string) ?? "",
+          warehouseId:
+            (row.warehouseId as number) ?? (row.WarehouseId as number) ?? 0,
+          warehouseName:
+            (row.warehouseName as string) ??
+            (row.WarehouseName as string) ??
+            "",
+          reason: (row.reason as string) ?? (row.Reason as string) ?? "",
+          requestedBy:
+            (row.requestedBy as string) ?? (row.RequestedBy as string) ?? "",
+          requestedByName:
+            (row.requestedByName as string | null | undefined) ??
+            (row.RequestedByName as string | null | undefined) ??
+            null,
+          requestedAt:
+            (row.requestedAt as string) ?? (row.RequestedAt as string) ?? "",
+          reviewedBy:
+            (row.reviewedBy as string | null | undefined) ??
+            (row.ReviewedBy as string | null | undefined) ??
+            null,
+          reviewedByName:
+            (row.reviewedByName as string | null | undefined) ??
+            (row.ReviewedByName as string | null | undefined) ??
+            null,
+          reviewedAt:
+            (row.reviewedAt as string | null | undefined) ??
+            (row.ReviewedAt as string | null | undefined) ??
+            null,
+          reviewNote:
+            (row.reviewNote as string | null | undefined) ??
+            (row.ReviewNote as string | null | undefined) ??
+            null,
+          boxCount: (row.boxCount as number) ?? (row.BoxCount as number) ?? 0,
+          items: items.map((it) => ({
+            boxId: (it.boxId as number) ?? (it.BoxId as number) ?? 0,
+            boxCode: (it.boxCode as string) ?? (it.BoxCode as string) ?? "",
+            weight: (it.weight as number) ?? (it.Weight as number) ?? 0,
+            lotCode:
+              (it.lotCode as string | null | undefined) ??
+              (it.LotCode as string | null | undefined) ??
+              null,
+            expiryDate:
+              (it.expiryDate as string | null | undefined) ??
+              (it.ExpiryDate as string | null | undefined) ??
+              null,
+            slotCode:
+              (it.slotCode as string | null | undefined) ??
+              (it.SlotCode as string | null | undefined) ??
+              null,
+            productName:
+              (it.productName as string | null | undefined) ??
+              (it.ProductName as string | null | undefined) ??
+              null,
+            productVariantName:
+              (it.productVariantName as string | null | undefined) ??
+              (it.ProductVariantName as string | null | undefined) ??
+              null,
+          })),
+        };
+      },
+      providesTags: [{ type: "Notification" as const, id: "LIST" }],
+    }),
+
+    approveDisposalRequest: builder.mutation<{ message: string }, { id: number; reviewNote?: string }>({
+      query: ({ id, reviewNote }) => ({
+        url: `DisposalRequests/${id}/approve`,
+        method: "POST",
+        body: reviewNote ?? "",
+      }),
+      invalidatesTags: [{ type: "Notification" as const, id: "LIST" }],
+    }),
+
+    rejectDisposalRequest: builder.mutation<{ message: string }, { id: number; reviewNote?: string }>({
+      query: ({ id, reviewNote }) => ({
+        url: `DisposalRequests/${id}/reject`,
+        method: "POST",
+        body: reviewNote ?? "",
+      }),
+      invalidatesTags: [{ type: "Notification" as const, id: "LIST" }],
+    }),
+
     getDisposeHistoryByWarehouse: builder.query<
       DisposeHistoryItem[],
       { warehouseId: number; fromDate?: string; toDate?: string; createdBy?: string }
@@ -981,6 +1216,10 @@ export const goodsReceiptApi = api.injectEndpoints({
                 (row.WarehouseName as string) ??
                 "",
               status: (row.status as string) ?? (row.Status as string) ?? "",
+              suggestedDiscountPercent:
+                (row.suggestedDiscountPercent as number | null | undefined) ??
+                (row.SuggestedDiscountPercent as number | null | undefined) ??
+                undefined,
               boxes: boxesRaw.map((b) => ({
                 boxId: (b.boxId as number) ?? (b.BoxId as number) ?? 0,
                 boxCode:
@@ -1067,10 +1306,7 @@ export const goodsReceiptApi = api.injectEndpoints({
           usableWeight: body.usableWeight,
         },
       }),
-      invalidatesTags: (_res, _err, arg) => {
-        const tags = [{ type: "GoodsReceipt" as const, id: "LIST" as const }];
-        return tags;
-      },
+      invalidatesTags: () => [{ type: "GoodsReceipt" as const, id: "LIST" }],
     }),
 
     createBoxes: builder.mutation<
@@ -1351,6 +1587,12 @@ export const {
   useGetDamagedBoxesQuery,
   useGetExpiredBoxesByWarehouseQuery,
   useDisposeExpiredBoxesMutation,
+  useCreateDisposalRequestMutation,
+  useDirectDisposeBoxesMutation,
+  useGetDisposalRequestsQuery,
+  useGetDisposalRequestByIdQuery,
+  useApproveDisposalRequestMutation,
+  useRejectDisposalRequestMutation,
   useGetDisposeHistoryByWarehouseQuery,
   useGetNearExpiryDashboardQuery,
   useLazyGetBoxByQrQuery,

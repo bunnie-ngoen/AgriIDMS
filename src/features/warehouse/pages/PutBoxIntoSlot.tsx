@@ -178,12 +178,12 @@ export default function PutBoxIntoSlot() {
   const handleLoadBox = async (qrOverride?: string) => {
     const qr = (qrOverride ?? boxQrInput).trim();
     if (!qr) {
-      toast.error("Vui lòng quét/nhập QR box hoặc chọn ảnh có mã QR.");
+      toast.error("Vui lòng quét/nhập QR hàng hoặc chọn ảnh có mã QR.");
       return;
     }
     try {
       await triggerBoxByQr(qr).unwrap();
-      toast.success("Đã tải thông tin box.");
+      toast.success("Đã tải thông tin hàng.");
       setTimeout(() => slotInputRef.current?.focus(), 50);
     } catch (err: any) {
       const msg =
@@ -191,7 +191,7 @@ export default function PutBoxIntoSlot() {
         err?.data?.Message ||
         err?.data?.error ||
         err?.data?.Error ||
-        "Không tìm thấy box theo QR.";
+        "Không tìm thấy hàng theo QR.";
       toast.error(msg);
     }
   };
@@ -199,14 +199,14 @@ export default function PutBoxIntoSlot() {
   const handleLoadLot = async (qrOverride?: string) => {
     const qr = (qrOverride ?? lotQrInput).trim();
     if (!qr) {
-      toast.error("Vui lòng quét/nhập QR lot hoặc chọn ảnh có mã QR.");
+      toast.error("Vui lòng quét/nhập QR lô hàng hoặc chọn ảnh có mã QR.");
       return;
     }
     try {
       const loaded = await triggerLotByQr(qr).unwrap();
       setSelectedLotId(loaded.id);
       setSelectedLotBoxIds([]);
-      toast.success(`Đã tải lot ${loaded.lotCode}.`);
+      toast.success(`Đã tải lô hàng ${loaded.lotCode}.`);
       setTimeout(() => lotInputRef.current?.blur(), 50);
     } catch (err: any) {
       const msg =
@@ -214,7 +214,7 @@ export default function PutBoxIntoSlot() {
         err?.data?.Message ||
         err?.data?.error ||
         err?.data?.Error ||
-        "Không tìm thấy lot theo QR.";
+        "Không tìm thấy lô hàng theo QR.";
       toast.error(msg);
     }
   };
@@ -223,26 +223,26 @@ export default function PutBoxIntoSlot() {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    const loading = toast.loading("Đang đọc QR lot từ ảnh...");
+    const loading = toast.loading("Đang đọc QR lô hàng từ ảnh...");
     try {
       const text = await decodeQrFromImageFile(file);
       if (!text) {
         toast.error(
-          "Không tìm thấy mã QR lot trong ảnh. Thử ảnh rõ hơn hoặc crop sát mã QR.",
+          "Không tìm thấy mã QR lô hàng trong ảnh. Thử ảnh rõ hơn hoặc crop sát mã QR.",
           { id: loading },
         );
         return;
       }
       setLotQrInput(text);
       await handleLoadLot(text);
-      toast.success("Đã tải lot từ ảnh.", { id: loading });
+      toast.success("Đã tải lô hàng từ ảnh.", { id: loading });
     } catch (err: any) {
       const msg =
         err?.data?.message ||
         err?.data?.Message ||
         err?.data?.error ||
         err?.data?.Error ||
-        "Không tìm thấy lot theo QR trong ảnh.";
+        "Không tìm thấy lô hàng theo QR trong ảnh.";
       toast.error(msg, { id: loading });
     }
   };
@@ -263,7 +263,7 @@ export default function PutBoxIntoSlot() {
       }
       setBoxQrInput(text);
       await triggerBoxByQr(text).unwrap();
-      toast.success("Đã tải thông tin box từ ảnh.", { id: loading });
+      toast.success("Đã tải thông tin hàng từ ảnh.", { id: loading });
       setTimeout(() => slotInputRef.current?.focus(), 50);
     } catch (err: any) {
       const msg =
@@ -271,7 +271,7 @@ export default function PutBoxIntoSlot() {
         err?.data?.Message ||
         err?.data?.error ||
         err?.data?.Error ||
-        "Không tìm thấy box theo QR trong ảnh.";
+        "Không tìm thấy hàng theo QR trong ảnh.";
       toast.error(msg, { id: loading });
     }
   };
@@ -279,20 +279,20 @@ export default function PutBoxIntoSlot() {
   const handleLoadSlot = async (qrOverride?: string) => {
     const qr = (qrOverride ?? slotQrInput).trim();
     if (!qr) {
-      toast.error("Vui lòng quét/nhập QR slot hoặc chọn ảnh có mã QR.");
+      toast.error("Vui lòng quét/nhập QR vị trí hoặc chọn ảnh có mã QR.");
       return;
     }
     try {
       const loaded = await triggerSlotByQr(qr).unwrap();
       setSelectedSlotId(loaded.id);
-      toast.success("Đã tải thông tin slot.");
+      toast.success("Đã tải thông tin vị trí.");
     } catch (err: any) {
       const msg =
         err?.data?.message ||
         err?.data?.Message ||
         err?.data?.error ||
         err?.data?.Error ||
-        "Không tìm thấy slot theo QR.";
+        "Không tìm thấy vị trí theo QR.";
       toast.error(msg);
     }
   };
@@ -316,14 +316,14 @@ export default function PutBoxIntoSlot() {
       setSlotQrInput(text);
       const loaded = await triggerSlotByQr(text).unwrap();
       setSelectedSlotId(loaded.id);
-      toast.success("Đã tải slot từ ảnh.", { id: loading });
+      toast.success("Đã tải vị trí từ ảnh.", { id: loading });
     } catch (err: any) {
       const msg =
         err?.data?.message ||
         err?.data?.Message ||
         err?.data?.error ||
         err?.data?.Error ||
-        "Không tìm thấy slot theo QR trong ảnh.";
+        "Không tìm thấy vị trí theo QR trong ảnh.";
       toast.error(msg, { id: loading });
     }
   };
@@ -333,16 +333,16 @@ export default function PutBoxIntoSlot() {
 
     if (!effectiveBoxId || effectiveBoxId <= 0) {
       toast.error(
-        "Vui lòng tải box bằng QR (máy quét, dán mã, hoặc ảnh có QR).",
+        "Vui lòng tải hàng bằng QR (máy quét, dán mã, hoặc ảnh có QR).",
       );
       return;
     }
     if (!selectedSlotId || selectedSlotId <= 0) {
-      toast.error("Vui lòng chọn slot (quét QR slot hoặc chọn theo danh sách).");
+      toast.error("Vui lòng chọn vị trí (quét QR vị trí hoặc chọn theo danh sách).");
       return;
     }
 
-    const toastId = toast.loading("Đang xếp box vào slot...");
+    const toastId = toast.loading("Đang xếp hàng vào vị trí...");
     try {
       const isTransfer =
         box?.id &&
@@ -360,7 +360,7 @@ export default function PutBoxIntoSlot() {
             boxId: effectiveBoxId,
             slotId: selectedSlotId,
           }).unwrap();
-      toast.success(res?.message || "Xếp box vào slot thành công.", {
+      toast.success(res?.message || "Xếp hàng vào vị trí thành công.", {
         id: toastId,
       });
 
@@ -376,7 +376,7 @@ export default function PutBoxIntoSlot() {
         err?.data?.Message ||
         err?.data?.error ||
         err?.data?.Error ||
-        "Xếp box vào slot thất bại.";
+        "Xếp hàng vào vị trí thất bại.";
       toast.error(msg, { id: toastId });
     }
   };
@@ -396,30 +396,30 @@ export default function PutBoxIntoSlot() {
 
   const handleAssignMultiple = async () => {
     if (selectedSlotId <= 0) {
-      toast.error("Vui lòng chọn slot trước khi xếp nhiều box.");
+      toast.error("Vui lòng chọn vị trí trước khi xếp nhiều hàng.");
       return;
     }
     if (selectedLotBoxIds.length === 0) {
-      toast.error("Vui lòng chọn ít nhất 1 box trong lot.");
+      toast.error("Vui lòng chọn ít nhất 1 hàng trong lô.");
       return;
     }
 
     const selectedSet = new Set(selectedLotBoxIds);
     const targets = availableLotBoxes.filter((b) => selectedSet.has(b.boxId));
     if (targets.length === 0) {
-      toast.error("Không tìm thấy danh sách box đã chọn.");
+      toast.error("Không tìm thấy danh sách hàng đã chọn.");
       return;
     }
 
     const tolerance = 0.0001;
     if (selectedLotTotalWeight - slotRemaining > tolerance) {
       toast.error(
-        `Slot không đủ dung lượng: còn ${slotRemaining.toFixed(3)} kg, đã chọn ${selectedLotTotalWeight.toFixed(3)} kg.`,
+        `Vị trí không đủ dung lượng: còn ${slotRemaining.toFixed(3)} kg, đã chọn ${selectedLotTotalWeight.toFixed(3)} kg.`,
       );
       return;
     }
 
-    const toastId = toast.loading(`Đang xếp ${targets.length} box vào slot...`);
+    const toastId = toast.loading(`Đang xếp ${targets.length} hàng vào vị trí...`);
     setIsBulkAssigning(true);
     try {
       const assignableBoxIds = targets
@@ -427,7 +427,7 @@ export default function PutBoxIntoSlot() {
         .map((b) => b.boxId);
 
       if (assignableBoxIds.length === 0) {
-        toast.error("Không có box hợp lệ để xếp vào slot.", { id: toastId });
+        toast.error("Không có hàng hợp lệ để xếp vào vị trí.", { id: toastId });
         return;
       }
 
@@ -440,8 +440,8 @@ export default function PutBoxIntoSlot() {
       setSelectedLotBoxIds([]);
       toast.success(
         res?.assignedCount != null
-          ? `${res.message} (${res.assignedCount} box)`
-          : res?.message || "Xếp box vào slot thành công.",
+          ? `${res.message} (${res.assignedCount} hàng)`
+          : res?.message || "Xếp hàng vào vị trí thành công.",
         { id: toastId },
       );
       setTimeout(() => lotInputRef.current?.focus(), 50);
@@ -451,7 +451,7 @@ export default function PutBoxIntoSlot() {
         err?.data?.Message ||
         err?.data?.error ||
         err?.data?.Error ||
-        "Xếp nhiều box vào slot thất bại.";
+        "Xếp nhiều hàng vào vị trí thất bại.";
       toast.error(msg, { id: toastId });
     } finally {
       setIsBulkAssigning(false);
@@ -483,8 +483,8 @@ export default function PutBoxIntoSlot() {
               Kho · Xếp hàng vào vị trí
             </h1>
             <p className="text-xs text-slate-400 mt-0.5">
-              Hỗ trợ quét QR box, QR lot và QR slot (máy quét / dán mã / ảnh /
-              camera). Có thể xếp nhiều box cùng lúc từ một lot.
+              Hỗ trợ quét QR hàng, QR lô hàng và QR vị trí (máy quét / dán mã / ảnh /
+              camera). Có thể xếp nhiều hàng cùng lúc từ một lô.
             </p>
           </div>
         </div>
@@ -516,7 +516,7 @@ export default function PutBoxIntoSlot() {
                       : "text-slate-600"
                   }`}
                 >
-                  Xếp 1 box
+                  Xếp 1 hàng
                 </button>
                 <button
                   type="button"
@@ -527,7 +527,7 @@ export default function PutBoxIntoSlot() {
                       : "text-slate-600"
                   }`}
                 >
-                  Xếp nhiều box theo lot
+                  Xếp nhiều hàng theo lô
                 </button>
               </div>
 
@@ -536,7 +536,7 @@ export default function PutBoxIntoSlot() {
                   <div className="flex gap-2">
                     <div className="flex-1">
                       <label className="block text-xs font-medium text-slate-600 mb-1">
-                        QR box
+                        QR hàng
                       </label>
                       <input
                         ref={boxInputRef}
@@ -549,7 +549,7 @@ export default function PutBoxIntoSlot() {
                           }
                         }}
                         className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
-                        placeholder="Quét hoặc dán QR box"
+                        placeholder="Quét hoặc dán QR hàng"
                       />
                     </div>
                     <button
@@ -559,7 +559,7 @@ export default function PutBoxIntoSlot() {
                       className="mt-6 inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-700 text-xs font-semibold text-white px-4 py-2 disabled:opacity-60"
                     >
                       <QrCode size={14} />
-                      Tải box
+                      Tải hàng
                     </button>
                   </div>
 
@@ -593,7 +593,7 @@ export default function PutBoxIntoSlot() {
 
                   <QrCameraScannerModal
                     open={isBoxCameraOpen}
-                    title="Quét QR box bằng camera"
+                    title="Quét QR hàng bằng camera"
                     onClose={() => setIsBoxCameraOpen(false)}
                     onDetected={(value) => {
                       setBoxQrInput(value);
@@ -604,12 +604,12 @@ export default function PutBoxIntoSlot() {
                   <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-sm">
                     {!box ? (
                       <p className="text-slate-500">
-                        Chưa có thông tin box. Vui lòng quét QR box.
+                        Chưa có thông tin hàng. Vui lòng quét QR hàng.
                       </p>
                     ) : (
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <p className="text-[11px] font-medium text-slate-500">Box</p>
+                          <p className="text-[11px] font-medium text-slate-500">Hàng</p>
                           <p className="font-semibold text-slate-900">
                             #{box.id} · {box.boxCode}
                           </p>
@@ -623,7 +623,7 @@ export default function PutBoxIntoSlot() {
                           <p className="font-semibold text-slate-900">{box.status}</p>
                         </div>
                         <div>
-                          <p className="text-[11px] font-medium text-slate-500">Slot hiện tại</p>
+                          <p className="text-[11px] font-medium text-slate-500">Vị trí hiện tại</p>
                           <p className="font-semibold text-slate-900">
                             {box.slotCode ?? "Chưa xếp"}
                           </p>
@@ -637,7 +637,7 @@ export default function PutBoxIntoSlot() {
                   <div className="flex gap-2">
                     <div className="flex-1">
                       <label className="block text-xs font-medium text-slate-600 mb-1">
-                        QR lot
+                        QR lô hàng
                       </label>
                       <input
                         ref={lotInputRef}
@@ -650,7 +650,7 @@ export default function PutBoxIntoSlot() {
                           }
                         }}
                         className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
-                        placeholder="Quét hoặc dán QR lot"
+                        placeholder="Quét hoặc dán QR lô hàng"
                       />
                     </div>
                     <button
@@ -660,7 +660,7 @@ export default function PutBoxIntoSlot() {
                       className="mt-6 inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-700 text-xs font-semibold text-white px-4 py-2 disabled:opacity-60"
                     >
                       <QrCode size={14} />
-                      Tải lot
+                      Tải lô
                     </button>
                   </div>
                   <input
@@ -672,7 +672,7 @@ export default function PutBoxIntoSlot() {
                   />
                   <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-3 py-3">
                     <p className="text-[11px] font-medium text-slate-600 mb-2">
-                      Ảnh có mã QR lot
+                      Ảnh có mã QR lô hàng
                     </p>
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -682,7 +682,7 @@ export default function PutBoxIntoSlot() {
                         className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                       >
                         <ImageUp size={14} />
-                        Chọn ảnh QR lot
+                        Chọn ảnh QR lô
                       </button>
                       <button
                         type="button"
@@ -691,13 +691,13 @@ export default function PutBoxIntoSlot() {
                         className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
                       >
                         <Camera size={14} />
-                        Quét lot bằng camera
+                        Quét lô bằng camera
                       </button>
                     </div>
                   </div>
                   <QrCameraScannerModal
                     open={isLotCameraOpen}
-                    title="Quét QR lot bằng camera"
+                    title="Quét QR lô bằng camera"
                     onClose={() => setIsLotCameraOpen(false)}
                     onDetected={(value) => {
                       setLotQrInput(value);
@@ -708,7 +708,7 @@ export default function PutBoxIntoSlot() {
                   <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="text-sm text-slate-600">
-                        Lot: <span className="font-semibold text-slate-900">{lot?.lotCode || "—"}</span>
+                        Lô hàng: <span className="font-semibold text-slate-900">{lot?.lotCode || "—"}</span>
                       </div>
                       <div className="flex gap-2">
                         <button
@@ -728,11 +728,11 @@ export default function PutBoxIntoSlot() {
                       </div>
                     </div>
                     <div className="mt-2 text-xs text-slate-500">
-                      Đã chọn {selectedLotBoxIds.length} box · Tổng KL {selectedLotTotalWeight.toFixed(3)} kg
+                      Đã chọn {selectedLotBoxIds.length} hàng · Tổng KL {selectedLotTotalWeight.toFixed(3)} kg
                     </div>
                     {isFetchingLotDetail ? (
                       <div className="text-xs text-slate-500 mt-2 inline-flex items-center gap-2">
-                        <Loader2 size={13} className="animate-spin" /> Đang tải danh sách box của lot...
+                        <Loader2 size={13} className="animate-spin" /> Đang tải danh sách hàng của lô...
                       </div>
                     ) : (
                       <div className="mt-2 max-h-56 overflow-auto rounded-xl border border-slate-100 bg-white">
@@ -740,16 +740,16 @@ export default function PutBoxIntoSlot() {
                           <thead className="bg-slate-50 text-slate-600">
                             <tr>
                               <th className="px-2 py-2 text-left">Chọn</th>
-                              <th className="px-2 py-2 text-left">Box</th>
+                              <th className="px-2 py-2 text-left">Hàng</th>
                               <th className="px-2 py-2 text-right">KG</th>
-                              <th className="px-2 py-2 text-left">Slot hiện tại</th>
+                              <th className="px-2 py-2 text-left">Vị trí hiện tại</th>
                             </tr>
                           </thead>
                           <tbody>
                             {availableLotBoxes.length === 0 ? (
                               <tr>
                                 <td colSpan={4} className="px-2 py-3 text-center text-slate-500">
-                                  Không có box chưa xếp trong lot này.
+                                  Không có hàng chưa xếp trong lô này.
                                 </td>
                               </tr>
                             ) : (
@@ -785,13 +785,13 @@ export default function PutBoxIntoSlot() {
             </div>
           </div>
 
-          {/* Slot select */}
+          {/* Position select */}
           <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <MapPin size={16} className="text-emerald-700" />
                 <h2 className="text-sm font-semibold text-slate-800">
-                  Bước 2 · Chọn slot
+                  Bước 2 · Chọn vị trí
                 </h2>
               </div>
               {slotByQr.isFetching && (
@@ -805,7 +805,7 @@ export default function PutBoxIntoSlot() {
               <div className="flex gap-2">
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-slate-600 mb-1">
-                    QR slot (ưu tiên)
+                    QR vị trí (ưu tiên)
                   </label>
                   <input
                     value={slotQrInput}
@@ -818,7 +818,7 @@ export default function PutBoxIntoSlot() {
                     }}
                     ref={slotInputRef}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
-                    placeholder="Quét QR dán trên slot"
+                    placeholder="Quét QR dán trên vị trí"
                   />
                 </div>
                 <button
@@ -828,7 +828,7 @@ export default function PutBoxIntoSlot() {
                   className="mt-6 inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-700 text-xs font-semibold text-white px-4 py-2 disabled:opacity-60"
                 >
                   <QrCode size={14} />
-                  Tải slot
+                  Tải vị trí
                 </button>
               </div>
 
@@ -841,7 +841,7 @@ export default function PutBoxIntoSlot() {
               />
               <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-3 py-3">
                 <p className="text-[11px] font-medium text-slate-600 mb-2">
-                  Ảnh có mã QR slot
+                  Ảnh có mã QR vị trí
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <button
@@ -867,7 +867,7 @@ export default function PutBoxIntoSlot() {
 
               <QrCameraScannerModal
                 open={isSlotCameraOpen}
-                title="Quét QR slot bằng camera"
+                title="Quét QR vị trí bằng camera"
                 onClose={() => setIsSlotCameraOpen(false)}
                 onDetected={(value) => {
                   setSlotQrInput(value);
@@ -910,7 +910,7 @@ export default function PutBoxIntoSlot() {
 
                   <div>
                     <label className="block text-xs font-medium text-slate-600 mb-1">
-                      Zone
+                      Khu
                     </label>
                     <select
                       value={selectedZoneId || ""}
@@ -927,8 +927,8 @@ export default function PutBoxIntoSlot() {
                         {!selectedWarehouseId
                           ? "Chọn kho trước"
                           : isLoadingZones
-                            ? "Đang tải zone..."
-                            : "Chọn zone"}
+                            ? "Đang tải khu..."
+                            : "Chọn khu"}
                       </option>
                       {zones.map((z) => (
                         <option key={z.id} value={z.id}>
@@ -940,7 +940,7 @@ export default function PutBoxIntoSlot() {
 
                   <div>
                     <label className="block text-xs font-medium text-slate-600 mb-1">
-                      Rack
+                      Kệ
                     </label>
                     <select
                       value={selectedRackId || ""}
@@ -954,10 +954,10 @@ export default function PutBoxIntoSlot() {
                     >
                       <option value="">
                         {!selectedZoneId
-                          ? "Chọn zone trước"
+                          ? "Chọn khu trước"
                           : isLoadingRacks
-                            ? "Đang tải rack..."
-                            : "Chọn rack"}
+                            ? "Đang tải kệ..."
+                            : "Chọn kệ"}
                       </option>
                       {racks.map((r) => (
                         <option key={r.id} value={r.id}>
@@ -969,7 +969,7 @@ export default function PutBoxIntoSlot() {
 
                   <div className="md:col-span-2">
                     <label className="block text-xs font-medium text-slate-600 mb-1">
-                      Slot
+                      Vị trí
                     </label>
                     <select
                       value={selectedSlotId || ""}
@@ -979,10 +979,10 @@ export default function PutBoxIntoSlot() {
                     >
                       <option value="">
                         {!selectedRackId
-                          ? "Chọn rack trước"
+                          ? "Chọn kệ trước"
                           : isLoadingSlots
-                            ? "Đang tải slot..."
-                            : "Chọn slot"}
+                            ? "Đang tải vị trí..."
+                            : "Chọn vị trí"}
                       </option>
                       {slots.map((s) => (
                         <option key={s.id} value={s.id}>
@@ -997,13 +997,13 @@ export default function PutBoxIntoSlot() {
               <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-sm">
                 {selectedSlotId <= 0 ? (
                   <p className="text-slate-500">
-                    Chưa chọn slot. Bạn có thể quét QR slot hoặc chọn theo danh sách.
+                    Chưa chọn vị trí. Bạn có thể quét QR vị trí hoặc chọn theo danh sách.
                   </p>
                 ) : (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <p className="text-[11px] font-medium text-slate-500">
-                        Slot
+                        Vị trí
                       </p>
                       <p className="font-semibold text-slate-900">
                         #{selectedSlotId} ·{" "}
@@ -1029,14 +1029,14 @@ export default function PutBoxIntoSlot() {
                         slotCapacity > 0 && (
                         <p className="text-xs text-slate-500 mt-1">
                           {hasBulkSelection
-                            ? `Tổng box đã chọn nặng ${selectedLotTotalWeight.toFixed(3)} kg`
-                            : `Box nặng ${box?.weight ?? 0} kg`}{" "}
+                            ? `Tổng hàng đã chọn nặng ${selectedLotTotalWeight.toFixed(3)} kg`
+                            : `Hàng nặng ${box?.weight ?? 0} kg`}{" "}
                           ·{" "}
                           {(hasBulkSelection
                             ? selectedLotTotalWeight
                             : box?.weight ?? 0) > slotRemaining ? (
                             <span className="text-rose-600 font-semibold">
-                              Slot có thể không đủ dung lượng (BE sẽ kiểm tra).
+                              Vị trí có thể không đủ dung lượng (BE sẽ kiểm tra).
                             </span>
                           ) : (
                             <span className="text-emerald-700 font-semibold">
@@ -1057,7 +1057,7 @@ export default function PutBoxIntoSlot() {
           <div className="px-6 py-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-slate-700">
               <span className="font-semibold text-slate-900">Bước 3</span> · Xếp
-              box vào slot
+              hàng vào vị trí
             </p>
             <button
               type="button"
@@ -1069,8 +1069,8 @@ export default function PutBoxIntoSlot() {
                 <Loader2 size={16} className="animate-spin" />
               )}
               {sourceMode === "lot"
-                ? `Xếp ${selectedLotBoxIds.length} box vào slot`
-                : "Xếp vào slot"}
+                ? `Xếp ${selectedLotBoxIds.length} hàng vào vị trí`
+                : "Xếp vào vị trí"}
             </button>
           </div>
           <div className="px-6 pb-5">
