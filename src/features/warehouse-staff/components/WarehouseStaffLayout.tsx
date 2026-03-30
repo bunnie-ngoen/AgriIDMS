@@ -8,6 +8,8 @@ import {
   QrCode,
   ShieldCheck,
   Warehouse,
+  Boxes,
+  AlertTriangle,
 } from "lucide-react";
 import { useAppDispatch } from "../../../app/hook";
 import { logout } from "../../auth/slices/auth.slice";
@@ -22,6 +24,11 @@ export default function WarehouseStaffLayout() {
 
   const [isStockCheckOpen, setIsStockCheckOpen] = useState(
     location.pathname.includes("/warehouse/stock-checks")
+  );
+  const [isWarehouseMenuOpen, setIsWarehouseMenuOpen] = useState(
+    location.pathname.includes("/warehouse/warehouses") ||
+      location.pathname.includes("/warehouse/putaway") ||
+      location.pathname.includes("/warehouse/inventory-issues"),
   );
 
   const handleLogout = () => {
@@ -111,8 +118,78 @@ export default function WarehouseStaffLayout() {
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-800 text-slate-200">
                   <QrCode size={15} />
                 </span>
-                Danh sách lot
+                Danh sách lô hàng
               </NavLink>
+            </li>
+
+            <li className="mt-3 pt-2 border-t border-slate-800/60">
+              <button
+                type="button"
+                onClick={() => setIsWarehouseMenuOpen((v) => !v)}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                  location.pathname.includes("/warehouse/warehouses")
+                    ? "bg-slate-800 text-white border border-slate-700"
+                    : "text-slate-300 hover:bg-slate-800/70"
+                }`}
+              >
+                <span className="flex items-center min-w-0">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-800 text-slate-200">
+                    <Boxes size={15} />
+                  </span>
+                  <span className="truncate">Quản lý kho</span>
+                </span>
+                <ChevronRight
+                  size={16}
+                  className={`transition-transform ${isWarehouseMenuOpen ? "rotate-90" : ""}`}
+                />
+              </button>
+
+              {isWarehouseMenuOpen ? (
+                <ul className="mt-1 pl-3 space-y-1">
+                  <li>
+                    <NavLink
+                      to="/warehouse/warehouses"
+                      className={({ isActive }) =>
+                        `w-full flex items-center px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                          isActive
+                            ? "bg-slate-700 text-white border border-slate-600"
+                            : "text-slate-300 hover:bg-slate-800/70"
+                        }`
+                      }
+                    >
+                      Danh sách kho (sơ đồ)
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink
+                      to="/warehouse/putaway"
+                      className={({ isActive }) =>
+                        `w-full flex items-center px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                          isActive
+                            ? "bg-slate-700 text-white border border-slate-600"
+                            : "text-slate-300 hover:bg-slate-800/70"
+                        }`
+                      }
+                    >
+                      Xếp hàng vào vị trí
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink
+                      to="/warehouse/inventory-issues"
+                      className={({ isActive }) =>
+                        `w-full flex items-center px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                          isActive
+                            ? "bg-slate-700 text-white border border-slate-600"
+                            : "text-slate-300 hover:bg-slate-800/70"
+                        }`
+                      }
+                    >
+                      Hàng hư hỏng / quá hạn
+                    </NavLink>
+                  </li>
+                </ul>
+              ) : null}
             </li>
 
             <li>

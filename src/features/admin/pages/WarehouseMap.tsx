@@ -12,30 +12,116 @@ import {
 import {
   useGetUnassignedBoxesByWarehouseQuery,
   useGetExpiredBoxesByWarehouseQuery,
-  useDisposeExpiredBoxesMutation,
+  useCreateDisposalRequestMutation,
+  useDirectDisposeBoxesMutation,
   useGetDisposeHistoryByWarehouseQuery,
 } from "../../goods-receipt/api/goods-receipt.api";
 import type { SlotBoxItem, SlotItem } from "../types/warehouse.type";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
+const DisposeReasonModal = ({
+  isOpen,
+  title,
+  subtitle,
+  value,
+  onChange,
+  onClose,
+  onConfirm,
+  isSubmitting,
+  confirmLabel = "Xác nhận",
+}: {
+  isOpen: boolean;
+  title: string;
+  subtitle?: string;
+  value: string;
+  onChange: (value: string) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+  isSubmitting?: boolean;
+  confirmLabel?: string;
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50 backdrop-blur-[1px]"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="bg-gradient-to-r from-rose-50 to-amber-50 border-b border-slate-100 px-5 py-4">
+          <p className="text-base font-semibold text-slate-900">{title}</p>
+          {subtitle && <p className="mt-1 text-xs text-slate-600">{subtitle}</p>}
+        </div>
+
+        <div className="px-5 py-4">
+          <label className="block text-xs font-medium text-slate-700 mb-1.5">
+            Lý do tiêu hủy
+          </label>
+          <textarea
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            rows={4}
+            placeholder="Nhập lý do cụ thể để lưu lại lịch sử tiêu hủy..."
+            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+          />
+          <p className="mt-1 text-[11px] text-slate-500">
+            Thông tin này sẽ được lưu kèm lịch sử giao dịch.
+          </p>
+        </div>
+
+        <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-end gap-2 bg-slate-50">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+          >
+            Hủy
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isSubmitting}
+            className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
+          >
+            {isSubmitting ? "Đang xử lý..." : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /** Panel chi tiết slot: thông tin + slot chứa gì (hiện tại chỉ có capacity, có thể bổ sung API sản phẩm sau) */
 const SlotDetailPanel = ({
   slot,
+  warehouseId,
   onClose,
   onTransferBox,
   className = "",
 }: {
   slot: SlotItem;
+  warehouseId: number;
   onClose: () => void;
   onTransferBox: (box: SlotBoxItem) => void;
   className?: string;
 }) => {
   const { data: contents, isLoading: isLoadingContents, refetch: refetchContents } =
     useGetSlotContentsQuery(slot.id);
+  const { isManager, isAdmin } = useRoleGuard();
   const [selectedBox, setSelectedBox] = useState<SlotBoxItem | null>(null);
   const [isBoxesModalOpen, setIsBoxesModalOpen] = useState(false);
-  const [disposeExpiredBoxes, disposeExpiredState] =
-    useDisposeExpiredBoxesMutation();
+  const [selectedBoxIdsInSlot, setSelectedBoxIdsInSlot] = useState<number[]>([]);
+  const [isDisposeReasonModalOpen, setIsDisposeReasonModalOpen] = useState(false);
+  const [disposeTargetBox, setDisposeTargetBox] = useState<SlotBoxItem | null>(null);
+  const [disposeReason, setDisposeReason] = useState("");
+  const [createDisposalRequest, createDisposalRequestState] = useCreateDisposalRequestMutation();
+  const [directDisposeBoxes, directDisposeBoxesState] = useDirectDisposeBoxesMutation();
 
   const copyText = async (text: string) => {
     if (!text) return;
@@ -50,27 +136,101 @@ const SlotDetailPanel = ({
     slot.capacity > 0
       ? Math.min(1, (slot.currentCapacity || 0) / slot.capacity) * 100
       : 0;
+  const sortedSlotBoxes = useMemo(() => {
+    if (!contents?.boxes) return [];
+    return [...contents.boxes].sort((a, b) => {
+      const da = a.expiryDate ? new Date(a.expiryDate).getTime() : Number.POSITIVE_INFINITY;
+      const db = b.expiryDate ? new Date(b.expiryDate).getTime() : Number.POSITIVE_INFINITY;
+      return da - db;
+    });
+  }, [contents?.boxes]);
+  useEffect(() => {
+    if (!isBoxesModalOpen) {
+      setSelectedBoxIdsInSlot([]);
+      return;
+    }
+    const idSet = new Set(sortedSlotBoxes.map((b) => b.id));
+    setSelectedBoxIdsInSlot((prev) => prev.filter((id) => idSet.has(id)));
+  }, [isBoxesModalOpen, sortedSlotBoxes]);
 
-  const handleDisposeSingleBox = async (box: SlotBoxItem) => {
-    const isExpired =
-      !!box.expiryDate && new Date(box.expiryDate).getTime() <= Date.now();
-    if (!isExpired) {
-      toast.error("Chỉ tiêu hủy box đã hết hạn.");
+  const handleDisposeSingleBox = (box: SlotBoxItem) => {
+    setDisposeTargetBox(box);
+    setDisposeReason("");
+    setIsDisposeReasonModalOpen(true);
+  };
+
+  const toggleSelectBoxInSlot = (boxId: number) => {
+    setSelectedBoxIdsInSlot((prev) =>
+      prev.includes(boxId) ? prev.filter((id) => id !== boxId) : [...prev, boxId],
+    );
+  };
+
+  const submitDisposeSingleBox = async () => {
+    if (!disposeTargetBox) return;
+    if (!disposeReason.trim()) {
+      toast.error("Vui lòng nhập lý do tiêu hủy.");
       return;
     }
 
-    const ok = window.confirm(
-      `Xác nhận tiêu hủy box ${box.boxCode} (${box.weight} kg)? Hệ thống sẽ ghi transaction.`,
-    );
-    if (!ok) return;
+    try {
+      const canDisposeDirectly = isManager() || isAdmin();
+      const res = canDisposeDirectly
+        ? await directDisposeBoxes({
+            warehouseId,
+            boxIds: [disposeTargetBox.id],
+            reason: disposeReason.trim(),
+          }).unwrap()
+        : await createDisposalRequest({
+            warehouseId,
+            boxIds: [disposeTargetBox.id],
+            reason: disposeReason.trim(),
+          }).unwrap();
+      toast.success(res.message);
+      setDisposeTargetBox(null);
+      setDisposeReason("");
+      await refetchContents();
+      if (selectedBox?.id === disposeTargetBox.id) setSelectedBox(null);
+    } catch (err: any) {
+      const msg =
+        err?.data?.message ||
+        err?.data?.Message ||
+        err?.data?.error ||
+        err?.data?.Error ||
+        "Tiêu hủy box thất bại.";
+      toast.error(msg);
+    }
+  };
+
+  const submitDisposeSelectedInSlot = async () => {
+    if (!selectedBoxIdsInSlot.length) {
+      toast.error("Chọn ít nhất 1 hàng để tiêu hủy.");
+      return;
+    }
+    if (!disposeReason.trim()) {
+      toast.error("Vui lòng nhập lý do tiêu hủy.");
+      return;
+    }
 
     try {
-      const res = await disposeExpiredBoxes({ boxIds: [box.id] }).unwrap();
-      toast.success(
-        `${res.message}. Đã tiêu hủy ${res.disposedCount}/${res.requestedCount} box.`,
-      );
+      const canDisposeDirectly = isManager() || isAdmin();
+      const res = canDisposeDirectly
+        ? await directDisposeBoxes({
+            warehouseId,
+            boxIds: selectedBoxIdsInSlot,
+            reason: disposeReason.trim(),
+          }).unwrap()
+        : await createDisposalRequest({
+            warehouseId,
+            boxIds: selectedBoxIdsInSlot,
+            reason: disposeReason.trim(),
+          }).unwrap();
+      toast.success(res.message);
+      setSelectedBoxIdsInSlot([]);
+      setDisposeTargetBox(null);
+      setDisposeReason("");
+      setIsDisposeReasonModalOpen(false);
+      setSelectedBox(null);
       await refetchContents();
-      if (selectedBox?.id === box.id) setSelectedBox(null);
     } catch (err: any) {
       const msg =
         err?.data?.message ||
@@ -104,7 +264,7 @@ const SlotDetailPanel = ({
                   Chi tiết box
                 </p>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Slot {slot.code}
+                  Vị trí {slot.code}
                 </p>
               </div>
               <button
@@ -132,7 +292,7 @@ const SlotDetailPanel = ({
                       onClick={() => copyText(selectedBox.qrCode || "")}
                       className="shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-50"
                     >
-                      Copy
+                      Sao chép
                     </button>
                   </div>
                 )}
@@ -164,7 +324,7 @@ const SlotDetailPanel = ({
                   </dd>
                 </div>
                 <div className="rounded-xl border border-slate-100 px-3 py-2 col-span-2">
-                  <dt className="text-[10px] text-slate-500">Lot</dt>
+                  <dt className="text-[10px] text-slate-500">Lô hàng</dt>
                   <dd className="font-semibold text-slate-900 mt-1">
                     {selectedBox.lotCode} (#{selectedBox.lotId})
                   </dd>
@@ -194,6 +354,37 @@ const SlotDetailPanel = ({
           </div>
         </div>
       )}
+      <DisposeReasonModal
+        isOpen={isDisposeReasonModalOpen}
+        title={
+          selectedBoxIdsInSlot.length > 0
+            ? `Tiêu hủy ${selectedBoxIdsInSlot.length} hàng đã chọn`
+            : disposeTargetBox
+            ? `Tiêu hủy hàng ${disposeTargetBox.boxCode}`
+            : "Tiêu hủy hàng"
+        }
+        subtitle={
+          disposeTargetBox
+            ? isManager() || isAdmin()
+              ? "Bạn đang tiêu hủy trực tiếp. Hệ thống sẽ trừ tồn ngay."
+              : "Yêu cầu sẽ được gửi lên Quản lí để duyệt."
+            : undefined
+        }
+        value={disposeReason}
+        onChange={setDisposeReason}
+        onClose={() => {
+          setDisposeTargetBox(null);
+          setDisposeReason("");
+          setIsDisposeReasonModalOpen(false);
+        }}
+        onConfirm={() =>
+          void (selectedBoxIdsInSlot.length > 0
+            ? submitDisposeSelectedInSlot()
+            : submitDisposeSingleBox())
+        }
+        isSubmitting={createDisposalRequestState.isLoading || directDisposeBoxesState.isLoading}
+        confirmLabel={isManager() || isAdmin() ? "Tiêu hủy ngay" : "Gửi yêu cầu"}
+      />
 
       {isBoxesModalOpen && contents && contents.boxCount > 0 && (
         <div
@@ -209,12 +400,12 @@ const SlotDetailPanel = ({
             <div className="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-slate-900">
-                  Danh sách box trong slot {slot.code}
+                  Danh sách hàng trong vị trí {slot.code}
                 </p>
                 <p className="text-[10px] text-slate-500 mt-0.5">
                   {contents.productName || "Sản phẩm"}
                   {contents.variantName ? ` · ${contents.variantName}` : ""} —{" "}
-                  {contents.boxCount} box · {contents.totalBoxWeight} kg
+                  {contents.boxCount} hàng · {contents.totalBoxWeight} kg
                 </p>
               </div>
               <button
@@ -228,11 +419,51 @@ const SlotDetailPanel = ({
             </div>
 
             <div className="px-5 py-4">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBoxIdsInSlot(sortedSlotBoxes.map((b) => b.id))}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Chọn tất cả
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBoxIdsInSlot([])}
+                    disabled={!selectedBoxIdsInSlot.length}
+                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    Bỏ chọn
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!selectedBoxIdsInSlot.length) {
+                      toast.error("Chọn ít nhất 1 hàng để tiêu hủy.");
+                      return;
+                    }
+                    setDisposeTargetBox(null);
+                    setDisposeReason("");
+                    setIsDisposeReasonModalOpen(true);
+                  }}
+                  disabled={
+                    !selectedBoxIdsInSlot.length ||
+                    createDisposalRequestState.isLoading ||
+                    directDisposeBoxesState.isLoading
+                  }
+                  className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-[10px] font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60"
+                >
+                  Tiêu hủy đã chọn ({selectedBoxIdsInSlot.length})
+                </button>
+              </div>
               <div className="max-h-[65vh] overflow-auto rounded-xl border border-slate-100 bg-slate-50">
                 <table className="w-full text-[11px]">
                   <thead className="sticky top-0 bg-slate-50">
                     <tr className="text-slate-500 border-b border-slate-200">
-                      <th className="text-left font-semibold px-3 py-2">Box</th>
+                      <th className="text-left font-semibold px-3 py-2 w-[36px]">#</th>
+                      <th className="text-left font-semibold px-3 py-2">Hàng</th>
                       <th className="text-right font-semibold px-3 py-2">
                         Thao tác
                       </th>
@@ -240,25 +471,29 @@ const SlotDetailPanel = ({
                     </tr>
                   </thead>
                   <tbody className="text-slate-700">
-                    {[...contents.boxes]
-                      .sort((a, b) => {
-                        const da = a.expiryDate
-                          ? new Date(a.expiryDate).getTime()
-                          : Number.POSITIVE_INFINITY;
-                        const db = b.expiryDate
-                          ? new Date(b.expiryDate).getTime()
-                          : Number.POSITIVE_INFINITY;
-                        return da - db; // gần hết hạn lên đầu
-                      })
-                      .map((b) => (
+                    {sortedSlotBoxes.map((b) => (
                       <tr
                         key={b.id}
                         className="border-t border-slate-100 hover:bg-white cursor-pointer"
                         onClick={() => {
                           setSelectedBox(b);
                         }}
-                        title="Bấm xem chi tiết box"
+                        title="Bấm xem chi tiết hàng"
                       >
+                        <td
+                          className="px-3 py-2"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedBoxIdsInSlot.includes(b.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              toggleSelectBoxInSlot(b.id);
+                            }}
+                          />
+                        </td>
                         <td className="px-3 py-2 pr-2">
                           <div className="font-mono text-[10px] truncate max-w-[320px]">
                             {b.boxCode}
@@ -281,7 +516,7 @@ const SlotDetailPanel = ({
                                 onTransferBox(b);
                               }}
                               className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-50"
-                              title="Chuyển box sang slot khác"
+                              title="Chuyển hàng sang vị trí khác"
                             >
                               Chuyển
                             </button>
@@ -292,18 +527,11 @@ const SlotDetailPanel = ({
                                 void handleDisposeSingleBox(b);
                               }}
                               disabled={
-                                disposeExpiredState.isLoading ||
-                                !b.expiryDate ||
-                                new Date(b.expiryDate).getTime() > Date.now()
+                                createDisposalRequestState.isLoading ||
+                                directDisposeBoxesState.isLoading
                               }
                               className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
-                              title={
-                                !b.expiryDate
-                                  ? "Box chưa có HSD"
-                                  : new Date(b.expiryDate).getTime() > Date.now()
-                                    ? "Chỉ tiêu hủy box đã hết hạn"
-                                    : "Tiêu hủy box (ghi transaction)"
-                              }
+                              title="Tiêu hủy hàng (có ghi nhận lịch sử)"
                             >
                               Tiêu hủy
                             </button>
@@ -376,7 +604,7 @@ const SlotDetailPanel = ({
       </dl>
       <div className="mt-2 pt-2 border-t border-slate-100">
         <p className="text-[10px] font-medium text-slate-600 mb-0.5">
-          Slot đang chứa
+          Vị trí đang chứa
         </p>
         {isLoadingContents ? (
           <p className="text-[11px] text-slate-500">Đang tải chi tiết...</p>
@@ -484,9 +712,11 @@ const RackOverview = ({
                 : 0;
             const cellStyle = getUsageStyleFromRatio(r);
             const pct = Math.round(r * 100);
+            const hasVariantFilter = !!variantFilterId;
             const isVariantMatched =
-              !!variantFilterId &&
+              hasVariantFilter &&
               Number(s.productVariantId ?? 0) === Number(variantFilterId);
+            const isVariantDimmed = hasVariantFilter && !isVariantMatched;
             return (
               <button
                 key={s.id}
@@ -494,7 +724,11 @@ const RackOverview = ({
                 onClick={() => onSlotClick?.(s)}
                 className={`inline-flex flex-col items-center justify-center rounded-lg border min-w-[52px] py-1.5 px-1.5 text-[10px] font-medium cursor-pointer transition ring-2 ring-transparent hover:ring-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-400 ${cellStyle} ${
                   isVariantMatched
-                    ? "bg-blue-600/95 text-white"
+                    ? "bg-sky-600 text-white border-sky-700 shadow-[0_0_0_2px_rgba(14,165,233,0.28)]"
+                    : ""
+                } ${
+                  isVariantDimmed
+                    ? "opacity-40 saturate-50"
                     : ""
                 }`}
                 title={`${s.code}: ${s.currentCapacity}/${s.capacity} (${pct}%) — Bấm xem chi tiết`}
@@ -533,7 +767,7 @@ const ZoneOverview = ({
     <div className="border border-slate-200 rounded-2xl p-3.5 bg-gradient-to-b from-slate-50 to-slate-100/60 shadow-sm">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-semibold text-slate-900">
-          Zone <span className="font-bold">{name}</span>
+          Khu <span className="font-bold">{name}</span>
         </p>
         <p className="text-[10px] text-slate-500">
           {isLoading ? "Đang tải rack..." : `${racks?.length ?? 0} rack`}
@@ -561,7 +795,7 @@ const ZoneOverview = ({
 };
 
 const WarehouseMap = () => {
-  const { isManager } = useRoleGuard();
+  const { isManager, isAdmin } = useRoleGuard();
   const warehouseBasePath = isManager() ? "/manager/warehouses" : "/admin/warehouses";
   const putawayBasePath = isManager() ? "/manager/putaway" : "/admin/putaway";
   const { id } = useParams<{ id: string }>();
@@ -587,6 +821,8 @@ const WarehouseMap = () => {
   const [selectedDisposeBoxIds, setSelectedDisposeBoxIds] = useState<number[]>(
     [],
   );
+  const [isBulkDisposeModalOpen, setIsBulkDisposeModalOpen] = useState(false);
+  const [bulkDisposeReason, setBulkDisposeReason] = useState("");
   const [disposeFromDate, setDisposeFromDate] = useState("");
   const [disposeToDate, setDisposeToDate] = useState("");
   const [disposeCreatedBy, setDisposeCreatedBy] = useState("");
@@ -604,8 +840,10 @@ const WarehouseMap = () => {
   } = useGetExpiredBoxesByWarehouseQuery(warehouseId, {
     skip: Number.isNaN(warehouseId),
   });
-  const [disposeExpiredBoxes, disposingExpiredState] =
-    useDisposeExpiredBoxesMutation();
+  const [createDisposalRequestForList, createDisposalRequestForListState] =
+    useCreateDisposalRequestMutation();
+  const [directDisposeBoxesForList, directDisposeBoxesForListState] =
+    useDirectDisposeBoxesMutation();
   const [syncSlotCapacitiesByWarehouse, syncCapacitiesState] =
     useSyncSlotCapacitiesByWarehouseMutation();
   const { data: disposeHistory = [], isFetching: isFetchingDisposeHistory } =
@@ -751,14 +989,36 @@ const WarehouseMap = () => {
       toast.error("Chọn ít nhất 1 box để tiêu hủy.");
       return;
     }
+    setBulkDisposeReason("");
+    setIsBulkDisposeModalOpen(true);
+  };
+
+  const submitBulkDispose = async () => {
+    if (!selectedDisposeBoxIds.length) {
+      toast.error("Chọn ít nhất 1 box để tiêu hủy.");
+      return;
+    }
+    if (!bulkDisposeReason.trim()) {
+      toast.error("Vui lòng nhập lý do tiêu hủy.");
+      return;
+    }
 
     try {
-      const result = await disposeExpiredBoxes({
-        boxIds: selectedDisposeBoxIds,
-      }).unwrap();
-      toast.success(
-        `${result.message}. Đã xử lý ${result.disposedCount}/${result.requestedCount} box.`,
-      );
+      const canDisposeDirectly = isManager() || isAdmin();
+      const result = canDisposeDirectly
+        ? await directDisposeBoxesForList({
+            warehouseId,
+            boxIds: selectedDisposeBoxIds,
+            reason: bulkDisposeReason.trim(),
+          }).unwrap()
+        : await createDisposalRequestForList({
+            warehouseId,
+            boxIds: selectedDisposeBoxIds,
+            reason: bulkDisposeReason.trim(),
+          }).unwrap();
+      toast.success(result.message);
+      setIsBulkDisposeModalOpen(false);
+      setBulkDisposeReason("");
       setSelectedDisposeBoxIds([]);
       await refetchExpiredBoxes();
     } catch (err: any) {
@@ -786,6 +1046,27 @@ const WarehouseMap = () => {
 
   return (
     <div className="px-5">
+      <DisposeReasonModal
+        isOpen={isBulkDisposeModalOpen}
+        title={`Tiêu hủy ${selectedDisposeBoxIds.length} hàng đã chọn`}
+        subtitle={
+          isManager() || isAdmin()
+            ? "Bạn đang tiêu hủy trực tiếp. Hệ thống sẽ trừ tồn ngay."
+            : "Yêu cầu sẽ được gửi lên Quản lí để duyệt."
+        }
+        value={bulkDisposeReason}
+        onChange={setBulkDisposeReason}
+        onClose={() => {
+          setIsBulkDisposeModalOpen(false);
+          setBulkDisposeReason("");
+        }}
+        onConfirm={() => void submitBulkDispose()}
+        isSubmitting={
+          createDisposalRequestForListState.isLoading ||
+          directDisposeBoxesForListState.isLoading
+        }
+        confirmLabel={isManager() || isAdmin() ? "Tiêu hủy ngay" : "Gửi yêu cầu"}
+      />
       {detailSlot && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
@@ -800,13 +1081,14 @@ const WarehouseMap = () => {
           >
             <SlotDetailPanel
               slot={detailSlot}
+              warehouseId={warehouseId}
               onClose={() => setDetailSlot(null)}
               onTransferBox={(box) => {
                 const qr = box.qrCode || "";
                 if (!qr) {
                   navigate(putawayBasePath);
                   toast(
-                    "Box chưa có mã QR trên hệ thống. Tại trang xếp hàng, hãy chụp/chọn ảnh có QR box hoặc nhập mã.",
+                    "Hàng chưa có mã QR trên hệ thống. Tại trang xếp hàng, hãy chụp/chọn ảnh có QR hàng hoặc nhập mã.",
                     { icon: "📷", duration: 4500 },
                   );
                   return;
@@ -858,7 +1140,7 @@ const WarehouseMap = () => {
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
-                  Box hết hạn
+                  Hàng hết hạn
                 </button>
                 <button
                   type="button"
@@ -909,11 +1191,14 @@ const WarehouseMap = () => {
                         type="button"
                         onClick={() => void handleDisposeExpiredBoxes()}
                         disabled={
-                          disposingExpiredState.isLoading || !selectedDisposeBoxIds.length
+                          createDisposalRequestForListState.isLoading ||
+                          directDisposeBoxesForListState.isLoading ||
+                          !selectedDisposeBoxIds.length
                         }
                         className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
                       >
-                        {disposingExpiredState.isLoading
+                        {createDisposalRequestForListState.isLoading ||
+                        directDisposeBoxesForListState.isLoading
                           ? "Đang tiêu hủy..."
                           : `Tiêu hủy đã chọn (${selectedDisposeBoxIds.length})`}
                       </button>
@@ -925,10 +1210,10 @@ const WarehouseMap = () => {
                       <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 text-slate-500">
                         <tr>
                           <th className="px-3 py-2 text-left w-[40px]">#</th>
-                          <th className="px-3 py-2 text-left">Box</th>
-                          <th className="px-3 py-2 text-left">Lot</th>
+                          <th className="px-3 py-2 text-left">Hàng</th>
+                          <th className="px-3 py-2 text-left">Lô hàng</th>
                           <th className="px-3 py-2 text-left">HSD</th>
-                          <th className="px-3 py-2 text-left">Slot</th>
+                          <th className="px-3 py-2 text-left">Vị trí</th>
                           <th className="px-3 py-2 text-right">Kg</th>
                         </tr>
                       </thead>
@@ -936,7 +1221,7 @@ const WarehouseMap = () => {
                         {expiredBoxesInWarehouse.length === 0 ? (
                           <tr>
                             <td colSpan={6} className="px-3 py-6 text-center text-slate-500">
-                              Không có box hết hạn cần tiêu hủy.
+                              Không có hàng hết hạn cần tiêu hủy.
                             </td>
                           </tr>
                         ) : (
@@ -1005,7 +1290,7 @@ const WarehouseMap = () => {
                       <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 text-slate-500">
                         <tr>
                           <th className="px-3 py-2 text-left">Thời gian</th>
-                          <th className="px-3 py-2 text-left">Box / Lot</th>
+                          <th className="px-3 py-2 text-left">Hàng / Lô</th>
                           <th className="px-3 py-2 text-left">Sản phẩm</th>
                           <th className="px-3 py-2 text-left">Người thao tác</th>
                           <th className="px-3 py-2 text-right">Kg tiêu hủy</th>
@@ -1072,7 +1357,7 @@ const WarehouseMap = () => {
               onClick={() => setIsDisposeModalOpen(true)}
               className="inline-flex items-center rounded-lg border border-rose-100 bg-rose-50 px-2.5 py-1 font-medium text-rose-700 hover:bg-rose-100"
             >
-              List box tiêu hủy
+              Danh sách hàng tiêu hủy
             </button>
             <Link
               to={`${warehouseBasePath}/${warehouseId}/config`}
@@ -1093,7 +1378,7 @@ const WarehouseMap = () => {
           <div className="flex flex-col md:flex-row gap-2 md:items-center md:justify-between">
             <div className="flex items-center gap-2 flex-1">
               <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
-                Sản Phẩm biến thể
+                Sản phẩm biến thể
               </span>
               <select
                 value={selectedVariantFilterId ?? ""}
@@ -1108,7 +1393,7 @@ const WarehouseMap = () => {
                 <option value="">
                   {!variantOptionsInRack.length
                     ? "Rack chưa có sản phẩm"
-                    : "Chọn Sản phẩm biến thể để highlight slot"}
+                    : "Chọn biến thể để tô nổi vị trí đang chứa"}
                 </option>
                 {variantOptionsInRack.map((v) => (
                   <option key={v.id} value={v.id}>
@@ -1118,7 +1403,7 @@ const WarehouseMap = () => {
               </select>
             </div>
             <p className="text-[11px] text-slate-500 md:pl-2">
-              Ô màu xanh dương = slot đang chứa “Sản phẩm biến thể” đã chọn.
+              Vị trí có viền xanh dương = đang chứa biến thể đã chọn.
             </p>
           </div>
 
@@ -1129,7 +1414,7 @@ const WarehouseMap = () => {
             <p className="text-xs font-semibold text-slate-700 mb-2 flex items-center justify-between">
               Tổng quan cấu trúc kho
               <span className="text-[11px] font-normal text-slate-500">
-                Zone → Rack → Slot
+                Khu → Kệ → Vị trí
               </span>
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -1150,7 +1435,7 @@ const WarehouseMap = () => {
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-slate-600">
-                Zone:
+                Khu:
               </span>
               <select
                 value={selectedZoneId ?? ""}
@@ -1161,7 +1446,7 @@ const WarehouseMap = () => {
                 }}
                 className="min-w-[160px] rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
               >
-                <option value="">Chọn zone</option>
+                <option value="">Chọn khu</option>
                 {zones?.map((z) => (
                   <option key={z.id} value={z.id}>
                     {z.name}
@@ -1172,7 +1457,7 @@ const WarehouseMap = () => {
 
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-slate-600">
-                Rack:
+                Kệ:
               </span>
               <select
                 value={selectedRackId ?? ""}
@@ -1182,7 +1467,7 @@ const WarehouseMap = () => {
                 }}
                 className="min-w-[160px] rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
               >
-                <option value="">Chọn rack</option>
+                <option value="">Chọn kệ</option>
                 {racks?.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.name}
@@ -1193,7 +1478,7 @@ const WarehouseMap = () => {
 
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-slate-600">
-                Box chưa xếp:
+                Hàng chưa xếp:
               </span>
               <select
                 value={selectedUnassignedBoxQr}
@@ -1213,8 +1498,8 @@ const WarehouseMap = () => {
                   {!filteredUnassignedBoxes.length
                     ? isFetchingUnassignedBoxes
                       ? "Đang tải..."
-                      : "Không có box chưa xếp theo bộ lọc"
-                    : "Chọn box chưa xếp"}
+                    : "Không có hàng chưa xếp theo bộ lọc"
+                    : "Chọn hàng chưa xếp"}
                 </option>
                 {filteredUnassignedBoxes.map((b) => (
                   <option key={b.id} value={b.qrCode ?? ""} disabled={!b.qrCode}>
@@ -1231,7 +1516,7 @@ const WarehouseMap = () => {
               className="inline-flex items-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100"
               title="Mở danh sách box hết hạn để tiêu hủy"
             >
-              Tiêu hủy hàng hết hạn
+              Yêu cầu tiêu hủy hàng
             </button>
             <button
               type="button"
@@ -1242,7 +1527,7 @@ const WarehouseMap = () => {
             >
               {syncCapacitiesState.isLoading
                 ? "Đang đồng bộ..."
-                : "Đồng bộ sức chứa slot"}
+                : "Đồng bộ sức chứa vị trí"}
             </button>
           </div>
 
@@ -1277,7 +1562,7 @@ const WarehouseMap = () => {
 
           {selectedRackId && slots && slots.length === 0 && (
             <p className="text-xs text-slate-500">
-              Chưa có slot nào trong rack "{selectedRackName}".
+              Chưa có vị trí nào trong kệ "{selectedRackName}".
             </p>
           )}
 
@@ -1286,15 +1571,15 @@ const WarehouseMap = () => {
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <p className="text-sm font-semibold text-slate-800">
-                    Zone: {selectedZoneName || "—"} • Rack:{" "}
+                    Khu: {selectedZoneName || "—"} • Kệ:{" "}
                     {selectedRackName || "—"}
                   </p>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    Mỗi ô là một slot, màu sắc thể hiện mức độ sử dụng tải.
+                    Mỗi ô là một vị trí, màu sắc thể hiện mức độ sử dụng tải.
                   </p>
                   {selectedVariantFilterId ? (
-                    <p className="text-[11px] text-blue-600 mt-0.5">
-                      Ô màu xanh dương là slot đang chứa ProductVariant đã chọn.
+                    <p className="text-[11px] text-sky-700 mt-0.5">
+                      Vị trí có viền xanh dương là vị trí đang chứa biến thể đã chọn, các vị trí còn lại được làm mờ.
                     </p>
                   ) : null}
                 </div>
@@ -1307,10 +1592,12 @@ const WarehouseMap = () => {
                       ? (slot.currentCapacity / slot.capacity) * 100
                       : 0;
                   const isSelected = detailSlot?.id === slot.id;
+                  const hasVariantFilter = !!selectedVariantFilterId;
                   const isVariantMatched =
-                    !!selectedVariantFilterId &&
+                    hasVariantFilter &&
                     Number(slot.productVariantId ?? 0) ===
                       Number(selectedVariantFilterId);
+                  const isVariantDimmed = hasVariantFilter && !isVariantMatched;
 
                   return (
                     <button
@@ -1321,8 +1608,8 @@ const WarehouseMap = () => {
                           prev?.id === slot.id ? null : slot
                         )
                       }
-                      className={`relative flex flex-col items-center justify-center rounded-lg border text-[10px] font-medium shadow-sm h-14 cursor-pointer transition ring-2 ring-transparent hover:ring-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-400 ${style} ${isSelected ? "ring-2 ring-emerald-500 ring-offset-2" : ""} ${isVariantMatched ? "bg-blue-600/95 text-white" : ""}`}
-                      title="Bấm xem chi tiết slot"
+                      className={`relative flex flex-col items-center justify-center rounded-xl border text-[10px] font-medium shadow-sm h-14 cursor-pointer transition ring-2 ring-transparent hover:ring-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-400 ${style} ${isSelected ? "ring-2 ring-emerald-500 ring-offset-2" : ""} ${isVariantMatched ? "z-10 bg-sky-600 text-white border-sky-700 shadow-[0_0_0_3px_rgba(14,165,233,0.30)] scale-[1.03]" : ""} ${isVariantDimmed ? "opacity-35 saturate-50" : ""}`}
+                      title="Bấm xem chi tiết vị trí"
                     >
                       <span className="truncate max-w-[80%]">{slot.code}</span>
                       <span className="mt-0.5 text-[9px] opacity-90">

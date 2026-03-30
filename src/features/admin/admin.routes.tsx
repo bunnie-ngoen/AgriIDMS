@@ -121,6 +121,9 @@ const ManagerStockChecksDashboardPage = lazy(
 const StockCheckDetailsPage = lazy(
   () => import("../stock-check/pages/StockCheckDetailsPage")
 );
+const DisposalRequestsPage = lazy(
+  () => import("../admin/pages/DisposalRequestsPage")
+);
 
 export const adminRoutes = [
   {
@@ -179,6 +182,7 @@ export const adminRoutes = [
       // Kiểm kê
       { path: "stock-checks", element: <ManagerStockChecksDashboardPage /> },
       { path: "stock-checks/:id", element: <StockCheckDetailsPage /> },
+      { path: "disposal-requests", element: <DisposalRequestsPage /> },
     ],
   },
 ];

@@ -16,6 +16,7 @@ import {
   PackageSearch,
   ShieldCheck,
   QrCode,
+  Trash2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
@@ -67,6 +68,7 @@ const mainMenu: MenuItem[] = [
       { name: "Danh sách kho", path: "warehouses", icon: List },
       { name: "Tạo kho", path: "warehouses/create", icon: CirclePlus },
       { name: "Xếp hàng vào vị trí", path: "putaway", icon: Boxes },
+      { name: "Duyệt yêu cầu tiêu hủy", path: "disposal-requests", icon: Trash2 },
     ],
   },
   {

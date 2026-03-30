@@ -57,7 +57,7 @@ export default function InventoryIssueManagementPage() {
           Quản lý hàng hư hỏng và quá hạn
         </h2>
         <p className="mt-1 text-sm text-slate-600">
-          Theo dõi box hư hỏng và lot sắp hết hạn/hết hạn để xử lý kịp thời.
+          Theo dõi hàng hư hỏng và lô hàng sắp hết hạn/hết hạn để xử lý kịp thời.
         </p>
 
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -107,7 +107,7 @@ export default function InventoryIssueManagementPage() {
           <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-rose-100 text-rose-700">
             <PackageX size={16} />
           </div>
-          <div className="mt-2 text-xs text-rose-700">Box hư hỏng</div>
+          <div className="mt-2 text-xs text-rose-700">Hàng hư hỏng</div>
           <div className="text-2xl font-bold text-rose-800">
             {isFetchingDamaged ? "..." : damagedBoxes.length}
           </div>
@@ -117,7 +117,7 @@ export default function InventoryIssueManagementPage() {
           <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
             <AlertTriangle size={16} />
           </div>
-          <div className="mt-2 text-xs text-amber-700">Lot sắp hết hạn</div>
+          <div className="mt-2 text-xs text-amber-700">Lô hàng sắp hết hạn</div>
           <div className="text-2xl font-bold text-amber-800">
             {isFetchingNearExpiry ? "..." : nearExpiryLots.length}
           </div>
@@ -127,7 +127,7 @@ export default function InventoryIssueManagementPage() {
           <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-200 text-slate-700">
             <CalendarClock size={16} />
           </div>
-          <div className="mt-2 text-xs text-slate-700">Lot đã quá hạn</div>
+          <div className="mt-2 text-xs text-slate-700">Lô hàng đã quá hạn</div>
           <div className="text-2xl font-bold text-slate-900">
             {isFetchingNearExpiry ? "..." : expiredLots.length}
           </div>
@@ -136,25 +136,25 @@ export default function InventoryIssueManagementPage() {
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="text-sm font-semibold text-slate-900">
-          Danh sách box hư hỏng
+          Danh sách hàng hư hỏng
         </div>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-600">
               <tr>
-                <th className="px-3 py-2 text-left">Box</th>
-                <th className="px-3 py-2 text-left">Lot</th>
+                <th className="px-3 py-2 text-left">Hàng</th>
+                <th className="px-3 py-2 text-left">Lô hàng</th>
                 <th className="px-3 py-2 text-left">Sản phẩm</th>
                 <th className="px-3 py-2 text-left">Kho</th>
                 <th className="px-3 py-2 text-right">Khối lượng</th>
-                <th className="px-3 py-2 text-left">Slot</th>
+                <th className="px-3 py-2 text-left">Vị trí</th>
               </tr>
             </thead>
             <tbody>
               {damagedBoxes.length === 0 ? (
                 <tr>
                   <td className="px-3 py-4 text-center text-slate-500" colSpan={6}>
-                    Không có box hư hỏng.
+                    Không có hàng hư hỏng.
                   </td>
                 </tr>
               ) : (
@@ -179,13 +179,13 @@ export default function InventoryIssueManagementPage() {
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="text-sm font-semibold text-slate-900">
-          Danh sách lot sắp hết hạn / quá hạn
+          Danh sách lô hàng sắp hết hạn / quá hạn
         </div>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-slate-600">
               <tr>
-                <th className="px-3 py-2 text-left">Lot</th>
+                <th className="px-3 py-2 text-left">Lô hàng</th>
                 <th className="px-3 py-2 text-left">Sản phẩm</th>
                 <th className="px-3 py-2 text-right">Còn lại</th>
                 <th className="px-3 py-2 text-left">Hạn dùng</th>
@@ -197,7 +197,7 @@ export default function InventoryIssueManagementPage() {
               {(nearExpiry?.lots ?? []).length === 0 ? (
                 <tr>
                   <td className="px-3 py-4 text-center text-slate-500" colSpan={6}>
-                    Không có lot trong ngưỡng cảnh báo.
+                    Không có lô hàng trong ngưỡng cảnh báo.
                   </td>
                 </tr>
               ) : (

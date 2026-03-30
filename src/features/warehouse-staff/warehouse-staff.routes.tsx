@@ -37,6 +37,18 @@ const LotListPage = lazy(
 const LotDetailPage = lazy(
   () => import("../goods-receipt/pages/LotDetailPage"),
 );
+const WarehouseListPage = lazy(
+  () => import("../admin/pages/WarehouseList"),
+);
+const WarehouseMapPage = lazy(
+  () => import("../admin/pages/WarehouseMap"),
+);
+const PutBoxIntoSlotPage = lazy(
+  () => import("../warehouse/pages/PutBoxIntoSlot"),
+);
+const InventoryIssueManagementPage = lazy(
+  () => import("../manager/pages/InventoryIssueManagementPage"),
+);
 
 export const warehouseStaffRoutes = [
   {
@@ -60,6 +72,10 @@ export const warehouseStaffRoutes = [
       { path: "goods-receipts/:id/qc", element: <GoodsReceiptQCPage /> },
       { path: "lots", element: <LotListPage /> },
       { path: "lots/:id", element: <LotDetailPage /> },
+      { path: "warehouses", element: <WarehouseListPage /> },
+      { path: "warehouses/:id/map", element: <WarehouseMapPage /> },
+      { path: "putaway", element: <PutBoxIntoSlotPage /> },
+      { path: "inventory-issues", element: <InventoryIssueManagementPage /> },
     ],
   },
 ];

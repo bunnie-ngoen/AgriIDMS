@@ -67,7 +67,7 @@ export default function ManagerStockChecksDashboard() {
               {toVietnameseStockCheckType(it.checkType)}
             </div>
             <div className="text-xs text-slate-500 mt-1">
-              Thời điểm snapshot: {formatDateTime(it.snapshotAt)}
+              Thời điểm chốt số liệu: {formatDateTime(it.snapshotAt)}
             </div>
             <div className="text-xs text-slate-500 mt-1">
               Đã đếm: {it.countedLines}/{it.totalLines}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Camera, QrCode, Search, Upload, Loader2 } from "lucide-react";
+import { Camera, QrCode, Search, Upload, Loader2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { decodeQrFromImageFile } from "../../../../shared/lib/decodeQrFromImage";
 import QrCameraScannerModal from "../../../../shared/components/QrCameraScannerModal";
@@ -26,6 +26,7 @@ export default function AdminHeaderQrMiniScan() {
   const [slotBoxDetail, setSlotBoxDetail] = useState<any>(null);
   const [isLoadingSlotBoxDetail, setIsLoadingSlotBoxDetail] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isResultPanelOpen, setIsResultPanelOpen] = useState(true);
 
   const [triggerLot, lotState] = useLazyGetLotByQrQuery();
   const [triggerBox, boxState] = useLazyGetBoxByQrQuery();
@@ -73,6 +74,7 @@ export default function AdminHeaderQrMiniScan() {
       toast.error("Vui lòng nhập mã QR.");
       return;
     }
+    setIsResultPanelOpen(true);
 
     try {
       if (mode === "lot") {
@@ -147,9 +149,9 @@ export default function AdminHeaderQrMiniScan() {
         className="border border-gray-200 p-2 rounded-lg bg-white text-xs focus:outline-none focus:ring-1 focus:ring-emerald-950"
         title="Chọn loại QR"
       >
-        <option value="lot">Lot</option>
-        <option value="box">Box</option>
-        <option value="slot">Slot</option>
+        <option value="lot">Lô hàng</option>
+        <option value="box">Mặt hàng</option>
+        <option value="slot">Vị trí</option>
       </select>
 
       <div className="flex items-center gap-2">
@@ -158,7 +160,7 @@ export default function AdminHeaderQrMiniScan() {
           className="border border-gray-200 p-2 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-emerald-950 w-[200px]"
           value={qrInput}
           onChange={(e) => setQrInput(e.target.value)}
-          placeholder="Nhập/scan QR..."
+          placeholder="Nhập/quét QR..."
           onKeyDown={(e) => {
             if (e.key === "Enter") runScan(qrInput);
           }}
@@ -216,8 +218,16 @@ export default function AdminHeaderQrMiniScan() {
       />
 
       {/* Dropdown kết quả */}
-      {currentResult || isAnyFetching ? (
+      {isResultPanelOpen && (currentResult || isAnyFetching) ? (
         <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[360px] bg-white border border-gray-200 rounded-xl shadow-lg p-3">
+          <button
+            type="button"
+            onClick={() => setIsResultPanelOpen(false)}
+            className="absolute right-2 top-2 inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            aria-label="Đóng"
+          >
+            <X size={14} />
+          </button>
           {isAnyFetching ? (
             <div className="flex items-center gap-2 text-sm text-gray-700">
               <Loader2 size={16} className="animate-spin" />

@@ -120,10 +120,16 @@ export default function CreateGoodsReceipt() {
     totalCapacityOfWarehouse - occupiedWeightOfWarehouse,
   );
 
+  const EPS = 0.0001;
+
   const totalIncomingWeight = useMemo(
     () => detailLines.reduce((sum, line) => sum + Number(line.receivedWeight ?? 0), 0),
     [detailLines],
   );
+
+  const isOverCapacity =
+    !!selectedWarehouse &&
+    totalIncomingWeight > remainingCapacityOfWarehouse + EPS;
 
   const onSubmit = async (values: FormValues) => {
     setServerMessage(null);
@@ -146,8 +152,8 @@ export default function CreateGoodsReceipt() {
           0,
         );
 
-        if (incoming > remaining + 0.0001) {
-          const msg = `Khối lượng phiếu (${incoming.toLocaleString("vi-VN")} kg) vượt sức chứa còn trống của kho (${remaining.toLocaleString("vi-VN")} kg).`;
+        if (incoming > remaining + EPS) {
+          const msg = `Vượt sức chứa: cần ${incoming.toLocaleString("vi-VN")} kg, kho còn trống ${remaining.toLocaleString("vi-VN")} kg.`;
           form.setError("warehouseId", { type: "manual", message: msg });
           toast.error(msg);
           return;
@@ -579,7 +585,7 @@ export default function CreateGoodsReceipt() {
                     <p className="text-[11px] text-red-500 mt-1">
                       Không tải được danh sách kho.{" "}
                       {(warehousesError as { status?: number })?.status === 401 &&
-                        "Vui lòng đăng nhập lại với tài khoản Admin/Manager."}
+                        "Vui lòng đăng nhập lại với tài khoản Admin/Quản lí."}
                     </p>
                   )}
                   {!isWarehousesError && selectedWarehouse && (
@@ -592,9 +598,11 @@ export default function CreateGoodsReceipt() {
                         Còn trống: {remainingCapacityOfWarehouse.toLocaleString("vi-VN")} kg ·
                         Phiếu này: {totalIncomingWeight.toLocaleString("vi-VN")} kg
                       </p>
-                      {totalIncomingWeight > remainingCapacityOfWarehouse + 0.0001 && (
+                      {isOverCapacity && (
                         <p className="text-[11px] text-red-500 font-medium">
-                          Khối lượng phiếu đang vượt sức chứa còn trống của kho.
+                          Vượt sức chứa: cần{" "}
+                          {totalIncomingWeight.toLocaleString("vi-VN")} kg, kho còn trống{" "}
+                          {remainingCapacityOfWarehouse.toLocaleString("vi-VN")} kg.
                         </p>
                       )}
                     </div>
@@ -675,7 +683,7 @@ export default function CreateGoodsReceipt() {
             </button>
             <button
               type="submit"
-              disabled={isLoading || detailLines.length === 0}
+              disabled={isLoading || detailLines.length === 0 || isOverCapacity}
               className="flex-[2] rounded-2xl py-3.5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 disabled:opacity-50 flex items-center justify-center gap-2.5 transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:translate-y-0"
             >
               {isLoading ? (

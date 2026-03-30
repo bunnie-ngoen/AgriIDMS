@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Bell } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import {
   useGetMyNotificationsQuery,
   useGetUnreadNotificationCountQuery,
   useMarkAllNotificationsAsReadMutation,
   useMarkNotificationAsReadMutation,
 } from "../../../notification/api/notification.api";
+import { useRoleGuard } from "../../../auth/hooks/useRoleGuard";
 
 function formatNotificationTime(iso: string): string {
   const dt = new Date(iso);
@@ -16,6 +18,20 @@ function formatNotificationTime(iso: string): string {
 export default function AdminHeaderNotificationBell() {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
+
+  const navigate = useNavigate();
+  const { isManager, isWarehouseStaff } = useRoleGuard();
+
+  const lotBasePath = isWarehouseStaff()
+    ? "/warehouse/lots"
+    : isManager()
+      ? "/manager/lots"
+      : "/admin/lots";
+  const goodsReceiptBasePath = isWarehouseStaff()
+    ? "/warehouse/goods-receipts"
+    : isManager()
+      ? "/manager/goods-receipts"
+      : "/admin/goods-receipts";
 
   const { data: notificationData, refetch: refetchNotifications } =
     useGetMyNotificationsQuery({ page: 1, pageSize: 10 });
@@ -47,16 +63,6 @@ export default function AdminHeaderNotificationBell() {
     await Promise.all([refetchNotifications(), refetchUnreadCount()]);
   };
 
-  const handleReadOne = async (notificationId: number, isRead: boolean) => {
-    if (isRead) return;
-    try {
-      await markAsRead(notificationId).unwrap();
-      await Promise.all([refetchNotifications(), refetchUnreadCount()]);
-    } catch {
-      // Keep UI responsive even if mark read fails.
-    }
-  };
-
   const handleReadAll = async () => {
     try {
       await markAllAsRead().unwrap();
@@ -64,6 +70,60 @@ export default function AdminHeaderNotificationBell() {
     } catch {
       // Keep UI responsive even if mark all read fails.
     }
+  };
+
+  const getNavigationPath = (item: {
+    referenceType?: string | null;
+    referenceId?: number | null;
+  }): string | null => {
+    if (!item.referenceType || !item.referenceId) return null;
+
+    switch (item.referenceType) {
+      case "NearExpiryLot":
+        return `${lotBasePath}/${item.referenceId}`;
+      case "StockCheck": {
+        if (isWarehouseStaff()) return `/warehouse/stock-checks/${item.referenceId}`;
+        if (isManager()) return `/manager/stock-checks/${item.referenceId}`;
+        return `/admin/stock-checks/${item.referenceId}`;
+      }
+      case "GoodsReceipt":
+        return `${goodsReceiptBasePath}/${item.referenceId}`;
+      case "BackorderExpired":
+        // Only warehouse staff has the proposals page.
+        if (isWarehouseStaff()) {
+          return `/warehouse/orders/${item.referenceId}/proposals`;
+        }
+        return null;
+      case "DisposalRequest":
+        return isManager()
+          ? "/manager/disposal-requests"
+          : isWarehouseStaff()
+            ? "/warehouse/goods-receipts"
+            : "/admin/disposal-requests";
+      default:
+        return null;
+    }
+  };
+
+  const handleNotificationClick = async (item: {
+    notificationId: number;
+    isRead: boolean;
+    referenceType?: string | null;
+    referenceId?: number | null;
+  }) => {
+    // Navigate after marking as read (best effort).
+    if (!item.isRead) {
+      try {
+        await markAsRead(item.notificationId).unwrap();
+        await Promise.all([refetchNotifications(), refetchUnreadCount()]);
+      } catch {
+        // Even if mark-as-read fails, still navigate to reduce user friction.
+      }
+    }
+
+    const path = getNavigationPath(item);
+    setOpen(false);
+    if (path) navigate(path);
   };
 
   return (
@@ -107,9 +167,7 @@ export default function AdminHeaderNotificationBell() {
                   <button
                     key={item.userNotificationId}
                     type="button"
-                    onClick={() =>
-                      void handleReadOne(item.notificationId, item.isRead)
-                    }
+                    onClick={() => void handleNotificationClick(item)}
                     className={`w-full px-4 py-3 text-left transition-colors hover:bg-gray-50 ${
                       item.isRead ? "bg-white" : "bg-emerald-50/40"
                     }`}

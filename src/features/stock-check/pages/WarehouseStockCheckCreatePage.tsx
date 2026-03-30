@@ -213,7 +213,7 @@ export default function WarehouseStockCheckCreatePage() {
                 <option value={0}>Chọn kho...</option>
                 {warehouses.map((w) => (
                   <option key={w.id} value={w.id}>
-                    {w.name} ({w.titleWarehouse})
+                    {w.name} ({w.titleWarehouse === "Cold" ? "Kho lạnh" : "Kho thường"})
                   </option>
                 ))}
               </select>
@@ -253,7 +253,7 @@ export default function WarehouseStockCheckCreatePage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <label className="text-xs font-medium text-slate-700">Khu (Zone)</label>
+                    <label className="text-xs font-medium text-slate-700">Khu</label>
                     <select
                       value={zoneId}
                       onChange={(e) => {
@@ -275,7 +275,7 @@ export default function WarehouseStockCheckCreatePage() {
                   </div>
 
                   <div>
-                    <label className="text-xs font-medium text-slate-700">Dãy kệ (Rack)</label>
+                    <label className="text-xs font-medium text-slate-700">Dãy kệ</label>
                     <select
                       value={rackId}
                       onChange={(e) => {
@@ -296,7 +296,7 @@ export default function WarehouseStockCheckCreatePage() {
                   </div>
 
                   <div>
-                    <label className="text-xs font-medium text-slate-700">Ô kệ (Slot)</label>
+                    <label className="text-xs font-medium text-slate-700">Ô kệ</label>
                     <select
                       value={slotId}
                       onChange={(e) => setSlotId(Number(e.target.value))}
@@ -353,7 +353,7 @@ export default function WarehouseStockCheckCreatePage() {
                       className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                     >
                       <Camera size={14} />
-                      Camera
+                      Máy ảnh
                     </button>
                     <input
                       ref={boxQrImageRef}

@@ -29,13 +29,20 @@ function formatDateTime(input: string | Date) {
   return d.toLocaleString("vi-VN");
 }
 
+function formatWeight1(value?: number | null): string {
+  if (value == null || !Number.isFinite(Number(value))) return "—";
+  return Number(value).toFixed(1);
+}
+
 const VARIANCE_TOLERANCE = 0.001;
+const OTHER_VARIANCE_REASON_VALUE = 4;
 
 function varianceReasonStringToValue(reason?: string | null): number | null {
   if (!reason) return null;
   if (reason === "Damaged") return 1;
   if (reason === "Loss") return 2;
   if (reason === "MeasurementError") return 3;
+  if (reason === "Other") return OTHER_VARIANCE_REASON_VALUE;
   return null;
 }
 
@@ -84,6 +91,8 @@ export default function StockCheckDetailsPage() {
   const detailQrImageRef = useRef<HTMLInputElement | null>(null);
   const rowRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const countedInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const varianceReasonSelectRefs = useRef<Record<number, HTMLSelectElement | null>>({});
+  const noteInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
   useEffect(() => {
     if (!data?.details) return;
@@ -129,6 +138,12 @@ export default function StockCheckDetailsPage() {
       const varianceType = getVarianceTypeFromDiff(diff);
       if (varianceType === "Shortage") {
         if (inp.varianceReason == null) return false;
+        if (
+          inp.varianceReason === OTHER_VARIANCE_REASON_VALUE &&
+          !inp.note.trim()
+        ) {
+          return false;
+        }
       }
     }
     return true;
@@ -196,6 +211,14 @@ export default function StockCheckDetailsPage() {
       toast.error("Thiếu hàng cần chọn nguyên nhân");
       return;
     }
+    if (
+      varianceType === "Shortage" &&
+      varianceReason === OTHER_VARIANCE_REASON_VALUE &&
+      !inp.note.trim()
+    ) {
+      toast.error("Thiếu hàng (Khác) cần điền nguyên nhân khác");
+      return;
+    }
 
     const payload: UpdateCountedWeightPayload = {
       stockCheckDetailId: d.stockCheckDetailId,
@@ -237,7 +260,39 @@ export default function StockCheckDetailsPage() {
 
       if (canWarehouseEdit) {
         setTimeout(() => {
-          countedInputRefs.current[matched.stockCheckDetailId]?.focus();
+          const inp = inputs[matched.stockCheckDetailId];
+
+          const countedValRaw = inp?.countedWeight?.trim()
+            ? Number(inp.countedWeight)
+            : null;
+          const countedVal =
+            countedValRaw != null && Number.isFinite(countedValRaw)
+              ? countedValRaw
+              : null;
+
+          const diff =
+            countedVal != null
+              ? countedVal - matched.snapshotWeight
+              : matched.differenceWeight != null
+                ? Number(matched.differenceWeight)
+                : null;
+
+          const varianceType =
+            diff != null && Number.isFinite(diff)
+              ? getVarianceTypeFromDiff(diff)
+              : matched.varianceType ?? null;
+
+          const shortage = varianceType === "Shortage";
+
+          if (shortage) {
+            if (inp?.varianceReason === OTHER_VARIANCE_REASON_VALUE) {
+              noteInputRefs.current[matched.stockCheckDetailId]?.focus();
+            } else {
+              varianceReasonSelectRefs.current[matched.stockCheckDetailId]?.focus();
+            }
+          } else {
+            countedInputRefs.current[matched.stockCheckDetailId]?.focus();
+          }
         }, 120);
       }
 
@@ -295,7 +350,7 @@ export default function StockCheckDetailsPage() {
             </h2>
             <div className="mt-1 text-sm text-slate-700">
               {toVietnameseStockCheckType(data.checkType)} ·{" "}
-              {toVietnameseStockCheckStatus(data.status)} · Thời điểm snapshot:{" "}
+              {toVietnameseStockCheckStatus(data.status)} · Thời điểm chốt số liệu:{" "}
               {formatDateTime(data.snapshotAt)}
             </div>
           </div>
@@ -366,32 +421,32 @@ export default function StockCheckDetailsPage() {
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="text-sm font-semibold text-slate-900">Danh sách thùng</div>
+        <div className="text-sm font-semibold text-slate-900">Danh sách hàng</div>
         <div className="mt-1 text-xs text-slate-500">
-          {details.length} dòng · Đã khóa snapshot: {data.isLockedSnapshot ? "Có" : "Không"}
+          {details.length} dòng · Đã khóa số liệu chốt: {data.isLockedSnapshot ? "Có" : "Không"}
         </div>
         {details.length > 0 ? (
           <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
             <div className="text-xs font-semibold text-slate-700 inline-flex items-center gap-2">
               <QrCode size={14} />
-              Tìm nhanh dòng thùng bằng QR
+              Tìm nhanh dòng hàng bằng QR
             </div>
             <div className="mt-2 flex flex-col gap-2 sm:flex-row">
               <input
                 type="text"
                 value={detailQrInput}
                 onChange={(e) => setDetailQrInput(e.target.value)}
-                placeholder="Dán hoặc quét QR thùng"
+                placeholder="Dán hoặc quét QR hàng"
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
               />
               <button
                 type="button"
                 onClick={() => void handleFocusDetailByQr()}
                 disabled={isFindingByQr}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
               >
                 {isFindingByQr ? <Loader2 size={14} className="animate-spin" /> : null}
-                Tìm dòng
+                Tìm kiếm
               </button>
               <button
                 type="button"
@@ -407,7 +462,7 @@ export default function StockCheckDetailsPage() {
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
                 <Camera size={14} />
-                Camera
+                Máy ảnh
               </button>
               <input
                 ref={detailQrImageRef}
@@ -454,28 +509,28 @@ export default function StockCheckDetailsPage() {
                 >
                   <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                     <div className="min-w-0">
-                      <div className="text-xs text-slate-500">Thùng</div>
+                      <div className="text-xs text-slate-500">Hàng</div>
                       <div className="text-sm font-semibold text-slate-900 truncate">{d.boxCode}</div>
                       <div className="text-[11px] text-slate-600 truncate mt-1">
-                        Lô: {d.lotCode}
+                        Lô hàng: {d.lotCode}
                       </div>
                       <div className="text-[11px] text-slate-600 truncate">
-                        Ô kệ: {d.slotCode ?? "—"}
+                        Vị trí: {d.slotCode ?? "—"}
                       </div>
                     </div>
 
                     <div>
-                      <div className="text-xs text-slate-500">Tại snapshot</div>
-                      <div className="text-sm font-semibold text-slate-900">{d.snapshotWeight} kg</div>
+                      <div className="text-xs text-slate-500">Tại thời điểm chốt</div>
+                      <div className="text-sm font-semibold text-slate-900">{formatWeight1(d.snapshotWeight)} kg</div>
                       <div className="text-[11px] text-slate-600 mt-1">
-                        Hệ thống hiện tại: {d.currentSystemWeight ?? "—"} kg
+                        Hệ thống hiện tại: {formatWeight1(d.currentSystemWeight)} kg
                       </div>
                     </div>
 
                     <div>
                       <div className="text-xs text-slate-500">Chênh lệch</div>
                       <div className="text-sm font-semibold text-slate-900">
-                        {diff != null && Number.isFinite(diff) ? Math.abs(diff).toFixed(3) : "—"} kg
+                        {diff != null && Number.isFinite(diff) ? Math.abs(diff).toFixed(1) : "—"} kg
                       </div>
                       <div className="text-[11px] text-slate-600 mt-1">
                         Trạng thái:{" "}
@@ -514,7 +569,7 @@ export default function StockCheckDetailsPage() {
                             />
                           ) : (
                             <div className="text-sm font-semibold text-slate-900">
-                              {d.countedWeight ?? "—"} kg
+                              {formatWeight1(d.countedWeight)} kg
                             </div>
                           )}
                         </div>
@@ -523,6 +578,10 @@ export default function StockCheckDetailsPage() {
                           <div className="text-xs text-slate-500">Nguyên nhân</div>
                           {canWarehouseEdit && shortage ? (
                             <select
+                              ref={(el) => {
+                                varianceReasonSelectRefs.current[d.stockCheckDetailId] =
+                                  el;
+                              }}
                               value={inp?.varianceReason ?? ""}
                               onChange={(e) => {
                                 const v = e.target.value === "" ? null : Number(e.target.value);
@@ -534,6 +593,13 @@ export default function StockCheckDetailsPage() {
                                     varianceReason: v,
                                   },
                                 }));
+                                if (
+                                  v === OTHER_VARIANCE_REASON_VALUE
+                                ) {
+                                  setTimeout(() => {
+                                    noteInputRefs.current[d.stockCheckDetailId]?.focus();
+                                  }, 0);
+                                }
                               }}
                               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
                             >
@@ -541,12 +607,15 @@ export default function StockCheckDetailsPage() {
                               <option value={1}>Hỏng</option>
                               <option value={2}>Mất</option>
                               <option value={3}>Sai số cân</option>
+                            <option value={OTHER_VARIANCE_REASON_VALUE}>Khác</option>
                             </select>
                           ) : (
                             <div className="text-sm text-slate-700">
                               {shortage ? (
                                 d.varianceReason ? (
-                                  toVietnameseVarianceReason(d.varianceReason)
+                                d.varianceReason === "Other" && d.note
+                                  ? `${toVietnameseVarianceReason(d.varianceReason)}: ${d.note}`
+                                  : toVietnameseVarianceReason(d.varianceReason)
                                 ) : (
                                   <span className="text-rose-600">Chưa chọn</span>
                                 )
@@ -559,8 +628,16 @@ export default function StockCheckDetailsPage() {
 
                         {canWarehouseEdit ? (
                           <div className="sm:col-span-2">
-                            <div className="text-xs text-slate-500">Ghi chú</div>
+                          <div className="text-xs text-slate-500">
+                            {shortage && inp?.varianceReason === OTHER_VARIANCE_REASON_VALUE
+                              ? "Nguyên nhân khác"
+                              : "Ghi chú"}
+                          </div>
                             <input
+                              ref={(el) => {
+                                noteInputRefs.current[d.stockCheckDetailId] =
+                                  el;
+                              }}
                               type="text"
                               value={inp?.note ?? ""}
                               onChange={(e) => {
@@ -575,7 +652,11 @@ export default function StockCheckDetailsPage() {
                                 }));
                               }}
                               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
-                              placeholder="(tuỳ chọn)"
+                            placeholder={
+                              shortage && inp?.varianceReason === OTHER_VARIANCE_REASON_VALUE
+                                ? "(bắt buộc khi chọn Khác)"
+                                : "(tuỳ chọn)"
+                            }
                             />
                             <div className="mt-2 flex items-center justify-end">
                               <button
@@ -585,7 +666,7 @@ export default function StockCheckDetailsPage() {
                                 className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
                               >
                                 <Save size={14} />
-                                Lưu dòng
+                                Lưu
                               </button>
                             </div>
                           </div>
@@ -608,7 +689,7 @@ export default function StockCheckDetailsPage() {
 
       <QrCameraScannerModal
         open={isDetailQrCameraOpen}
-        title="Quét QR để tìm dòng thùng"
+        title="Quét QR để tìm dòng hàng"
         onClose={() => setIsDetailQrCameraOpen(false)}
         onDetected={(value) => {
           setDetailQrInput(value);

@@ -68,11 +68,11 @@ function toVietnameseReceiptStatus(status: string): string {
     case "Received":
       return "Đã nhận";
     case "QCCompleted":
-      return "Đã hoàn tất QC";
+      return "Đã hoàn tất kiểm tra chất lượng";
     case "PendingManagerApproval":
       return "Chờ quản lý duyệt";
     case "PendingManagerApprovalQc":
-      return "Chờ quản lý duyệt (QC)";
+      return "Chờ quản lý duyệt (kiểm tra chất lượng)";
     case "Approved":
       return "Đã duyệt";
     case "Rejected":
@@ -83,7 +83,7 @@ function toVietnameseReceiptStatus(status: string): string {
 }
 
 function toVietnameseQcResult(qcResult?: string | null): string {
-  if (!qcResult) return "Chưa QC";
+  if (!qcResult) return "Chưa kiểm tra chất lượng";
   if (qcResult === "Passed") return "Đạt";
   if (qcResult === "Rejected") return "Loại";
   return qcResult;
@@ -142,6 +142,26 @@ export default function GoodsReceiptQC() {
     useUpdateGoodsReceiptWarehouseMutation();
 
   const { data: warehouses = [] } = useGetWarehousesQuery();
+
+  // Pagination for receipt boxes table.
+  const [boxesPage, setBoxesPage] = useState(1);
+  const [boxesPageSize, setBoxesPageSize] = useState(10);
+
+  useEffect(() => {
+    // Reset pagination when list changes.
+    setBoxesPage(1);
+  }, [receiptBoxes.length]);
+
+  const boxesTotalPages = Math.max(
+    1,
+    Math.ceil(receiptBoxes.length / boxesPageSize),
+  );
+  const safeBoxesPage = Math.min(boxesPage, boxesTotalPages);
+  const boxesPaged = receiptBoxes.slice(
+    (safeBoxesPage - 1) * boxesPageSize,
+    safeBoxesPage * boxesPageSize,
+  );
+
   const otherWarehouses = useMemo(
     () =>
       receipt
@@ -306,12 +326,12 @@ export default function GoodsReceiptQC() {
 
   const handleSubmitQc = async (values: QCForm) => {
     if (!selectedDetailIdForQc) {
-      toast.error("Vui lòng chọn dòng chi tiết cần QC.");
+      toast.error("Vui lòng chọn dòng chi tiết cần kiểm tra chất lượng.");
       return;
     }
     const detail = receipt.details.find((d) => d.id === selectedDetailIdForQc);
     if (!detail) {
-      toast.error("Không tìm thấy dòng chi tiết cần QC.");
+      toast.error("Không tìm thấy dòng chi tiết cần kiểm tra chất lượng.");
       return;
     }
 
@@ -326,13 +346,17 @@ export default function GoodsReceiptQC() {
       );
       return;
     }
-    const toastId = toast.loading("Đang cập nhật QC cho dòng chi tiết...");
+    const toastId = toast.loading(
+      "Đang cập nhật kiểm tra chất lượng cho dòng chi tiết..."
+    );
     try {
       await qcInspection({
         detailId: selectedDetailIdForQc,
         usableWeight: usable,
       }).unwrap();
-      toast.success("Cập nhật QC thành công.", { id: toastId });
+      toast.success("Cập nhật kiểm tra chất lượng thành công.", {
+        id: toastId,
+      });
       setSelectedDetailIdForQc(null);
       await refetch();
       if (canViewPrice) await refetchForApproval();
@@ -340,7 +364,7 @@ export default function GoodsReceiptQC() {
       const msg =
         err?.data?.message ||
         err?.data?.error ||
-        "Cập nhật QC thất bại.";
+        "Cập nhật kiểm tra chất lượng thất bại.";
       toast.error(msg, { id: toastId });
     }
   };
@@ -402,19 +426,21 @@ export default function GoodsReceiptQC() {
     if (
       !window.confirm(
         approve
-          ? "Manager xác nhận DUYỆT phiếu nhập vượt dung sai?"
-          : "Manager xác nhận TỪ CHỐI phiếu nhập vượt dung sai?"
+          ? "Quản lí xác nhận DUYỆT phiếu nhập vượt dung sai?"
+          : "Quản lí xác nhận TỪ CHỐI phiếu nhập vượt dung sai?"
       )
     )
       return;
 
     const toastId = toast.loading(
-      approve ? "Manager đang duyệt..." : "Manager đang từ chối..."
+      approve ? "Quản lí đang duyệt..." : "Quản lí đang từ chối..."
     );
     try {
       await managerReviewTolerance({ receiptId: receipt.id, approve }).unwrap();
       toast.success(
-        approve ? "Manager duyệt thành công." : "Manager từ chối thành công.",
+        approve
+          ? "Quản lí duyệt thành công."
+          : "Quản lí từ chối thành công.",
         { id: toastId }
       );
       await refetch();
@@ -426,7 +452,7 @@ export default function GoodsReceiptQC() {
         err?.data?.Message ||
         err?.data?.error ||
         err?.data?.Error ||
-        "Manager xử lý thất bại.";
+        "Quản lí xử lý thất bại.";
       toast.error(msg, { id: toastId });
     }
   };
@@ -435,18 +461,18 @@ export default function GoodsReceiptQC() {
     if (
       !window.confirm(
         approve
-          ? "Manager cho phép tiếp tục QC/Approve (ngoại lệ định mức tối thiểu)?"
-          : "Manager xác nhận TỪ CHỐI phiếu do dưới định mức tối thiểu?"
+          ? "Quản lí cho phép tiếp tục kiểm tra chất lượng/Approve (ngoại lệ định mức tối thiểu)?"
+          : "Quản lí xác nhận TỪ CHỐI phiếu do dưới định mức tối thiểu?"
       )
     )
       return;
 
     const toastId = toast.loading(
-      approve ? "Manager đang xử lý..." : "Manager đang từ chối..."
+      approve ? "Quản lí đang xử lý..." : "Quản lí đang từ chối..."
     );
     try {
       await managerReviewMin({ receiptId: receipt.id, approve }).unwrap();
-      toast.success("Đã xử lý phiếu theo quyết định Manager.", {
+      toast.success("Đã xử lý phiếu theo quyết định Quản lí.", {
         id: toastId,
       });
       await refetch();
@@ -457,17 +483,26 @@ export default function GoodsReceiptQC() {
         err?.data?.Message ||
         err?.data?.error ||
         err?.data?.Error ||
-        "Manager xử lý thất bại.";
+        "Quản lí xử lý thất bại.";
       toast.error(msg, { id: toastId });
     }
   };
 
   const handleManagerAllowQc = async () => {
-    if (!window.confirm("Manager cho phép quay lại bước QC?")) return;
-    const toastId = toast.loading("Đang cập nhật trạng thái để QC tiếp...");
+    if (
+      !window.confirm(
+        "Quản lí cho phép quay lại bước kiểm tra chất lượng?"
+      )
+    )
+      return;
+    const toastId = toast.loading(
+      "Đang cập nhật trạng thái để kiểm tra chất lượng tiếp..."
+    );
     try {
       await managerAllowQc(receipt.id).unwrap();
-      toast.success("Đã cho phép tiếp tục QC.", { id: toastId });
+      toast.success("Đã cho phép tiếp tục kiểm tra chất lượng.", {
+        id: toastId,
+      });
       await refetch();
       if (canViewPrice) await refetchForApproval();
     } catch (err: any) {
@@ -476,7 +511,7 @@ export default function GoodsReceiptQC() {
         err?.data?.Message ||
         err?.data?.error ||
         err?.data?.Error ||
-        "Không thể cho phép QC tiếp.";
+        "Không thể cho phép kiểm tra chất lượng tiếp.";
       toast.error(msg, { id: toastId });
     }
   };
@@ -584,7 +619,8 @@ export default function GoodsReceiptQC() {
           </button>
           <div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-              Bước 2 · QC & duyệt phiếu nhập · {receipt.receiptCode}
+              Bước 2 · Kiểm tra chất lượng & duyệt phiếu nhập ·{" "}
+              {receipt.receiptCode}
             </h1>
             <p className="text-xs text-slate-400 mt-0.5">
               {receipt.supplierName} · {receipt.warehouseName} ·{" "}
@@ -628,7 +664,7 @@ export default function GoodsReceiptQC() {
           </div>
           <div className="px-6 py-3 border-t border-slate-100 space-y-1.5">
             <p className="text-xs font-semibold text-slate-600">
-              Bước 3 · Duyệt phiếu / Manager duyệt
+              Bước 3 · Duyệt phiếu / Quản lí duyệt
             </p>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-xs text-slate-500">
@@ -662,7 +698,7 @@ export default function GoodsReceiptQC() {
                       {isManagerReviewingTolerance && (
                         <Loader2 size={12} className="animate-spin" />
                       )}
-                      Manager duyệt (dung sai)
+                      Quản lí duyệt (dung sai)
                     </button>
                     <button
                       type="button"
@@ -673,7 +709,7 @@ export default function GoodsReceiptQC() {
                       {isManagerReviewingTolerance && (
                         <Loader2 size={12} className="animate-spin" />
                       )}
-                      Manager từ chối
+                      Quản lí từ chối
                     </button>
                   </>
                 )}
@@ -689,7 +725,7 @@ export default function GoodsReceiptQC() {
                       {isManagerReviewingMin && (
                         <Loader2 size={12} className="animate-spin" />
                       )}
-                      Cho phép QC tiếp
+                      Cho phép kiểm tra chất lượng tiếp
                     </button>
                     <button
                       type="button"
@@ -705,7 +741,7 @@ export default function GoodsReceiptQC() {
                   </>
                 )}
 
-                {/* Trường hợp đặc biệt: cho phép quay lại QC khi đang PendingManagerApproval */}
+                {/* Trường hợp đặc biệt: cho phép quay lại kiểm tra chất lượng khi đang PendingManagerApproval */}
                 {canManagerToleranceAction && (
                   <button
                     type="button"
@@ -716,7 +752,7 @@ export default function GoodsReceiptQC() {
                     {isManagerAllowingQc && (
                       <Loader2 size={12} className="animate-spin" />
                     )}
-                    Cho phép QC lại
+                    Cho phép kiểm tra chất lượng lại
                   </button>
                 )}
               </div>
@@ -724,16 +760,16 @@ export default function GoodsReceiptQC() {
           </div>
         </div>
 
-        {/* QC table + form */}
+        {/* Kiểm tra chất lượng table + form */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100">
             <div className="flex items-baseline justify-between gap-2">
               <h2 className="text-sm font-semibold text-slate-800">
-                Bước 2 · QC dòng chi tiết phiếu nhập
+                Bước 2 · Kiểm tra chất lượng dòng chi tiết phiếu nhập
               </h2>
               {!canQC && (
                 <p className="text-[11px] text-slate-400">
-                  QC chỉ thực hiện trước khi phiếu được duyệt / tạo box.
+                  Kiểm tra chất lượng chỉ thực hiện trước khi phiếu được duyệt / tạo box.
                 </p>
               )}
             </div>
@@ -748,24 +784,24 @@ export default function GoodsReceiptQC() {
                   {canViewPrice && (
                     <>
                       <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                        Đơn giá
+                        Đơn giá(VNĐ)
                       </th>
                       <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                        Thành tiền
+                        Thành tiền(VNĐ)
                       </th>
                     </>
                   )}
                   <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    KL nhận
+                    KL nhận (KG)
                   </th>
                   <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    KL dùng được
+                    KL dùng được (KG)
                   </th>
                   <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    KL loại
+                    KL loại (KG)
                   </th>
                   <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    Kết quả QC
+                    Kết quả kiểm tra chất lượng
                   </th>
                   <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                     Thao tác
@@ -795,14 +831,14 @@ export default function GoodsReceiptQC() {
                         <>
                           <td className="px-5 py-3 text-right text-slate-700 tabular-nums">
                             {d.unitPrice != null
-                              ? `${moneyFmt.format(Number(d.unitPrice))} ₫`
+                              ? moneyFmt.format(Number(d.unitPrice))
                               : "—"}
                           </td>
                           <td className="px-5 py-3 text-right text-slate-700 tabular-nums">
                             {d.unitPrice != null
-                              ? `${moneyFmt.format(
+                              ? moneyFmt.format(
                                   Number(d.unitPrice) * Number(d.receivedWeight),
-                                )} ₫`
+                                )
                               : "—"}
                           </td>
                         </>
@@ -828,11 +864,11 @@ export default function GoodsReceiptQC() {
                             }
                             className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200"
                           >
-                            QC dòng
+                            Kiểm tra chất lượng dòng
                           </button>
                         ) : (
                           <span className="text-[11px] text-slate-400">
-                            Đã khoá QC
+                            Đã khoá kiểm tra chất lượng
                           </span>
                         )}
                       </td>
@@ -843,11 +879,11 @@ export default function GoodsReceiptQC() {
             </table>
           </div>
 
-          {/* QC form */}
+          {/* Kiểm tra chất lượng form */}
           {selectedDetailIdForQc && canQC && (
             <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/60">
               <h3 className="text-xs font-semibold text-slate-800 mb-3">
-                QC cho dòng chi tiết #{selectedDetailIdForQc}
+                Kiểm tra chất lượng cho dòng chi tiết #{selectedDetailIdForQc}
               </h3>
               <form
                 onSubmit={qcForm.handleSubmit(handleSubmitQc)}
@@ -883,7 +919,7 @@ export default function GoodsReceiptQC() {
                     {isQcLoading && (
                       <Loader2 size={14} className="animate-spin" />
                     )}
-                    Lưu QC
+                    Lưu kiểm tra chất lượng
                   </button>
                 </div>
               </form>
@@ -1026,7 +1062,7 @@ export default function GoodsReceiptQC() {
                         </tr>
                       </thead>
                       <tbody>
-                        {receiptBoxes.map((b) => (
+                        {boxesPaged.map((b) => (
                           <tr key={b.id} className="border-t border-slate-100">
                             <td className="px-3 py-2 text-slate-800 font-medium">
                               {b.boxCode}
@@ -1068,6 +1104,58 @@ export default function GoodsReceiptQC() {
                         ))}
                       </tbody>
                     </table>
+
+                    {/* Pagination controls */}
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-[11px] text-slate-500">
+                        Hiển thị{" "}
+                        <span className="font-semibold text-slate-700">
+                          {(safeBoxesPage - 1) * boxesPageSize + 1}
+                        </span>{" "}
+                        -{" "}
+                        <span className="font-semibold text-slate-700">
+                          {Math.min(safeBoxesPage * boxesPageSize, receiptBoxes.length)}
+                        </span>{" "}
+                        / {receiptBoxes.length} box
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={boxesPageSize}
+                          onChange={(e) => {
+                            setBoxesPageSize(Number(e.target.value));
+                            setBoxesPage(1);
+                          }}
+                          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700"
+                        >
+                          <option value={10}>10 / trang</option>
+                          <option value={20}>20 / trang</option>
+                          <option value={50}>50 / trang</option>
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => setBoxesPage((p) => Math.max(1, p - 1))}
+                          disabled={safeBoxesPage <= 1}
+                          className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 disabled:opacity-50"
+                        >
+                          Trước
+                        </button>
+                        <span className="text-[11px] text-slate-600">
+                          Trang {safeBoxesPage}/{boxesTotalPages}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setBoxesPage((p) =>
+                              Math.min(boxesTotalPages, p + 1),
+                            )
+                          }
+                          disabled={safeBoxesPage >= boxesTotalPages}
+                          className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 disabled:opacity-50"
+                        >
+                          Sau
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
