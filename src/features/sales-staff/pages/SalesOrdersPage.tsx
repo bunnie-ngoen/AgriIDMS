@@ -24,6 +24,7 @@ import type { PendingCodPaymentItem } from "../../payment/schemas/payment.schema
 import { useAuth } from "../../auth/hooks/useAuth";
 import { AUTH_ROLE } from "../../auth/constants/auth.constants";
 import type { SaleConfirmResponse } from "../../order/schemas/order.schema";
+import { paymentStatusLabelVietnam } from "../../../shared/lib/paymentStatus";
 
 function vnd(n: number) {
   return n.toLocaleString("vi-VN");
@@ -45,6 +46,27 @@ function orderStatusTone(status: string) {
   if (status === "BackorderWaiting") {
     return "bg-violet-100 text-violet-700 border-violet-200";
   }
+  if (status === "Confirmed") {
+    return "bg-teal-100 text-teal-700 border-teal-200";
+  }
+  if (status === "Shipping") {
+    return "bg-cyan-100 text-cyan-700 border-cyan-200";
+  }
+  if (status === "Delivered") {
+    return "bg-green-100 text-green-700 border-green-200";
+  }
+  if (status === "FailedDelivery") {
+    return "bg-orange-100 text-orange-700 border-orange-200";
+  }
+  if (status === "Returned") {
+    return "bg-slate-200 text-slate-700 border-slate-300";
+  }
+  if (status === "Completed") {
+    return "bg-emerald-100 text-emerald-700 border-emerald-200";
+  }
+  if (status === "Cancelled") {
+    return "bg-rose-100 text-rose-700 border-rose-200";
+  }
   return "bg-slate-100 text-slate-700 border-slate-200";
 }
 
@@ -54,17 +76,18 @@ function orderStatusLabel(status: string) {
   if (status === "PendingWarehouseConfirm") return "Chờ kho xác nhận";
   if (status === "PartiallyAllocated") return "Giữ hàng một phần";
   if (status === "BackorderWaiting") return "Chờ backorder";
+  if (status === "Confirmed") return "Đã xác nhận";
+  if (status === "Shipping") return "Đang giao";
+  if (status === "Delivered") return "Đã giao hàng";
+  if (status === "FailedDelivery") return "Giao thất bại";
+  if (status === "Returned") return "Hoàn hàng";
   if (status === "Completed") return "Hoàn thành";
   if (status === "Cancelled") return "Đã hủy";
   return status;
 }
 
 function paymentStatusLabel(status: string) {
-  if (status === "Pending") return "Chờ xử lý";
-  if (status === "Paid") return "Đã thanh toán";
-  if (status === "Cancelled") return "Đã hủy";
-  if (status === "Failed") return "Thất bại";
-  return status;
+  return paymentStatusLabelVietnam(status);
 }
 
 function sourceLabel(source: string) {
@@ -479,7 +502,7 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
                 <th className="py-2 pr-3">Trạng thái</th>
                 <th className="py-2 pr-3">Hình thức mua</th>
                 <th className="py-2 pr-3">Ngày tạo</th>
-                <th className="py-2 pr-3">Số loại sản phẩm</th>
+                <th className="py-2 pr-3">Số sản phẩm</th>
                 <th className="py-2 pr-3">Thành tiền (VNĐ)</th>
                 <th className="py-2 pr-3 w-[220px]">Thao tác</th>
               </tr>
@@ -668,7 +691,7 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
               <th className="py-2 pr-3">Trạng thái</th>
               {showSource && <th className="py-2 pr-3">Hình thức mua</th>}
               <th className="py-2 pr-3">Ngày tạo</th>
-              <th className="py-2 pr-3">Số loại sản phẩm</th>
+              <th className="py-2 pr-3">Số sản phẩm</th>
               <th className="py-2 pr-3">Thành tiền (VNĐ)</th>
               <th className="py-2 pr-3 w-[180px]">Thao tác</th>
             </tr>
@@ -799,7 +822,7 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
             <h2 className="text-lg font-semibold text-slate-900">Bộ lọc đơn hàng chờ xác nhận bán</h2>
             <div className="mt-3 grid md:grid-cols-3 gap-3">
               <div>
-                <label className="text-xs font-medium text-slate-600">Tìm theo Order ID</label>
+                <label className="text-xs font-medium text-slate-600">Tìm theo đơn hàng</label>
                 <input
                   value={saleConfirmOrderIdQuery}
                   onChange={(e) => setSaleConfirmOrderIdQuery(e.target.value)}
@@ -852,7 +875,7 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
             <h2 className="text-lg font-semibold text-slate-900">Bộ lọc thanh toán COD chờ xử lý</h2>
             <div className="mt-3 grid md:grid-cols-3 gap-3">
               <div>
-                <label className="text-xs font-medium text-slate-600">Tìm theo Order ID</label>
+                <label className="text-xs font-medium text-slate-600">Tìm theo đơn hàng</label>
                 <input
                   value={pendingCodOrderIdQuery}
                   onChange={(e) => setPendingCodOrderIdQuery(e.target.value)}
@@ -904,7 +927,7 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
                 </select>
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-600">Tìm theo Order ID</label>
+                <label className="text-xs font-medium text-slate-600">Tìm theo đơn hàng</label>
                 <input
                   value={orderIdQuery}
                   onChange={(e) => setOrderIdQuery(e.target.value)}
@@ -1065,7 +1088,7 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
                   <div className="mt-2 grid grid-cols-2 gap-3 text-xs text-slate-600 md:grid-cols-4">
                     <p>Thành tiền (VNĐ): <span className="font-semibold text-slate-800">{vnd(c.totalAmount)} ₫</span></p>
                     <p>Hình thức mua: <span className="font-semibold text-slate-800">{sourceLabel(c.source)}</span></p>
-                    <p>Số loại sản phẩm: <span className="font-semibold text-slate-800">{c.itemCount}</span></p>
+                    <p>Số sản phẩm: <span className="font-semibold text-slate-800">{c.itemCount}</span></p>
                     <p>Ngày tạo: <span className="font-semibold text-slate-800">{new Date(c.createdAt).toLocaleDateString("vi-VN")}</span></p>
                   </div>
                   <p className="mt-2 text-xs text-slate-600">
@@ -1103,7 +1126,7 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
                     <th className="py-2 pr-3">Trạng thái</th>
                     <th className="py-2 pr-3">Hình thức mua</th>
                     <th className="py-2 pr-3">Ngày tạo</th>
-                    <th className="py-2 pr-3">Số loại sản phẩm</th>
+                    <th className="py-2 pr-3">Số sản phẩm</th>
                     <th className="py-2 pr-3">Thành tiền (VNĐ)</th>
                     <th className="py-2 pr-3 w-[320px]">Thao tác</th>
                   </tr>
@@ -1203,7 +1226,7 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
                     <th className="py-2 pr-3">Trạng thái</th>
                     <th className="py-2 pr-3">Hình thức mua</th>
                     <th className="py-2 pr-3">Ngày tạo</th>
-                    <th className="py-2 pr-3">Số loại sản phẩm</th>
+                    <th className="py-2 pr-3">Số sản phẩm</th>
                     <th className="py-2 pr-3">Thành tiền (VNĐ)</th>
                     <th className="py-2 pr-3 w-[340px]">Thao tác duyệt hộ khách</th>
                   </tr>

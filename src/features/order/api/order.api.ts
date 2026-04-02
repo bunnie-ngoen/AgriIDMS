@@ -1,4 +1,5 @@
 import { api } from "../../../shared/api";
+import { toCreatePosOrderRequestBody } from "../../../shared/api/orderCheckoutBodies";
 import {
     allocationProposalResultSchema,
     allocationConfirmResponseSchema,
@@ -177,6 +178,28 @@ export const orderApi = api.injectEndpoints({
             },
         }),
 
+        getConfirmedAllocationOrders: builder.query<
+            OrderListItem[],
+            { customerUserId?: string; source?: string; skip?: number; take?: number } | void
+        >({
+            query: (arg) => ({
+                url: "Orders/staff/allocation-completed",
+                method: "GET",
+                params: {
+                    customerUserId: arg?.customerUserId,
+                    source: arg?.source,
+                    skip: arg?.skip ?? 0,
+                    take: arg?.take ?? 50,
+                },
+            }),
+            transformResponse: (raw: unknown) => {
+                const normalized = toCamelCase(raw);
+                const parsed = orderListSchema.safeParse(normalized);
+                if (!parsed.success) return [];
+                return parsed.data;
+            },
+        }),
+
         saleConfirmOrder: builder.mutation<SaleConfirmResponse, number>({
             query: (id) => ({
                 url: `Orders/${id}/sale-confirm`,
@@ -196,7 +219,10 @@ export const orderApi = api.injectEndpoints({
                 totalAmount: number;
             },
             {
+                fulfillmentType?: 0 | 1;
                 customerUserId?: string;
+                customerName?: string;
+                customerPhone?: string;
                 items: Array<{
                     productVariantId: number;
                     boxWeight: number;
@@ -209,7 +235,7 @@ export const orderApi = api.injectEndpoints({
             query: (body) => ({
                 url: "Orders/pos",
                 method: "POST",
-                body,
+                body: toCreatePosOrderRequestBody(body),
             }),
             transformResponse: (raw: unknown) => {
                 const normalized = toCamelCase(raw) as {
@@ -322,6 +348,27 @@ export const orderApi = api.injectEndpoints({
             }),
         }),
 
+        confirmDeliveredAsStaff: builder.mutation<void, number>({
+            query: (id) => ({
+                url: `Orders/${id}/delivery/confirm`,
+                method: "PATCH",
+            }),
+        }),
+
+        confirmFailedDeliveryAsStaff: builder.mutation<void, number>({
+            query: (id) => ({
+                url: `Orders/${id}/delivery/failed`,
+                method: "PATCH",
+            }),
+        }),
+
+        confirmReturnedAsStaff: builder.mutation<void, number>({
+            query: (id) => ({
+                url: `Orders/${id}/delivery/returned`,
+                method: "PATCH",
+            }),
+        }),
+
         getOverdueBackorders: builder.query<OverdueBackorderItem[], void>({
             query: () => ({
                 url: "Orders/backorder/overdue",
@@ -345,6 +392,7 @@ export const {
     useGetPaidPendingExportOrdersQuery,
     useGetPendingWarehouseConfirmOrdersQuery,
     useGetPendingCustomerDecisionOrdersQuery,
+    useGetConfirmedAllocationOrdersQuery,
     useCreatePosOrderMutation,
     useSaleConfirmOrderMutation,
     useConfirmOrderMutation,
@@ -358,6 +406,9 @@ export const {
     useCancelShortageAsStaffMutation,
     useAllocateBackorderAsStaffMutation,
     useCancelOrderMutation,
+    useConfirmDeliveredAsStaffMutation,
+    useConfirmFailedDeliveryAsStaffMutation,
+    useConfirmReturnedAsStaffMutation,
     useGetOverdueBackordersQuery,
 } = orderApi;
 

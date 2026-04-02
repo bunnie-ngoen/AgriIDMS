@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { ClipboardList } from "lucide-react";
 import { ROUTES } from "../../../shared/constants/routes";
+import { formatVietnamDate, formatVietnamTime, parseApiDateInput } from "../../../shared/lib/vietnamTime";
+import { paymentStatusLabelVietnam } from "../../../shared/lib/paymentStatus";
 import { useGetMyOrdersQuery } from "../api/order.api";
 
 function vnd(n: number) {
@@ -15,8 +17,10 @@ function getOrderStatusTone(status: string) {
     if (status === "BackorderWaiting") return "bg-violet-100 text-violet-700 border-violet-200";
     if (status === "Confirmed") return "bg-teal-100 text-teal-700 border-teal-200";
     if (status === "AwaitingPayment") return "bg-indigo-100 text-indigo-700 border-indigo-200";
-    if (status === "Paid") return "bg-lime-100 text-lime-700 border-lime-200";
     if (status === "Shipping") return "bg-cyan-100 text-cyan-700 border-cyan-200";
+    if (status === "Delivered") return "bg-green-100 text-green-700 border-green-200";
+    if (status === "FailedDelivery") return "bg-orange-100 text-orange-700 border-orange-200";
+    if (status === "Returned") return "bg-slate-200 text-slate-700 border-slate-300";
     if (status === "Completed") return "bg-green-100 text-green-700 border-green-200";
     if (status === "Cancelled") return "bg-rose-100 text-rose-700 border-rose-200";
     if (status === "InventoryFailed") return "bg-red-100 text-red-700 border-red-200";
@@ -30,8 +34,10 @@ function orderStatusLabel(status: string) {
     if (status === "PartiallyAllocated") return "Giữ hàng một phần";
     if (status === "BackorderWaiting") return "Chờ backorder";
     if (status === "Confirmed") return "Đã xác nhận";
-    if (status === "Paid") return "Đã thanh toán";
     if (status === "Shipping") return "Đang giao";
+    if (status === "Delivered") return "Đã giao hàng";
+    if (status === "FailedDelivery") return "Giao thất bại";
+    if (status === "Returned") return "Hoàn hàng";
     if (status === "Completed") return "Hoàn thành";
     if (status === "Cancelled") return "Đã hủy";
     if (status === "InventoryFailed") return "Thiếu tồn kho";
@@ -39,13 +45,18 @@ function orderStatusLabel(status: string) {
 }
 
 function paymentStatusLabel(status?: string | null) {
-    if (!status) return "N/A";
-    if (status === "Pending") return "Chờ xử lý";
-    if (status === "Processing") return "Đang xử lý";
-    if (status === "Paid" || status === "Success") return "Đã thanh toán";
-    if (status === "Cancelled") return "Đã hủy";
-    if (status === "Failed") return "Thất bại";
-    return status;
+    return paymentStatusLabelVietnam(status);
+}
+
+function paymentStatusTone(status?: string | null) {
+    if (!status) return "bg-slate-100 text-slate-600 border-slate-200";
+    if (status === "Pending") return "bg-amber-100 text-amber-700 border-amber-200";
+    if (status === "Processing") return "bg-sky-100 text-sky-700 border-sky-200";
+    if (status === "Paid" || status === "Success") return "bg-emerald-100 text-emerald-700 border-emerald-200";
+    if (status === "Cancelled") return "bg-slate-200 text-slate-700 border-slate-300";
+    if (status === "Failed") return "bg-rose-100 text-rose-700 border-rose-200";
+    if (status === "Refunded") return "bg-violet-100 text-violet-700 border-violet-200";
+    return "bg-slate-100 text-slate-700 border-slate-200";
 }
 
 export default function MyOrdersPage() {
@@ -70,9 +81,13 @@ export default function MyOrdersPage() {
         });
         const sorted = [...filtered];
         if (sortBy === "createdAsc") {
-            sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+            sorted.sort(
+                (a, b) => parseApiDateInput(a.createdAt).getTime() - parseApiDateInput(b.createdAt).getTime(),
+            );
         } else if (sortBy === "createdDesc") {
-            sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            sorted.sort(
+                (a, b) => parseApiDateInput(b.createdAt).getTime() - parseApiDateInput(a.createdAt).getTime(),
+            );
         } else if (sortBy === "totalAsc") {
             sorted.sort((a, b) => a.totalAmount - b.totalAmount);
         } else {
@@ -95,32 +110,36 @@ export default function MyOrdersPage() {
     };
 
     return (
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
-            <div className="flex flex-wrap items-end justify-between gap-3">
-                <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                    <ClipboardList size={22} />
-                    Đơn hàng của tôi
-                </h1>
-                <span className="text-sm text-slate-600">
-                    Tổng đơn: <span className="font-semibold text-slate-900">{orders.length}</span>
-                </span>
-            </div>
+        <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100/80">
+            <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
+                <header className="mb-8 border-b border-slate-200/80 pb-6">
+                    <div className="flex flex-wrap items-end justify-between gap-3">
+                        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+                            <ClipboardList size={22} />
+                            Đơn hàng của tôi
+                        </h1>
+                        <span className="text-sm text-slate-600">
+                            Tổng đơn: <span className="font-semibold text-slate-900">{orders.length}</span>
+                        </span>
+                    </div>
+                    <p className="mt-1.5 text-sm text-slate-500">Theo dõi giao hàng và thanh toán cho từng đơn.</p>
+                </header>
 
-            {isLoading ? (
-                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-6 text-slate-600">Đang tải đơn hàng...</div>
-            ) : isError ? (
-                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-6">
-                    <p className="text-red-700">Không tải được danh sách đơn hàng.</p>
-                    <button onClick={() => refetch()} className="mt-2 text-sm text-red-700 hover:underline">Thử lại</button>
-                </div>
-            ) : orders.length === 0 ? (
-                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-6 text-slate-600">Bạn chưa có đơn hàng nào.</div>
-            ) : (
-                <div className="mt-4 space-y-4">
-                    <div className="rounded-xl border border-slate-200 bg-white p-4">
+                {isLoading ? (
+                    <div className="rounded-2xl border border-slate-200/90 bg-white p-6 text-slate-600 shadow-sm">Đang tải đơn hàng...</div>
+                ) : isError ? (
+                    <div className="rounded-2xl border border-red-200 bg-red-50 p-6 shadow-sm">
+                        <p className="text-red-700">Không tải được danh sách đơn hàng.</p>
+                        <button onClick={() => refetch()} className="mt-2 text-sm font-medium text-red-700 hover:underline">Thử lại</button>
+                    </div>
+                ) : orders.length === 0 ? (
+                    <div className="rounded-2xl border border-slate-200/90 bg-white p-6 text-slate-600 shadow-sm">Bạn chưa có đơn hàng nào.</div>
+                ) : (
+                    <div className="space-y-4">
+                    <div className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm">
                         <div className="grid md:grid-cols-5 gap-3">
                             <div>
-                                <label className="text-xs font-medium text-slate-600">Trạng thái</label>
+                                <label className="text-xs font-medium text-slate-600">Lọc theo trạng thái đơn</label>
                                 <select
                                     value={statusFilter}
                                     onChange={(e) => {
@@ -136,7 +155,7 @@ export default function MyOrdersPage() {
                                 </select>
                             </div>
                             <div>
-                                <label className="text-xs font-medium text-slate-600">Tìm theo Order ID</label>
+                                <label className="text-xs font-medium text-slate-600">Tìm theo mã đơn</label>
                                 <input
                                     value={searchOrderId}
                                     onChange={(e) => {
@@ -148,7 +167,7 @@ export default function MyOrdersPage() {
                                 />
                             </div>
                             <div>
-                                <label className="text-xs font-medium text-slate-600">Sắp xếp</label>
+                                <label className="text-xs font-medium text-slate-600">Sắp xếp danh sách</label>
                                 <select
                                     value={sortBy}
                                     onChange={(e) => {
@@ -164,7 +183,7 @@ export default function MyOrdersPage() {
                                 </select>
                             </div>
                             <div>
-                                <label className="text-xs font-medium text-slate-600">Số dòng/trang</label>
+                                <label className="text-xs font-medium text-slate-600">Số đơn mỗi trang</label>
                                 <select
                                     value={pageSize}
                                     onChange={(e) => {
@@ -195,40 +214,49 @@ export default function MyOrdersPage() {
                             Không có đơn phù hợp với bộ lọc.
                         </div>
                     ) : (
-                        <div className="rounded-xl border border-slate-200 bg-white overflow-auto max-h-[620px]">
-                            <table className="w-full min-w-[980px]">
+                        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-auto max-h-[620px]">
+                            <table className="w-full min-w-[1120px]">
                                 <thead className="sticky top-0 z-10 bg-slate-50">
                                     <tr className="text-left text-xs text-slate-500 border-b border-slate-200">
                                         <th className="py-3 px-4">Mã đơn</th>
                                         <th className="py-3 px-4">Ngày tạo</th>
-                                        <th className="py-3 px-4">Trạng thái</th>
-                                        <th className="py-3 px-4">Số loại sản phẩm</th>
+                                        <th className="py-3 px-4">Giờ tạo</th>
+                                        <th className="py-3 px-4">Trạng thái đơn</th>
+                                        <th className="py-3 px-4">Số sản phẩm</th>
                                         <th className="py-3 px-4">Thành tiền (VNĐ)</th>
-                                        <th className="py-3 px-4">Thanh toán</th>
-                                        <th className="py-3 px-4">Chi tiết</th>
+                                        <th className="py-3 px-4">Thao tác</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {pageRows.map((o) => (
                                         <tr key={o.orderId} className="border-b border-slate-100 text-sm">
                                             <td className="py-3 px-4 font-semibold text-slate-900">#{o.orderId}</td>
-                                            <td className="py-3 px-4 text-slate-700">{new Date(o.createdAt).toLocaleString("vi-VN")}</td>
+                                            <td className="py-3 px-4 text-slate-700 whitespace-nowrap">{formatVietnamDate(o.createdAt)}</td>
+                                            <td className="py-3 px-4 text-slate-700 whitespace-nowrap tabular-nums">{formatVietnamTime(o.createdAt)}</td>
                                             <td className="py-3 px-4">
-                                                <span
-                                                    className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-semibold ${getOrderStatusTone(o.status)}`}
-                                                >
-                                                    {orderStatusLabel(o.status)}
-                                                </span>
+                                                <div className="flex flex-col gap-1.5">
+                                                    <p className="text-[11px] font-medium text-slate-500">Giao hàng</p>
+                                                    <span
+                                                        className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-semibold ${getOrderStatusTone(o.status)}`}
+                                                    >
+                                                        {orderStatusLabel(o.status)}
+                                                    </span>
+                                                    <p className="text-[11px] font-medium text-slate-500">Thanh toán</p>
+                                                    <span
+                                                        className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-semibold ${paymentStatusTone(o.latestPaymentStatus)}`}
+                                                    >
+                                                        {paymentStatusLabel(o.latestPaymentStatus)}
+                                                    </span>
+                                                </div>
                                             </td>
                                             <td className="py-3 px-4 text-slate-700">{o.itemCount}</td>
                                             <td className="py-3 px-4 font-semibold text-slate-900">{vnd(o.totalAmount)} ₫</td>
-                                            <td className="py-3 px-4 text-slate-700">{paymentStatusLabel(o.latestPaymentStatus)}</td>
                                             <td className="py-3 px-4">
                                                 <Link
                                                     to={ROUTES.CUSTOMER_ORDER_DETAIL.replace(":id", String(o.orderId))}
-                                                    className="inline-flex rounded-lg bg-[#1a5f2a] px-3 py-2 text-xs font-semibold text-white hover:bg-[#145026]"
+                                                    className="inline-flex rounded-lg bg-[#1a5f2a] px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-[#145026]"
                                                 >
-                                                    Xem chi tiết
+                                                    Xem đơn
                                                 </Link>
                                             </td>
                                         </tr>
@@ -259,8 +287,9 @@ export default function MyOrdersPage() {
                             Sau
                         </button>
                     </div>
-                </div>
-            )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
