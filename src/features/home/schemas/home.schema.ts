@@ -20,13 +20,28 @@ export type HomeProduct = z.infer<typeof homeProductSchema>;
 // ─── Cart (khớp BE AddCartItemRequest) ─────────────────────────────────────
 
 export const addToCartRequestSchema = z.object({
-    productVariantId: z.number(),
-    boxWeight: z.number().min(0.01),
+    productVariantId: z.number().int().positive("Vui lòng chọn biến thể sản phẩm hợp lệ"),
+    boxWeight: z.number().min(0.01, "Trọng lượng hộp phải lớn hơn 0"),
     isPartial: z.boolean(),
-    quantity: z.number().int().min(1),
+    quantity: z.number().int().min(1, "Số lượng phải ít nhất 1"),
 });
 
 export type AddToCartRequest = z.infer<typeof addToCartRequestSchema>;
+
+/** Kiểm tra body trước khi POST Carts/items — tránh gửi thiếu dữ liệu. */
+export function validateAddToCartRequest(
+    input: unknown,
+): { ok: true; value: AddToCartRequest } | { ok: false; message: string } {
+    const parsed = addToCartRequestSchema.safeParse(input);
+    if (!parsed.success) {
+        const first = parsed.error.issues[0];
+        return {
+            ok: false,
+            message: first?.message ?? "Dữ liệu thêm vào giỏ không hợp lệ.",
+        };
+    }
+    return { ok: true, value: parsed.data };
+}
 
 // ─── Detail – BoxType (khớp BE BoxTypeDto) ───────────────────────────────────
 

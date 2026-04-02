@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ClipboardList, LogOut, ShieldCheck, MessageCircleWarning, ChevronDown, Bell, PlusCircle } from "lucide-react";
+import { LayoutDashboard, ClipboardList, LogOut, ShieldCheck, MessageCircleWarning, ChevronDown, Bell, PlusCircle, Wallet } from "lucide-react";
 import { useAppDispatch } from "../../../app/hook";
 import { logout } from "../../auth/slices/auth.slice";
 import { persistor } from "../../../app/store";
@@ -162,6 +162,21 @@ export default function SalesStaffLayout() {
                     >
                       <PlusCircle size={14} />
                       Tạo đơn tại quầy (POS)
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink
+                      to="/sales/orders/unpaid-pos"
+                      className={({ isActive }) =>
+                        `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                          isActive
+                            ? "bg-emerald-900/30 text-emerald-200 border border-emerald-700/60"
+                            : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                        }`
+                      }
+                    >
+                      <Wallet size={14} />
+                      Đơn POS chưa thanh toán
                     </NavLink>
                   </li>
                   <li>

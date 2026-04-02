@@ -2,10 +2,11 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Leaf, ShoppingCart, ArrowLeft, AlertCircle } from "lucide-react";
 import { useGetHomeProductDetailQuery, useAddToCartMutation } from "../api/home.api";
-import type { BoxType } from "../schemas/home.schema";
+import { validateAddToCartRequest, type BoxType } from "../schemas/home.schema";
 import { ROUTES } from "../../../shared/constants/routes";
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import toast from "react-hot-toast";
+import { useGetApprovedReviewsByProductVariantQuery } from "../../review/api/review.api";
 
 // ─── Skeleton loading ────────────────────────────────────────
 
@@ -43,6 +44,10 @@ export default function ProductDetailPage() {
 
     const { data: product, isLoading, isError, refetch } = useGetHomeProductDetailQuery(productId, { skip });
     const [addToCart, { isLoading: isAdding }] = useAddToCartMutation();
+    const { data: approvedReviews } = useGetApprovedReviewsByProductVariantQuery(
+        { productVariantId: productId, skip: 0, take: 10 },
+        { skip },
+    );
 
     const [quantity, setQuantity] = useState(1);
     const [selectedBox, setSelectedBox] = useState<BoxType | null>(null);
@@ -87,13 +92,19 @@ export default function ProductDetailPage() {
 
     const handleAddToCart = async () => {
         if (!product || !selectedBox) return;
+        const body = {
+            productVariantId: product.id,
+            boxWeight: selectedBox.weight,
+            isPartial: selectedBox.boxType === "Partial",
+            quantity,
+        };
+        const checked = validateAddToCartRequest(body);
+        if (!checked.ok) {
+            toast.error(checked.message);
+            return;
+        }
         try {
-            await addToCart({
-                productVariantId: product.id,
-                boxWeight: selectedBox.weight,
-                isPartial: selectedBox.boxType === "Partial",
-                quantity,
-            }).unwrap();
+            await addToCart(checked.value).unwrap();
             toast.success("Đã thêm vào giỏ hàng.");
         } catch (error) {
             const msg = getApiErrorMessage(error);
@@ -103,13 +114,19 @@ export default function ProductDetailPage() {
 
     const handleBuyNow = async () => {
         if (!product || !selectedBox) return;
+        const body = {
+            productVariantId: product.id,
+            boxWeight: selectedBox.weight,
+            isPartial: selectedBox.boxType === "Partial",
+            quantity,
+        };
+        const checked = validateAddToCartRequest(body);
+        if (!checked.ok) {
+            toast.error(checked.message);
+            return;
+        }
         try {
-            await addToCart({
-                productVariantId: product.id,
-                boxWeight: selectedBox.weight,
-                isPartial: selectedBox.boxType === "Partial",
-                quantity,
-            }).unwrap();
+            await addToCart(checked.value).unwrap();
             toast.success("Đã thêm vào giỏ. Chuyển đến trang giỏ hàng.");
             navigate(ROUTES.CART);
         } catch (error) {
@@ -311,6 +328,28 @@ export default function ProductDetailPage() {
                     {product.productName} là sản phẩm chất lượng cao, được bảo quản theo tiêu chuẩn kho lạnh
                     và phân phối qua hệ thống AgriIDMS.
                 </p>
+            </div>
+
+            <div className="mt-10 border-t border-slate-200 pt-8">
+                <h3 className="font-bold text-lg text-[#1a5f2a]">Đánh giá từ khách hàng</h3>
+                {!approvedReviews || approvedReviews.items.length === 0 ? (
+                    <p className="mt-3 text-sm text-slate-500">Chưa có đánh giá nào được duyệt cho sản phẩm này.</p>
+                ) : (
+                    <div className="mt-4 space-y-3">
+                        {approvedReviews.items.map((r) => (
+                            <div key={r.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <p className="text-sm font-semibold text-slate-900">{r.customerName || "Khách hàng"}</p>
+                                    <p className="text-xs text-slate-500">{new Date(r.createdAt).toLocaleDateString("vi-VN")}</p>
+                                </div>
+                                <p className="mt-1 text-xs text-slate-600">
+                                    Tổng quan: {r.rating}/5 · Độ tươi: {r.freshness}/5 · Đóng gói: {r.packaging}/5
+                                </p>
+                                {r.comment && <p className="mt-2 text-sm text-slate-700">{r.comment}</p>}
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );

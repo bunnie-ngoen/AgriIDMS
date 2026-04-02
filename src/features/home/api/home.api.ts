@@ -1,4 +1,5 @@
 import { api } from "../../../shared/api";
+import { toAddCartItemRequestBody } from "../../../shared/api/orderCheckoutBodies";
 
 /** Chuyển key PascalCase sang camelCase (BE .NET có thể trả PascalCase). */
 function toCamelCase(obj: unknown): unknown {
@@ -72,7 +73,7 @@ export const homeApi = api.injectEndpoints({
             query: (body) => ({
                 url: "Carts/items",
                 method: "POST",
-                body,
+                body: toAddCartItemRequestBody(body),
             }),
             invalidatesTags: ["Cart"],
         }),

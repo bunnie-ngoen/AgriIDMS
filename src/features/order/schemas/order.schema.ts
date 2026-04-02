@@ -5,6 +5,7 @@ export const orderListItemSchema = z.object({
     totalAmount: z.coerce.number(),
     status: z.string(),
     source: z.string(),
+    fulfillmentType: z.string().nullable().optional(),
     createdAt: z.string(),
     itemCount: z.coerce.number().int(),
     latestPaymentStatus: z.string().nullable().optional(),
@@ -14,6 +15,7 @@ export const orderListSchema = z.array(orderListItemSchema);
 export type OrderListItem = z.infer<typeof orderListItemSchema>;
 
 export const orderDetailItemSchema = z.object({
+    orderDetailId: z.coerce.number().int().optional().default(0),
     productVariantId: z.coerce.number().int(),
     productName: z.string(),
     grade: z.string(),
@@ -25,13 +27,22 @@ export const orderDetailItemSchema = z.object({
     shortageQuantity: z.coerce.number(),
 });
 
+/** BE: OrderRecipientSnapshotDto trên OrderDetailDto */
+export const orderRecipientSnapshotSchema = z.object({
+    fullName: z.string(),
+    phone: z.string(),
+    address: z.string(),
+});
+
 export const orderDetailSchema = z.object({
     orderId: z.coerce.number().int(),
     totalAmount: z.coerce.number(),
     status: z.string(),
     source: z.string(),
+    fulfillmentType: z.string().nullable().optional(),
     createdAt: z.string(),
     latestPaymentStatus: z.string().nullable().optional(),
+    recipient: orderRecipientSnapshotSchema.optional().nullable(),
     items: z.array(orderDetailItemSchema),
 });
 

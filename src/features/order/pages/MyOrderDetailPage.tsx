@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ROUTES } from "../../../shared/constants/routes";
+import { formatVietnamDate, formatVietnamTime } from "../../../shared/lib/vietnamTime";
+import {
+    isPaymentActive,
+    isPaymentSettled,
+    paymentStatusLabelVietnam,
+} from "../../../shared/lib/paymentStatus";
 import {
     useCancelOrderMutation,
     useCancelShortageMutation,
@@ -14,6 +20,10 @@ import {
     useGetLatestPaymentByOrderQuery,
 } from "../../payment/api/payment.api";
 import { paymentMethodEnum } from "../../payment/schemas/payment.schema";
+import {
+    useCreateReviewMutation,
+    useIsReviewableByOrderDetailQuery,
+} from "../../review/api/review.api";
 
 function vnd(n: number) {
     return n.toLocaleString("vi-VN");
@@ -25,21 +35,165 @@ function orderStatusLabel(status: string) {
     if (status === "PendingWarehouseConfirm") return "Chờ kho xác nhận";
     if (status === "PartiallyAllocated") return "Giữ hàng một phần";
     if (status === "BackorderWaiting") return "Chờ backorder";
+    if (status === "Confirmed") return "Đã xác nhận";
     if (status === "Shipping") return "Đang giao";
+    if (status === "Delivered") return "Đã giao hàng";
+    if (status === "FailedDelivery") return "Giao thất bại";
+    if (status === "Returned") return "Hoàn hàng";
     if (status === "Completed") return "Hoàn thành";
     if (status === "Cancelled") return "Đã hủy";
     return status;
 }
 
 function paymentStatusLabel(status?: string | null) {
-    if (!status) return "Chưa có";
-    if (status === "Pending") return "Chờ xử lý";
-    if (status === "Processing") return "Đang xử lý";
-    if (status === "Paid") return "Đã thanh toán";
-    if (status === "Success") return "Đã thanh toán";
-    if (status === "Cancelled") return "Đã hủy";
-    if (status === "Failed") return "Thất bại";
-    return status;
+    return paymentStatusLabelVietnam(status);
+}
+
+function orderStatusTone(status: string) {
+    if (status === "PendingSaleConfirmation") return "bg-sky-100 text-sky-700 border-sky-200";
+    if (status === "AwaitingAllocation") return "bg-emerald-100 text-emerald-700 border-emerald-200";
+    if (status === "PendingWarehouseConfirm") return "bg-indigo-100 text-indigo-700 border-indigo-200";
+    if (status === "PartiallyAllocated") return "bg-amber-100 text-amber-700 border-amber-200";
+    if (status === "BackorderWaiting") return "bg-violet-100 text-violet-700 border-violet-200";
+    if (status === "Confirmed") return "bg-teal-100 text-teal-700 border-teal-200";
+    if (status === "Shipping") return "bg-cyan-100 text-cyan-700 border-cyan-200";
+    if (status === "Delivered") return "bg-green-100 text-green-700 border-green-200";
+    if (status === "FailedDelivery") return "bg-orange-100 text-orange-700 border-orange-200";
+    if (status === "Returned") return "bg-slate-200 text-slate-700 border-slate-300";
+    if (status === "Completed") return "bg-green-100 text-green-700 border-green-200";
+    if (status === "Cancelled") return "bg-rose-100 text-rose-700 border-rose-200";
+    return "bg-slate-100 text-slate-700 border-slate-200";
+}
+
+function paymentStatusTone(status?: string | null) {
+    if (!status) return "bg-slate-100 text-slate-600 border-slate-200";
+    if (status === "Pending") return "bg-amber-100 text-amber-700 border-amber-200";
+    if (status === "Processing") return "bg-sky-100 text-sky-700 border-sky-200";
+    if (status === "Paid" || status === "Success") return "bg-emerald-100 text-emerald-700 border-emerald-200";
+    if (status === "Cancelled") return "bg-slate-200 text-slate-700 border-slate-300";
+    if (status === "Failed") return "bg-rose-100 text-rose-700 border-rose-200";
+    if (status === "Refunded") return "bg-violet-100 text-violet-700 border-violet-200";
+    return "bg-slate-100 text-slate-700 border-slate-200";
+}
+
+function ReviewAction({
+    orderDetailId,
+    orderStatus,
+}: {
+    orderDetailId: number;
+    orderStatus: string;
+}) {
+    const [open, setOpen] = useState(false);
+    const [rating, setRating] = useState(5);
+    const [freshness, setFreshness] = useState(5);
+    const [packaging, setPackaging] = useState(5);
+    const [comment, setComment] = useState("");
+    const [feedback, setFeedback] = useState("");
+    const { data, isFetching, refetch } = useIsReviewableByOrderDetailQuery(orderDetailId, {
+        skip: orderDetailId <= 0,
+    });
+    const [createReview, { isLoading }] = useCreateReviewMutation();
+
+    const canReview = !!data?.isReviewable;
+    const canShow = orderStatus === "Delivered" || orderStatus === "Completed";
+
+    if (!canShow || orderDetailId <= 0) return null;
+
+    const submit = async () => {
+        setFeedback("");
+        try {
+            await createReview({
+                orderDetailId,
+                rating,
+                freshness,
+                packaging,
+                comment: comment.trim() || undefined,
+            }).unwrap();
+            setFeedback("Đã gửi đánh giá thành công.");
+            setOpen(false);
+            await refetch();
+        } catch (err) {
+            setFeedback(getApiErrorMessage(err, "Chưa đủ điều kiện đánh giá hoặc đã đánh giá trước đó."));
+        }
+    };
+
+    return (
+        <div className="mt-3">
+            <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                disabled={!canReview || isFetching}
+                className="rounded-lg border border-indigo-300 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+                {canReview ? "Đánh giá sản phẩm" : "Chưa đủ điều kiện đánh giá"}
+            </button>
+            {open && canReview && (
+                <div className="mt-2 grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
+                    <div className="grid grid-cols-3 gap-2">
+                        <label className="text-slate-700">
+                            Tổng quan
+                            <select
+                                value={rating}
+                                onChange={(e) => setRating(Number(e.target.value))}
+                                className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+                            >
+                                {[1, 2, 3, 4, 5].map((x) => (
+                                    <option key={x} value={x}>{x}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <label className="text-slate-700">
+                            Độ tươi
+                            <select
+                                value={freshness}
+                                onChange={(e) => setFreshness(Number(e.target.value))}
+                                className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+                            >
+                                {[1, 2, 3, 4, 5].map((x) => (
+                                    <option key={x} value={x}>{x}</option>
+                                ))}
+                            </select>
+                        </label>
+                        <label className="text-slate-700">
+                            Đóng gói
+                            <select
+                                value={packaging}
+                                onChange={(e) => setPackaging(Number(e.target.value))}
+                                className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+                            >
+                                {[1, 2, 3, 4, 5].map((x) => (
+                                    <option key={x} value={x}>{x}</option>
+                                ))}
+                            </select>
+                        </label>
+                    </div>
+                    <textarea
+                        value={comment}
+                        onChange={(e) => setComment(e.target.value)}
+                        rows={3}
+                        placeholder="Chia sẻ trải nghiệm của bạn (không bắt buộc)"
+                        className="w-full rounded border border-slate-300 px-2 py-1.5"
+                    />
+                    <button
+                        type="button"
+                        onClick={submit}
+                        disabled={isLoading}
+                        className="rounded bg-[#1a5f2a] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#145026] disabled:opacity-60"
+                    >
+                        {isLoading ? "Đang gửi..." : "Gửi đánh giá"}
+                    </button>
+                </div>
+            )}
+            {!!feedback && <p className="mt-1 text-xs text-slate-700">{feedback}</p>}
+        </div>
+    );
+}
+
+function fulfillmentTypeLabel(type?: string | null) {
+    if (!type) return "—";
+    if (type === "TakeAway") return "Lấy ngay tại quầy";
+    if (type === "Delivery") return "Giao hàng";
+    return type;
 }
 
 function sourceLabel(source?: string | null) {
@@ -81,9 +235,10 @@ export default function MyOrderDetailPage() {
     );
     const hasAnyFulfilled = fulfilledQty > 0;
     const latestPaymentStatus = latestPayment?.paymentStatus;
-    const isLatestPaymentPaid = latestPaymentStatus === "Paid" || latestPaymentStatus === "Success";
-    const isLatestPaymentActive =
-        latestPaymentStatus === "Pending" || latestPaymentStatus === "Processing";
+    const isLatestPaymentPaid = isPaymentSettled(latestPaymentStatus);
+    const isLatestPaymentActive = isPaymentActive(latestPaymentStatus);
+    const isTakeAway = order?.fulfillmentType === "TakeAway";
+    const isDelivery = order?.fulfillmentType === "Delivery";
     const canCreatePayment =
         !!order &&
         order.status === "Confirmed" &&
@@ -91,15 +246,14 @@ export default function MyOrderDetailPage() {
         !isLatestPaymentActive;
     const canCancelPayment =
         !!latestPayment &&
-        (latestPayment.paymentStatus === "Processing" || latestPayment.paymentStatus === "Pending");
+        isPaymentActive(latestPayment.paymentStatus);
 
     useEffect(() => {
         if (!valid || !order) return;
         const shouldPoll =
             order.status === "Confirmed" ||
-            order.status === "Paid" ||
-            latestPaymentStatus === "Pending" ||
-            latestPaymentStatus === "Processing";
+            order.status === "Shipping" ||
+            isPaymentActive(latestPaymentStatus);
         if (!shouldPoll) return;
 
         const timer = window.setInterval(() => {
@@ -168,8 +322,13 @@ export default function MyOrderDetailPage() {
             await cancelShortage(orderId).unwrap();
             setMsg("Đã hủy phần thiếu của đơn.");
             await refetch();
-        } catch {
-            setMsg("Không thể hủy phần thiếu lúc này.");
+        } catch (err) {
+            setMsg(
+                getApiErrorMessage(
+                    err,
+                    "Không thể hủy phần thiếu lúc này.",
+                ),
+            );
         }
     };
 
@@ -203,12 +362,48 @@ export default function MyOrderDetailPage() {
                         <div className="rounded-xl border border-slate-200 bg-white p-4">
                             <h1 className="text-xl font-bold text-slate-900">Đơn #{order.orderId}</h1>
                             <div className="mt-2 text-sm text-slate-700 flex flex-wrap gap-4">
-                                <p>Trạng thái: <span className="font-semibold">{orderStatusLabel(order.status)}</span></p>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-slate-600">Delivery:</span>
+                                    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${orderStatusTone(order.status)}`}>
+                                        {orderStatusLabel(order.status)}
+                                    </span>
+                                    <span className="text-slate-600">Payment:</span>
+                                    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${paymentStatusTone(order.latestPaymentStatus)}`}>
+                                        {paymentStatusLabel(order.latestPaymentStatus)}
+                                    </span>
+                                </div>
                                 <p>Hình thức mua: <span className="font-semibold">{sourceLabel(order.source)}</span></p>
-                                <p>Tạo lúc: <span className="font-semibold">{new Date(order.createdAt).toLocaleString("vi-VN")}</span></p>
-                                <p>Thanh toán gần nhất: <span className="font-semibold">{paymentStatusLabel(order.latestPaymentStatus)}</span></p>
+                                <p>Hình thức nhận hàng: <span className="font-semibold">{fulfillmentTypeLabel(order.fulfillmentType)}</span></p>
+                                <p className="flex flex-wrap gap-x-4 gap-y-1">
+                                    <span>Ngày tạo: <span className="font-semibold">{formatVietnamDate(order.createdAt)}</span></span>
+                                    <span>Giờ: <span className="font-semibold tabular-nums">{formatVietnamTime(order.createdAt)}</span></span>
+                                </p>
                             </div>
                         </div>
+                        {order.recipient &&
+                            (order.recipient.fullName ||
+                                order.recipient.phone ||
+                                order.recipient.address) && (
+                                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                                    <h2 className="text-sm font-bold text-slate-900">Thông tin nhận hàng</h2>
+                                    <dl className="mt-2 space-y-1 text-sm text-slate-700">
+                                        <div>
+                                            <dt className="text-slate-500">Họ tên</dt>
+                                            <dd className="font-medium">{order.recipient.fullName || "—"}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-slate-500">Số điện thoại</dt>
+                                            <dd className="font-medium">{order.recipient.phone || "—"}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-slate-500">Địa chỉ</dt>
+                                            <dd className="font-medium whitespace-pre-wrap">
+                                                {order.recipient.address || "—"}
+                                            </dd>
+                                        </div>
+                                    </dl>
+                                </div>
+                            )}
                         {order.items.map((i, idx) => (
                             <div key={`${i.productVariantId}-${idx}`} className="rounded-xl border border-slate-200 bg-white p-4">
                                 <p className="font-semibold text-slate-900">{i.productName}</p>
@@ -216,6 +411,7 @@ export default function MyOrderDetailPage() {
                                     {i.isPartial ? "Hộp lẻ" : "Hộp đầy"} - {i.boxWeight}kg · {i.grade}
                                 </p>
                                 <p className="text-sm mt-2">SL: <span className="font-semibold">{i.quantity}</span> · Đơn giá: <span className="font-semibold">{vnd(i.unitPrice)} ₫</span></p>
+                                <ReviewAction orderDetailId={i.orderDetailId} orderStatus={order.status} />
                             </div>
                         ))}
                     </div>
@@ -223,7 +419,7 @@ export default function MyOrderDetailPage() {
                     <div className="rounded-xl border border-slate-200 bg-white p-4 h-fit">
                         <h2 className="text-lg font-bold text-slate-900">Thanh toán & xử lý đơn</h2>
                         <p className="mt-1 text-sm text-slate-600">Thành tiền (VNĐ): <span className="font-semibold">{vnd(total)} ₫</span></p>
-                        {(order.status === "Shipping" || order.status === "Completed") && (
+                        {(order.status === "Shipping" || order.status === "Delivered" || order.status === "Completed") && (
                             <Link
                                 to={`${ROUTES.CUSTOMER_COMPLAINTS}?orderId=${order.orderId}`}
                                 className="mt-2 inline-flex text-sm font-semibold text-indigo-700 hover:text-indigo-800"
@@ -231,13 +427,13 @@ export default function MyOrderDetailPage() {
                                 Gửi khiếu nại cho đơn/box đã giao →
                             </Link>
                         )}
-                        {order.status === "PartiallyAllocated" && (
+                        {isDelivery && order.status === "PartiallyAllocated" && (
                             <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                                 Đơn đang thiếu hàng. Vui lòng chọn hướng xử lý phù hợp bên dưới.
                             </div>
                         )}
                         <div className="mt-3 space-y-3">
-                            {order.status === "AwaitingAllocation" && (
+                            {isDelivery && order.status === "AwaitingAllocation" && (
                                 <button
                                     type="button"
                                     onClick={onConfirmOrder}
@@ -247,7 +443,7 @@ export default function MyOrderDetailPage() {
                                     {isConfirmingOrder ? "Đang xác nhận..." : "Xác nhận đơn để giữ hàng"}
                                 </button>
                             )}
-                            {order.status === "PartiallyAllocated" && (
+                            {isDelivery && order.status === "PartiallyAllocated" && (
                                 <>
                                     <div className="rounded-lg border border-sky-200 bg-sky-50 p-3">
                                         <p className="text-sm font-semibold text-sky-800">Chờ hàng về (Backorder)</p>
@@ -291,6 +487,9 @@ export default function MyOrderDetailPage() {
                                 </>
                             )}
                             {order.status !== "Shipping" &&
+                                order.status !== "Delivered" &&
+                                order.status !== "FailedDelivery" &&
+                                order.status !== "Returned" &&
                                 order.status !== "Completed" &&
                                 order.status !== "Cancelled" &&
                                 order.status !== "PartiallyAllocated" && (
@@ -365,14 +564,20 @@ export default function MyOrderDetailPage() {
                                 <span className="font-semibold">
                                     {order.status === "Shipping"
                                         ? "Đang giao"
-                                        : order.status === "Completed"
-                                          ? "Hoàn thành"
-                                          : order.status === "Paid"
-                                            ? "Đã thanh toán, chờ xuất kho"
-                                            : "Chưa bắt đầu"}
+                                        : order.status === "Delivered"
+                                          ? "Đã giao hàng"
+                                          : order.status === "FailedDelivery"
+                                            ? "Giao thất bại"
+                                            : order.status === "Returned"
+                                              ? "Hoàn hàng"
+                                              : order.status === "Completed"
+                                                ? "Hoàn thành"
+                                                : isTakeAway && order.status === "Confirmed"
+                                                  ? "Đã giữ hàng tại quầy"
+                                                  : "Chưa bắt đầu"}
                                 </span>
                             </p>
-                            {(order.status === "Shipping" || order.status === "Completed") && (
+                            {(order.status === "Shipping" || order.status === "Delivered" || order.status === "Completed") && (
                                 <p className="text-emerald-700">
                                     Đơn đã đủ điều kiện để tạo khiếu nại theo rule backend.
                                 </p>
