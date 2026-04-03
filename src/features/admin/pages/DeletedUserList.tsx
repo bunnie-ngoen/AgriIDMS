@@ -42,7 +42,7 @@ const DeletedUserList = () => {
   const { data, isLoading, isError } = useGetDeletedUsersQuery();
   const [restoreUser, { isLoading: isRestoring }] = useRestoreUserMutation();
   const [confirm, setConfirm] = useState<ConfirmState>(CONFIRM_INITIAL);
-  const [searchInput, setSearchInput] = useState("");
+  const [searchInput] = useState("");
   const [emailFilter, setEmailFilter] = useState("");
 
   const closeConfirm = () => setConfirm(CONFIRM_INITIAL);

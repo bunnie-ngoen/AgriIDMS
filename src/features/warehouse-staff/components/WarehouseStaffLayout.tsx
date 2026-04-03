@@ -9,7 +9,6 @@ import {
   ShieldCheck,
   Warehouse,
   Boxes,
-  AlertTriangle,
 } from "lucide-react";
 import { useAppDispatch } from "../../../app/hook";
 import { logout } from "../../auth/slices/auth.slice";

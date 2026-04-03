@@ -6,7 +6,7 @@ import {
   useUpdateUserRoleMutation,
 } from "../api/create-user.api";
 import type { UserListItem } from "../types/user.type";
-import { Trash2, ChevronDown, Search, X, ShieldCheck, AlertTriangle } from "lucide-react";
+import { Trash2, Search, X, ShieldCheck, AlertTriangle } from "lucide-react";
 
 const PAGE_SIZE = 10;
 
@@ -171,7 +171,7 @@ const CONFIRM_INITIAL: ConfirmState = {
 
 const UserList = () => {
   const [pageIndex, setPageIndex] = useState(1);
-  const [searchInput, setSearchInput] = useState("");
+  const [searchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [emailFilter, setEmailFilter] = useState("");
   const [confirm, setConfirm] = useState<ConfirmState>(CONFIRM_INITIAL);
@@ -201,7 +201,6 @@ const UserList = () => {
   const closeConfirm = () => setConfirm(CONFIRM_INITIAL);
 
   const handleSearch = () => { setPageIndex(1); setSearchQuery(searchInput.trim()); };
-  const handleClearSearch = () => { setSearchInput(""); setSearchQuery(""); setPageIndex(1); };
 
   const handleDelete = (user: UserListItem) => {
     setConfirm({

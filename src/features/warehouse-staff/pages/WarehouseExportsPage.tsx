@@ -100,7 +100,6 @@ export default function WarehouseExportsPage() {
   const {
     data: pendingApproveRows = [],
     isLoading: isLoadingApprove,
-    isFetching: isFetchingApprove,
     refetch: refetchPendingApprove,
   } = useGetPendingApproveExportsQuery(
     { skip: approveSkip, take: pageSize, sort: approveSort },
@@ -116,7 +115,6 @@ export default function WarehouseExportsPage() {
 
   const receiptNorm = normalizeExportStatus(receipt?.status);
   const canConfirmPick = receiptNorm === "PendingPick";
-  const canApprove = receiptNorm === "ReadyToExport" && canApproveExport;
   const canCancel = receiptNorm !== "Approved" && receiptNorm !== "Cancelled";
 
   const summary = useMemo(() => {

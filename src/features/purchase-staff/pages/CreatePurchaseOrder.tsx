@@ -26,8 +26,6 @@ export default function CreatePurchaseOrder() {
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin/purchase-orders");
   const backLink = isAdmin ? "/admin/purchase-orders" : "/purchase-staff/orders";
-  const detailLink = (id: number) =>
-    isAdmin ? `/admin/purchase-orders/${id}` : `/purchase-staff/orders/${id}`;
 
   const [createPo, { isLoading }] = useCreatePurchaseOrderMutation();
   const { data: suppliers = [] } = useGetSuppliersQuery();
