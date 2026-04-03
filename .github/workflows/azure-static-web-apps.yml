@@ -1,3 +1,4 @@
+# .github/workflows/azure-static-web-apps.yml
 name: Azure Static Web Apps CI/CD
 
 on:
@@ -15,32 +16,38 @@ jobs:
     runs-on: ubuntu-latest
     name: Build and Deploy FE
     steps:
+      # Checkout code
       - uses: actions/checkout@v4
         with:
           submodules: true
           lfs: false
 
+      # Install Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '20'
 
-      - name: Install FE Dependencies
+      # Install dependencies
+      - name: Install dependencies
+        working-directory: ./AgriIDMS-FE/AgriIDMS
         run: npm ci
-        working-directory: AgriIDMS-FE/AgriIDMS
 
-      - name: Build FE
+      # Build project
+      - name: Build project
+        working-directory: ./AgriIDMS-FE/AgriIDMS
         run: npm run build
-        working-directory: AgriIDMS-FE/AgriIDMS
 
+      # Deploy to Azure Static Web App
       - name: Deploy to Azure Static Web App
+        id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_AGREEABLE_PEBBLE_0C3796B00 }}
           action: "upload"
           app_location: "AgriIDMS-FE/AgriIDMS"
-          api_location: ""
-          output_location: "dist"
+          api_location: "" # bỏ nếu không có Azure Functions
+          output_location: "AgriIDMS-FE/AgriIDMS/dist"
         env:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
           VITE_CLOUDINARY_CLOUD_NAME: ${{ secrets.VITE_CLOUDINARY_CLOUD_NAME }}
@@ -51,7 +58,8 @@ jobs:
     runs-on: ubuntu-latest
     name: Close Pull Request Job
     steps:
-      - uses: Azure/static-web-apps-deploy@v1
+      - name: Close Pull Request
+        uses: Azure/static-web-apps-deploy@v1
         with:
           action: "close"
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_AGREEABLE_PEBBLE_0C3796B00 }}
