@@ -1,10 +1,10 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { RootState } from '../../app/store';
 
-/** URL API backend — đặt trong `.env.local`: `VITE_API_BASE_URL` (vd: https://localhost:7007/api/ hoặc http://localhost:5132/api/). Phải khớp cổng khi bạn chạy `dotnet run` / profile trong launchSettings. */
+/** URL API backend — đặt trong `.env.local`: `VITE_API_BASE_URL` (vd: https://agriidms-eghneufmafazh0hx.japanwest-01.azurewebsites.net/api/). */
 const apiBaseUrl = (() => {
     const raw = import.meta.env.VITE_API_BASE_URL?.trim();
-    const fallback = 'https://localhost:7007/api/';
+    const fallback = 'https://agriidms-eghneufmafazh0hx.japanwest-01.azurewebsites.net/api/';
     const base = raw || fallback;
     return base.endsWith('/') ? base : `${base}/`;
 })();
