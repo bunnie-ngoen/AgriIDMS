@@ -38,3 +38,11 @@ export const paymentMethodEnum = {
 export type PaymentMethodValue =
     (typeof paymentMethodEnum)[keyof typeof paymentMethodEnum];
 
+/** BE PaymentService: POST Payments/staff/online-paybefore chỉ cho PayBefore + Delivery (+ Online/POS). */
+export function shouldUseStaffOnlinePayBeforeEndpoint(order: {
+    fulfillmentType?: string | null;
+    paymentTiming?: string | null;
+}): boolean {
+    return order.fulfillmentType === "Delivery" && order.paymentTiming === "PayBefore";
+}
+

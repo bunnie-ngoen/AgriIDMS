@@ -151,10 +151,6 @@ export default function PutBoxIntoSlot() {
     setSelectedLotBoxIds((prev) => prev.filter((id) => availableIds.has(id)));
   }, [lotDetail?.boxes]);
 
-  const selectedWarehouse = useMemo(
-    () => warehouses.find((w) => w.id === selectedWarehouseId),
-    [warehouses, selectedWarehouseId]
-  );
   const selectedSlot = useMemo(() => {
     if (selectedSlotId > 0) return slots.find((s) => s.id === selectedSlotId);
     return undefined;

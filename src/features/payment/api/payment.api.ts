@@ -40,6 +40,24 @@ export const paymentApi = api.injectEndpoints({
             },
         }),
 
+        // BE: POST api/Payments/staff/online-paybefore
+        createStaffOnlinePayBeforePayment: builder.mutation<
+            PaymentResponse,
+            { orderId: number; paymentMethod: number }
+        >({
+            query: (body) => ({
+                url: "Payments/staff/online-paybefore",
+                method: "POST",
+                body,
+            }),
+            transformResponse: (raw: unknown) => {
+                const normalized = toCamelCase(raw);
+                const parsed = paymentResponseSchema.safeParse(normalized);
+                if (!parsed.success) throw new Error("Invalid payment response");
+                return parsed.data;
+            },
+        }),
+
         // BE: GET api/Payments/order/{orderId}
         getLatestPaymentByOrder: builder.query<PaymentResponse, number>({
             query: (orderId) => ({
@@ -68,13 +86,13 @@ export const paymentApi = api.injectEndpoints({
             },
         }),
 
-        // BE: GET api/Payments/staff/pending-cod
+        // BE: GET api/Payments/staff/pending-cash
         getPendingCodPayments: builder.query<
             PendingCodPaymentItem[],
             { orderId?: number; customerUserId?: string; skip?: number; take?: number } | void
         >({
             query: (arg) => ({
-                url: "Payments/staff/pending-cod",
+                url: "Payments/staff/pending-cash",
                 method: "GET",
                 params: {
                     orderId: arg?.orderId,
@@ -91,10 +109,10 @@ export const paymentApi = api.injectEndpoints({
             },
         }),
 
-        // BE: PATCH api/Payments/{paymentId}/confirm-cod
+        // BE: PATCH api/Payments/{paymentId}/confirm-cash
         confirmCodPayment: builder.mutation<PaymentResponse, number>({
             query: (paymentId) => ({
-                url: `Payments/${paymentId}/confirm-cod`,
+                url: `Payments/${paymentId}/confirm-cash`,
                 method: "PATCH",
             }),
             transformResponse: (raw: unknown) => {
@@ -109,6 +127,7 @@ export const paymentApi = api.injectEndpoints({
 
 export const {
     useCreatePaymentMutation,
+    useCreateStaffOnlinePayBeforePaymentMutation,
     useGetLatestPaymentByOrderQuery,
     useLazyGetLatestPaymentByOrderQuery,
     useCancelPaymentMutation,

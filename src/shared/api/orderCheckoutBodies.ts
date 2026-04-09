@@ -100,6 +100,7 @@ export type CreatePosOrderItemBody = {
 /** BE: CreatePosOrderRequest */
 export type CreatePosOrderRequestBody = {
     fulfillmentType?: 0 | 1;
+    paymentTiming?: 0 | 1;
     customerUserId?: string;
     customerName?: string;
     customerPhone?: string;
@@ -108,6 +109,7 @@ export type CreatePosOrderRequestBody = {
 
 export function toCreatePosOrderRequestBody(input: {
     fulfillmentType?: 0 | 1;
+    paymentTiming?: 0 | 1;
     customerUserId?: string;
     customerName?: string;
     customerPhone?: string;
@@ -121,6 +123,7 @@ export function toCreatePosOrderRequestBody(input: {
 }): CreatePosOrderRequestBody {
     return {
         fulfillmentType: input.fulfillmentType,
+        paymentTiming: input.paymentTiming,
         customerUserId: input.customerUserId?.trim() || undefined,
         customerName: input.customerName?.trim() || undefined,
         customerPhone: input.customerPhone?.trim() || undefined,

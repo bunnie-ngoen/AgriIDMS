@@ -75,7 +75,7 @@ export default function SalesStaffLayout() {
     }
 
     if (referenceType === "OrderAllocationShortage" && referenceId) {
-      navigate(`/sales/orders/pending-customer-decision?orderId=${referenceId}`);
+      navigate(`/sales/orders?orderId=${referenceId}`);
       setNotificationOpen(false);
       return;
     }
@@ -120,7 +120,7 @@ export default function SalesStaffLayout() {
               Kênh nội bộ Sales Staff
             </div>
             <p className="mt-1 text-[11px] text-slate-400">
-              Theo dõi trạng thái đơn và xác nhận COD.
+              Theo dõi trạng thái đơn và xác nhận tiền mặt.
             </p>
           </div>
         </div>
@@ -176,7 +176,7 @@ export default function SalesStaffLayout() {
                       }
                     >
                       <Wallet size={14} />
-                      Đơn POS chưa thanh toán
+                      Đơn mua tại quầy chưa thanh toán
                     </NavLink>
                   </li>
                   <li>
@@ -206,37 +206,22 @@ export default function SalesStaffLayout() {
                       }
                     >
                       <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
-                      Thanh toán COD chờ xử lý
+                      Thanh toán tiền mặt chờ xử lý
                     </NavLink>
                   </li>
                   <li>
                     <NavLink
-                      to="/sales/orders/pos-no-proposal"
+                      to="/sales/orders/approved-export"
                       className={({ isActive }) =>
                         `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
                           isActive
-                            ? "bg-orange-900/30 text-orange-200 border border-orange-700/60"
+                            ? "bg-teal-900/30 text-teal-200 border border-teal-700/60"
                             : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
                         }`
                       }
                     >
-                      <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
-                      POS chưa có đề xuất FEFO
-                    </NavLink>
-                  </li>
-                  <li>
-                    <NavLink
-                      to="/sales/orders/pending-customer-decision"
-                      className={({ isActive }) =>
-                        `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                          isActive
-                            ? "bg-amber-900/30 text-amber-200 border border-amber-700/60"
-                            : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
-                        }`
-                      }
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-                      Thiếu hàng chờ chốt với khách
+                      <span className="h-1.5 w-1.5 rounded-full bg-teal-400" />
+                      Đơn đã duyệt xuất
                     </NavLink>
                   </li>
                 </ul>
@@ -313,8 +298,8 @@ export default function SalesStaffLayout() {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 border-b border-slate-200 bg-white/90 backdrop-blur flex items-center justify-between px-6 shrink-0">
-          <div>
+        <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white/90 pl-0 pr-3 backdrop-blur">
+          <div className="min-w-0 pl-0">
             <p className="text-sm text-slate-500">Không gian bán hàng</p>
             <span className="text-slate-800 font-semibold">Hệ thống xử lý đơn bán</span>
           </div>
@@ -386,7 +371,7 @@ export default function SalesStaffLayout() {
             )}
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto px-6 pt-6 pb-10">
+        <main className="min-h-0 flex-1 overflow-y-auto p-0">
           <Outlet />
         </main>
       </div>

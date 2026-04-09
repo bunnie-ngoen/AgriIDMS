@@ -78,7 +78,6 @@ export default function CustomerComplaintsPage() {
   const {
     data: boxes = [],
     isLoading: isLoadingBoxes,
-    isFetching: isFetchingBoxes,
     refetch: refetchBoxes,
   } = useGetOrderBoxesForComplaintQuery(orderIdFromQuery, { skip: !hasOrderId });
 

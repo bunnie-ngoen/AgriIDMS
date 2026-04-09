@@ -14,7 +14,7 @@ export default function WarehouseStaffDashboard() {
               Kho - Đơn hàng và thanh toán
             </h2>
             <p className="mt-1 text-sm text-slate-600">
-              Theo BE mới, kho tập trung các bước giữ hàng, kho xác nhận và COD.
+              Theo BE mới, kho tập trung các bước giữ hàng, kho xác nhận và tiền mặt.
             </p>
           </div>
         </div>
@@ -29,7 +29,7 @@ export default function WarehouseStaffDashboard() {
           <ClipboardList size={17} />
         </div>
         <p className="mt-2 text-xs opacity-90">
-          Gồm hàng đợi giữ hàng, chờ kho xác nhận, backorder và COD chờ xác nhận.
+          Gồm hàng đợi giữ hàng, chờ kho xác nhận và tiền mặt chờ xác nhận.
         </p>
       </Link>
     </div>

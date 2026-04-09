@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Minus, Plus, ShoppingCart, Trash2, Check, AlertCircle } from "lucide-react";
 
@@ -83,11 +83,6 @@ export default function CartPage() {
     }, [cart?.items]);
 
     const items = cart?.items ?? [];
-    const totalAmount = useMemo(() => {
-        if (!items.length) return 0;
-        // Lấy từ BE nếu có, fallback tính lại để tránh mismatch.
-        return cart?.totalAmount ?? items.reduce((sum, i) => sum + getLineAmount(i), 0);
-    }, [cart?.totalAmount, items]);
 
     const selectedItems = items.filter((item) => selectedKeys[cartItemKey(item)]);
     const selectedTotal = selectedItems.reduce((sum, item) => {
@@ -465,10 +460,6 @@ export default function CartPage() {
                             <h2 className="text-lg font-bold text-slate-900 mb-2">Tóm tắt</h2>
                             <div className="flex items-center justify-between gap-4 text-slate-700">
                                 <span className="font-medium">Thành tiền (VNĐ)</span>
-                                <span className="text-slate-900 font-bold">{vnd(totalAmount)} ₫</span>
-                            </div>
-                            <div className="mt-2 flex items-center justify-between gap-4 text-slate-700">
-                                <span className="font-medium">Thành tiền đã chọn (VNĐ)</span>
                                 <span className="text-slate-900 font-bold">{vnd(selectedTotal)} ₫</span>
                             </div>
 
