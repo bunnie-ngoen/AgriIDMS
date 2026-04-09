@@ -278,11 +278,11 @@ export default function GoodsReceiptQC() {
   };
 
   const canQC =
-    receipt.status === "Draft" || receipt.status === "Received";
+    receipt?.status === "Draft" || receipt?.status === "Received";
   const canApprove =
-    receipt.status === "QCCompleted" || receipt.status === "PendingManagerApproval";
-  const canManagerToleranceAction = receipt.status === "PendingManagerApproval";
-  const canManagerMinWeightAction = receipt.status === "PendingManagerApprovalQc";
+    receipt?.status === "QCCompleted" || receipt?.status === "PendingManagerApproval";
+  const canManagerToleranceAction = receipt?.status === "PendingManagerApproval";
+  const canManagerMinWeightAction = receipt?.status === "PendingManagerApprovalQc";
   const canViewPrice = isAdmin() || isManager();
   const moneyFmt = useMemo(
     () => new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }),

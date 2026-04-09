@@ -18,7 +18,7 @@ export default function SalesStaffDashboard() {
           <h1 className="text-2xl font-bold text-slate-900">Tổng quan Sales Staff</h1>
         </div>
         <p className="text-sm text-slate-600">
-          Theo dõi các đơn cần xử lý, allocate và xác nhận COD theo thời gian thực.
+          Theo dõi các đơn cần xử lý, allocate và xác nhận tiền mặt theo thời gian thực.
         </p>
         <div className="mt-5 grid sm:grid-cols-3 gap-3">
           <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
@@ -33,12 +33,12 @@ export default function SalesStaffDashboard() {
               <BadgeCheck size={16} />
               <span className="text-xs font-semibold">Giữ hàng</span>
             </div>
-            <p className="mt-1 text-xs text-emerald-800">Giữ hàng và xử lý backorder</p>
+            <p className="mt-1 text-xs text-emerald-800">Giữ hàng và phối hợp kho xác nhận</p>
           </div>
           <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
             <div className="flex items-center gap-2 text-violet-700">
               <Clock3 size={16} />
-              <span className="text-xs font-semibold">COD</span>
+              <span className="text-xs font-semibold">Tiền mặt</span>
             </div>
             <p className="mt-1 text-xs text-violet-800">Xác nhận thu tiền và chốt trạng thái</p>
           </div>

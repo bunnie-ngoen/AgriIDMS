@@ -1,5 +1,10 @@
 import StaffComplaintsPage from "../../complaint/pages/StaffComplaintsPage";
+import SalesStaffPageShell from "../components/SalesStaffPageShell";
 
 export default function SalesComplaintsProcessedPage() {
-  return <StaffComplaintsPage mode="processed" />;
+  return (
+    <SalesStaffPageShell>
+      <StaffComplaintsPage mode="processed" />
+    </SalesStaffPageShell>
+  );
 }

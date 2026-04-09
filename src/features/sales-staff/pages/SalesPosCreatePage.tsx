@@ -8,6 +8,7 @@ import {
   useAutoProposeAllocationAsStaffMutation,
   useCreatePosOrderMutation,
 } from "../../order/api/order.api";
+import SalesStaffPageShell from "../components/SalesStaffPageShell";
 
 type PosFormItem = {
   key: string;
@@ -184,7 +185,6 @@ export default function SalesPosCreatePage() {
   const [createdOrderId, setCreatedOrderId] = useState<number | null>(null);
   const [createdTotalAmount, setCreatedTotalAmount] = useState<number | null>(null);
   const [handoffMessage, setHandoffMessage] = useState<string>("");
-  const [hasProposal, setHasProposal] = useState<boolean | null>(null);
 
   const activeVariants = useMemo(
     () => variants,
@@ -229,7 +229,6 @@ export default function SalesPosCreatePage() {
     setCreatedOrderId(null);
     setCreatedTotalAmount(null);
     setHandoffMessage("");
-    setHasProposal(null);
     try {
       const created = await createPosOrder({
         fulfillmentType,
@@ -253,7 +252,6 @@ export default function SalesPosCreatePage() {
         try {
           const proposal = await autoPropose(created.orderId).unwrap();
           const hasProposalValue = (proposal.proposedBoxCount ?? 0) > 0;
-          setHasProposal(hasProposalValue);
           setHandoffMessage(proposal.message ?? "");
 
           if (hasProposalValue) {
@@ -263,13 +261,11 @@ export default function SalesPosCreatePage() {
             toast.error(proposal.message ?? "Không có box khả dụng để đề xuất FEFO.", { id: t });
           }
         } catch (e: unknown) {
-          setHasProposal(false);
           const msg = getApiErrorMessage(e, "Không thể tự động đề xuất FEFO.");
           setHandoffMessage(msg);
           toast.error(msg, { id: t });
         }
       } else {
-        setHasProposal(null);
         setHandoffMessage("TakeAway: đơn đã được giữ hàng ngay, chuyển sang bước thanh toán.");
       }
     } catch (e: unknown) {
@@ -279,12 +275,13 @@ export default function SalesPosCreatePage() {
   };
 
   return (
+    <SalesStaffPageShell>
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Tạo đơn mua trực tiếp tại quầy (POS)</h1>
+          <h1 className="text-xl font-bold text-slate-900">Tạo đơn mua trực tiếp tại quầy</h1>
           <p className="text-sm text-slate-600 mt-1">
-            Tạo đơn cho khách đến kho mua trực tiếp. Đơn POS không cần sale-confirm.
+            Tạo đơn cho khách đến kho mua trực tiếp.
           </p>
         </div>
         <Link
@@ -296,21 +293,6 @@ export default function SalesPosCreatePage() {
       </div>
 
       <form onSubmit={onSubmit} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-            <p className="text-xs font-medium text-slate-700">Thông tin khách POS</p>
-            <p className="mt-1 text-xs text-slate-500">
-              Có thể gắn tài khoản khách hoặc nhập tên/SĐT khách lẻ.
-            </p>
-          </div>
-          <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
-            <p className="text-xs font-medium text-indigo-700">Rẽ nhánh theo fulfillmentType</p>
-            <p className="mt-1 text-xs text-indigo-700">
-              TakeAway giữ hàng ngay. Delivery mới đi allocation/backorder và tự đề xuất FEFO.
-            </p>
-          </div>
-        </div>
-
         <div className="grid gap-3 md:grid-cols-2">
           <div>
             <label className="text-xs font-medium text-slate-600">Hình thức nhận</label>
@@ -319,8 +301,8 @@ export default function SalesPosCreatePage() {
               onChange={(e) => setFulfillmentType(Number(e.target.value) as 0 | 1)}
               className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
             >
-              <option value={0}>TakeAway (lấy ngay)</option>
-              <option value={1}>Delivery (giao hàng)</option>
+              <option value={0}>Nhận tại quầy</option>
+              <option value={1}>Giao hàng tận nơi</option>
             </select>
           </div>
           <div>
@@ -333,16 +315,16 @@ export default function SalesPosCreatePage() {
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-600">Tên khách lẻ</label>
+            <label className="text-xs font-medium text-slate-600">Tên khách hàng</label>
             <input
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
-              placeholder="Ví dụ: Nguyễn Văn A (khách lẻ)"
+              placeholder="Ví dụ: Nguyễn Văn A"
               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
             />
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-600">SĐT khách lẻ</label>
+            <label className="text-xs font-medium text-slate-600">Số điện thoại</label>
             <input
               value={customerPhone}
               onChange={(e) => setCustomerPhone(e.target.value)}
@@ -386,7 +368,7 @@ export default function SalesPosCreatePage() {
             ? "Đang tạo đơn..."
             : isAutoProposing
               ? "Đang tự đề xuất FEFO..."
-              : "Tạo đơn POS"}
+              : "Tạo đơn"}
         </button>
       </form>
 
@@ -407,22 +389,13 @@ export default function SalesPosCreatePage() {
             <p className="mt-2 text-xs text-emerald-800">{handoffMessage}</p>
           )}
           <div className="mt-3 flex flex-wrap gap-2">
-            {fulfillmentType === 1 && hasProposal === false && (
-              <button
-                type="button"
-                onClick={() => navigate(`/sales/orders/pos-no-proposal?orderId=${createdOrderId}`)}
-                className="rounded-lg border border-orange-300 bg-white px-3 py-2 text-xs font-semibold text-orange-700 hover:bg-orange-50"
-              >
-                Mở danh sách POS chưa có đề xuất
-              </button>
-            )}
             {fulfillmentType === 1 && (
               <button
                 type="button"
-                onClick={() => navigate(`/sales/orders/pending-customer-decision?orderId=${createdOrderId}`)}
+                onClick={() => navigate(`/sales/orders?orderId=${createdOrderId}`)}
                 className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50"
               >
-                Đến trang thiếu hàng (nếu có)
+                Mở hàng đợi đơn để theo dõi
               </button>
             )}
             <button
@@ -443,15 +416,15 @@ export default function SalesPosCreatePage() {
                 setCreatedOrderId(null);
                 setCreatedTotalAmount(null);
                 setHandoffMessage("");
-                setHasProposal(null);
               }}
               className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
-              Tạo đơn POS mới
+              Tạo đơn mới
             </button>
           </div>
         </div>
       )}
     </div>
+    </SalesStaffPageShell>
   );
 }

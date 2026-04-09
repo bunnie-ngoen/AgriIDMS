@@ -6,7 +6,7 @@ import {
   useUpdateUserRoleMutation,
 } from "../api/create-user.api";
 import type { UserListItem } from "../types/user.type";
-import { Trash2, ChevronDown, Search, X, ShieldCheck, AlertTriangle } from "lucide-react";
+import { Trash2, Search, X, ShieldCheck, AlertTriangle } from "lucide-react";
 
 const PAGE_SIZE = 10;
 
@@ -200,8 +200,16 @@ const UserList = () => {
 
   const closeConfirm = () => setConfirm(CONFIRM_INITIAL);
 
-  const handleSearch = () => { setPageIndex(1); setSearchQuery(searchInput.trim()); };
-  const handleClearSearch = () => { setSearchInput(""); setSearchQuery(""); setPageIndex(1); };
+  const handleSearch = () => {
+    setPageIndex(1);
+    setSearchQuery(searchInput.trim());
+  };
+  const handleClearSearch = () => {
+    setSearchInput("");
+    setSearchQuery("");
+    setEmailFilter("");
+    setPageIndex(1);
+  };
 
   const handleDelete = (user: UserListItem) => {
     setConfirm({
@@ -280,6 +288,28 @@ const UserList = () => {
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
               type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSearch();
+              }}
+              placeholder="Tìm userName / họ tên (API)..."
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-8 text-xs text-slate-700 placeholder-slate-400 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-100"
+            />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => setSearchInput("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+          <div className="relative flex-1 min-w-[180px] max-w-sm">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
               value={emailFilter}
               onChange={(e) => setEmailFilter(e.target.value)}
               placeholder="Lọc theo email..."
@@ -298,6 +328,13 @@ const UserList = () => {
           >
             <Search size={13} />
             Tìm kiếm
+          </button>
+          <button
+            type="button"
+            onClick={handleClearSearch}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+          >
+            Xóa bộ lọc
           </button>
 
         </div>

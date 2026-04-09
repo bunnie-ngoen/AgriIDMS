@@ -153,11 +153,11 @@ export default function PublicHeader() {
   };
 
   return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-6">
+    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white shadow-sm">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:flex-nowrap lg:gap-6">
 
         {/* LOGO */}
-        <Link to={ROUTES.HOME} className="flex items-center gap-3 flex-shrink-0">
+        <Link to={ROUTES.HOME} className="flex flex-shrink-0 items-center gap-3">
           <div className="h-12 w-12 rounded-full bg-[#1a5f2a] flex items-center justify-center">
             <Leaf size={26} className="text-white" />
           </div>
@@ -165,17 +165,17 @@ export default function PublicHeader() {
             <div className="text-base font-bold text-[#1a5f2a] uppercase tracking-tight">
               AgriIDMS
             </div>
-            <div className="text-xs text-slate-500 hidden sm:block">
+            <div className="hidden text-xs text-slate-500 sm:block">
               Quản lý kho & phân phối hoa quả
             </div>
           </div>
         </Link>
 
         {/* NAV */}
-        <nav className="flex items-center gap-1 sm:gap-2 flex-wrap justify-center flex-1 min-w-0">
+        <nav className="order-3 flex w-full items-center gap-1 overflow-x-auto whitespace-nowrap pb-1 sm:gap-2 lg:order-none lg:w-auto lg:flex-1 lg:justify-center lg:overflow-visible lg:pb-0">
           <Link
             to={ROUTES.HOME}
-            className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-slate-700 hover:text-[#1a5f2a] hover:bg-slate-50 rounded"
+            className="flex shrink-0 items-center gap-1 rounded px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-[#1a5f2a]"
           >
             <Home size={14} className="text-[#1a5f2a]" />
             Trang chủ
@@ -183,42 +183,35 @@ export default function PublicHeader() {
 
           <Link
             to={ROUTES.GIOI_THIEU}
-            className="px-3 py-2 text-sm font-medium text-slate-700 hover:text-[#1a5f2a] hover:bg-slate-50 rounded"
+            className="shrink-0 rounded px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-[#1a5f2a]"
           >
             Giới thiệu
           </Link>
 
           <a
             href="/#san-pham"
-            className="px-3 py-2 text-sm font-medium text-slate-700 hover:text-[#1a5f2a] hover:bg-slate-50 rounded"
+            className="shrink-0 rounded px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-[#1a5f2a]"
           >
             Sản phẩm
           </a>
 
           <a
             href="/#vi-sao-chon"
-            className="px-3 py-2 text-sm font-medium text-slate-700 hover:text-[#1a5f2a] hover:bg-slate-50 rounded hidden sm:inline"
+            className="hidden shrink-0 rounded px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-[#1a5f2a] sm:inline"
           >
             Tin tức
           </a>
 
-          <Link
-            to={hasDashboard ? dashboardPath! : ROUTES.LOGIN}
-            className="px-3 py-2 text-sm font-medium text-slate-700 hover:text-[#1a5f2a] hover:bg-slate-50 rounded"
-          >
-            Hệ thống
-          </Link>
-
           <a
             href="/#lien-he"
-            className="px-3 py-2 text-sm font-medium text-slate-700 hover:text-[#1a5f2a] hover:bg-slate-50 rounded"
+            className="shrink-0 rounded px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-[#1a5f2a]"
           >
             Liên hệ
           </a>
         </nav>
 
         {/* RIGHT SIDE */}
-        <div className="flex items-center gap-3 flex-shrink-0">
+        <div className="ml-auto flex flex-shrink-0 items-center gap-2 sm:gap-3">
 
           <a
             href="/#san-pham"
@@ -307,7 +300,7 @@ export default function PublicHeader() {
 
               <Link
                 to={ROUTES.CUSTOMER_ORDERS_PAGE}
-                className="px-3 py-2 text-sm font-medium text-slate-700 hover:text-[#1a5f2a] hover:bg-slate-50 rounded"
+                className="hidden rounded px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-[#1a5f2a] sm:inline-flex"
               >
                 Đơn của tôi
               </Link>

@@ -21,6 +21,26 @@ export const exportReceiptSchema = z.object({
 export type ExportDetail = z.infer<typeof exportDetailSchema>;
 export type ExportReceipt = z.infer<typeof exportReceiptSchema>;
 
+export const exportPrintLineSchema = z.object({
+  boxCode: z.string(),
+  grade: z.string().optional().nullable(),
+  boxWeight: z.coerce.number().optional().nullable(),
+  quantity: z.coerce.number(),
+});
+
+export const exportPrintDataSchema = z.object({
+  exportId: z.coerce.number().int(),
+  exportCode: z.string(),
+  orderId: z.coerce.number().int(),
+  createdAt: z.string(),
+  snapshotPhase: z.string().optional().nullable(),
+  isPreview: z.boolean().optional().nullable(),
+  printWarningMessage: z.string().optional().nullable(),
+  lines: z.array(exportPrintLineSchema),
+});
+
+export type ExportPrintData = z.infer<typeof exportPrintDataSchema>;
+
 /** GET Exports/staff/pending-approve */
 export const pendingApproveExportListItemSchema = z.object({
   exportId: z.coerce.number().int(),
