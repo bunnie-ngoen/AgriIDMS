@@ -32,4 +32,7 @@ export const ROUTES = {
     CUSTOMER_ORDER_DETAIL: "/my-orders/:id",
     CUSTOMER_COMPLAINTS: "/my-complaints",
     CART: "/cart",
+
+    /** Tab in phiếu xuất (cùng origin, tránh URL blob ở chân trang in). */
+    PRINT_EXPORT_SLIP: "/print/export-slip",
 };

@@ -175,6 +175,7 @@ export const {
   useGetExportReceiptByIdQuery,
   useLazyGetExportReceiptByIdQuery,
   useLazyGetExportPrintDataQuery,
+  useGetExportPrintDataQuery,
   useGetPendingApproveExportsQuery,
   useGetApprovedExportsQuery,
   useGetWarehousePostPickExportsQuery,

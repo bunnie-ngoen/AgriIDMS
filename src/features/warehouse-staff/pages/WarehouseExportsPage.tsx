@@ -5,11 +5,12 @@ import {
   useCancelExportMutation,
   useConfirmPickExportMutation,
   useCreateExportReceiptMutation,
+  useGetApprovedExportsQuery,
   useGetWarehousePostPickExportsQuery,
-  useLazyGetExportPrintDataQuery,
   useLazyGetExportReceiptByIdQuery,
 } from "../../export/api/export.api";
 import { useGetPaidPendingExportOrdersQuery } from "../../order/api/order.api";
+import { ROUTES } from "../../../shared/constants/routes";
 
 function vnd(n: number) {
   return n.toLocaleString("vi-VN");
@@ -61,7 +62,7 @@ export default function WarehouseExportsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const openedExportFromUrl = useRef<number | null>(null);
 
-  const [activeTab, setActiveTab] = useState<"paidOrders" | "postPick">("paidOrders");
+  const [activeTab, setActiveTab] = useState<"paidOrders" | "postPick" | "approvedHistory">("paidOrders");
 
   const [sortPaid, setSortPaid] = useState<
     "paidAtDesc" | "paidAtAsc" | "createdAtDesc" | "createdAtAsc"
@@ -72,6 +73,8 @@ export default function WarehouseExportsPage() {
   const [paidPage, setPaidPage] = useState(1);
   const [postPickPage, setPostPickPage] = useState(1);
   const [postPickSort, setPostPickSort] = useState<"createdAtDesc" | "createdAtAsc">("createdAtDesc");
+  const [approvedPage, setApprovedPage] = useState(1);
+  const [approvedSort, setApprovedSort] = useState<"createdAtDesc" | "createdAtAsc">("createdAtDesc");
 
   const [exportIdManual, setExportIdManual] = useState("");
   const [currentExportId, setCurrentExportId] = useState<number | null>(null);
@@ -108,10 +111,20 @@ export default function WarehouseExportsPage() {
     { skip: activeTab !== "postPick" },
   );
 
+  const approvedSkip = (approvedPage - 1) * pageSize;
+  const {
+    data: approvedRows = [],
+    isLoading: isLoadingApproved,
+    isFetching: isFetchingApproved,
+    refetch: refetchApproved,
+  } = useGetApprovedExportsQuery(
+    { skip: approvedSkip, take: pageSize, sort: approvedSort },
+    { skip: activeTab !== "approvedHistory" },
+  );
+
   const [createExport, { isLoading: isCreating }] = useCreateExportReceiptMutation();
   const [loadExport, { data: receipt, isFetching: isLoadingReceipt }] =
     useLazyGetExportReceiptByIdQuery();
-  const [loadPrintData] = useLazyGetExportPrintDataQuery();
   const [confirmPick, { isLoading: isConfirmingPick }] = useConfirmPickExportMutation();
   const [cancelExport, { isLoading: isCancelling }] = useCancelExportMutation();
 
@@ -130,6 +143,7 @@ export default function WarehouseExportsPage() {
 
   const hasNextPaidPage = paidRows.length === pageSize;
   const hasNextPostPickPage = postPickRows.length === pageSize;
+  const hasNextApprovedPage = approvedRows.length === pageSize;
 
   const refreshLists = async () => {
     await refetchPaid();
@@ -137,6 +151,9 @@ export default function WarehouseExportsPage() {
     // "Cannot refetch a query that has not been started yet."
     if (activeTab === "postPick") {
       await refetchPostPick();
+    }
+    if (activeTab === "approvedHistory") {
+      await refetchApproved();
     }
   };
 
@@ -253,104 +270,17 @@ export default function WarehouseExportsPage() {
     }
   };
 
-  const buildExportPrintHtml = (d: {
-    exportCode: string;
-    orderId: number;
-    createdAt: string;
-    printWarningMessage?: string | null;
-    lines: { boxCode: string; quantity: number }[];
-  }) => {
-    const created = new Date(d.createdAt).toLocaleString("vi-VN");
-    const warning = (d.printWarningMessage ?? "").trim();
-    const rows = d.lines
-      .map(
-        (x, idx) => `
-          <tr>
-            <td class="c">${idx + 1}</td>
-            <td>${x.boxCode}</td>
-            <td class="r">${x.quantity}</td>
-          </tr>`,
-      )
-      .join("");
-
-    return `<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Phiếu xuất kho</title>
-    <style>
-      @page { size: A4; margin: 12mm; }
-      body { font-family: Arial, Helvetica, sans-serif; color: #0f172a; }
-      h1 { font-size: 18px; margin: 0; }
-      .muted { color: #475569; font-size: 12px; }
-      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-top: 10px; }
-      .box { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; }
-      .warn { margin-top: 10px; padding: 10px; border: 1px solid #f59e0b44; background: #fffbeb; border-radius: 10px; color: #92400e; font-size: 12px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-      th, td { border: 1px solid #e2e8f0; padding: 8px; font-size: 12px; }
-      th { background: #f8fafc; text-align: left; }
-      .c { text-align: center; width: 48px; }
-      .r { text-align: right; }
-    </style>
-  </head>
-  <body>
-    <h1>Phiếu xuất kho</h1>
-    <div class="muted">In từ hệ thống • ${created}</div>
-
-    <div class="grid">
-      <div class="box">
-        <div class="muted">Mã phiếu</div>
-        <div style="font-size:16px;font-weight:700">${d.exportCode}</div>
-      </div>
-      <div class="box">
-        <div class="muted">Đơn hàng</div>
-        <div style="font-size:16px;font-weight:700">#${d.orderId}</div>
-      </div>
-    </div>
-
-    ${warning ? `<div class="warn"><b>Lưu ý:</b> ${warning}</div>` : ""}
-
-    <table>
-      <thead>
-        <tr>
-          <th class="c">STT</th>
-          <th>Box</th>
-          <th class="r">Khối lượng</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rows}
-      </tbody>
-    </table>
-  </body>
-</html>`;
-  };
-
   const onPrint = async () => {
     if (!currentExportId) return;
-    const t = toast.loading(`Đang tải dữ liệu in phiếu #${currentExportId}...`);
+    const t = toast.loading(`Đang mở phiếu #${currentExportId}...`);
     try {
-      const data = await loadPrintData(currentExportId).unwrap();
-      const html = buildExportPrintHtml({
-        exportCode: data.exportCode,
-        orderId: data.orderId,
-        createdAt: data.createdAt,
-        printWarningMessage: data.printWarningMessage,
-        lines: data.lines.map((l) => ({ boxCode: l.boxCode, quantity: Number(l.quantity) })),
-      });
-
-      const w = window.open("", "_blank", "noopener,noreferrer");
+      const q = new URLSearchParams({ exportId: String(currentExportId) });
+      const url = `${window.location.origin}${ROUTES.PRINT_EXPORT_SLIP}?${q.toString()}`;
+      const w = window.open(url, "_blank", "noopener,noreferrer");
       if (!w) throw new Error("Popup bị chặn. Hãy cho phép mở cửa sổ mới để in.");
-      w.document.open();
-      w.document.write(html);
-      w.document.close();
-      w.focus();
-      w.onload = () => w.print();
-
-      toast.success("Đã mở bản in.", { id: t });
+      toast.success("Đã mở tab phiếu — bấm In phiếu trên tab mới để chọn máy in.", { id: t });
     } catch (err) {
-      toast.error(getApiErrorMessage(err, "Không thể lấy dữ liệu in phiếu xuất."), { id: t });
+      toast.error(getApiErrorMessage(err, "Không thể mở phiếu in."), { id: t });
     }
   };
 
@@ -385,6 +315,17 @@ export default function WarehouseExportsPage() {
           }`}
         >
           Đã xác nhận lấy hàng (chờ Manager)
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("approvedHistory")}
+          className={`rounded-lg px-3 py-2 text-sm font-semibold border ${
+            activeTab === "approvedHistory"
+              ? "bg-slate-900 text-white border-slate-900"
+              : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+          }`}
+        >
+          Đã duyệt xuất (in phiếu)
         </button>
       </div>
 
@@ -668,6 +609,110 @@ export default function WarehouseExportsPage() {
         </div>
       )}
 
+      {activeTab === "approvedHistory" && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+          <p className="text-sm text-slate-600">
+            Phiếu xuất đã được Manager/Admin duyệt (Approved). Mở chi tiết để <span className="font-semibold">in phiếu xuất</span>.
+          </p>
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="text-xs font-medium text-slate-600">Sắp xếp</label>
+              <select
+                value={approvedSort}
+                onChange={(e) => {
+                  setApprovedSort(e.target.value as typeof approvedSort);
+                  setApprovedPage(1);
+                }}
+                className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              >
+                <option value="createdAtDesc">Phiếu mới nhất</option>
+                <option value="createdAtAsc">Phiếu cũ nhất</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                await refetchApproved();
+                toast.success("Đã làm mới danh sách phiếu đã duyệt.");
+              }}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Làm mới
+            </button>
+          </div>
+          {isLoadingApproved ? (
+            <p className="text-sm text-slate-500">Đang tải...</p>
+          ) : (
+            <div className="overflow-auto max-h-[400px] rounded-lg border border-slate-200">
+              <table className="w-full min-w-[860px] text-sm">
+                <thead className="sticky top-0 z-10 bg-slate-50">
+                  <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
+                    <th className="py-2 px-3">Phiếu</th>
+                    <th className="py-2 px-3">Đơn</th>
+                    <th className="py-2 px-3">Số box</th>
+                    <th className="py-2 px-3">Tạo lúc</th>
+                    <th className="py-2 px-3 w-[220px]">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {approvedRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-6 text-center text-slate-500">
+                        Chưa có phiếu đã duyệt xuất.
+                      </td>
+                    </tr>
+                  ) : (
+                    approvedRows.map((r) => (
+                      <tr key={r.exportId} className="border-b border-slate-100">
+                        <td className="py-2 px-3 font-semibold">
+                          #{r.exportId} · {r.exportCode}
+                        </td>
+                        <td className="py-2 px-3">Đơn hàng {r.orderId}</td>
+                        <td className="py-2 px-3">{r.boxCount}</td>
+                        <td className="py-2 px-3">{new Date(r.createdAt).toLocaleString("vi-VN")}</td>
+                        <td className="py-2 px-3">
+                          <div className="flex flex-wrap gap-1">
+                            <button
+                              type="button"
+                              onClick={() => openExportDetail(r.exportId)}
+                              className="rounded-lg border border-indigo-300 px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
+                            >
+                              Chi tiết
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {isFetchingApproved && !isLoadingApproved && (
+            <p className="text-xs text-slate-500">Đang cập nhật...</p>
+          )}
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setApprovedPage((p) => Math.max(1, p - 1))}
+              disabled={approvedPage <= 1}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Trước
+            </button>
+            <span className="text-sm text-slate-600">Trang {approvedPage}</span>
+            <button
+              type="button"
+              onClick={() => setApprovedPage((p) => p + 1)}
+              disabled={!hasNextApprovedPage}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Sau
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
         <h2 className="text-sm font-semibold text-slate-800">Mở phiếu theo mã (tuỳ chọn)</h2>
         <div className="mt-2 flex gap-2">
@@ -715,6 +760,12 @@ export default function WarehouseExportsPage() {
             {receiptNorm === "PendingPick" && (
               <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                 Bước kho: bấm &quot;Kho xác nhận lấy hàng&quot; để chuyển sang Sẵn sàng xuất.
+              </div>
+            )}
+            {receiptNorm === "Approved" && (
+              <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                Phiếu đã duyệt xuất. Bạn có thể <span className="font-semibold">In phiếu xuất</span> bên dưới; tra cứu lại trong tab{" "}
+                <span className="font-semibold">Đã duyệt xuất (in phiếu)</span>.
               </div>
             )}
 

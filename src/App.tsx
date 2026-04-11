@@ -21,6 +21,7 @@ import CartPage from './features/cart/pages/CartPage';
 import MyOrdersPage from './features/order/pages/MyOrdersPage';
 import MyOrderDetailPage from './features/order/pages/MyOrderDetailPage';
 import CustomerComplaintsPage from './features/complaint/pages/CustomerComplaintsPage';
+import ExportPrintSlipPage from './features/export/pages/ExportPrintSlipPage';
 function App() {
     return (
         <BrowserRouter>
@@ -71,6 +72,21 @@ function App() {
                     <Route path={ROUTES.REGISTER} element={<RegisterPage />} />
                     <Route path={ROUTES.FORGET_PASSWORD} element={<ForgotPasswordPage />} />
                     <Route path={ROUTES.UNAUTHORIZED} element={<UnauthorizedPage />} />
+
+                    <Route
+                        path={ROUTES.PRINT_EXPORT_SLIP}
+                        element={
+                            <ProtectedRoute
+                                allowedRoles={[
+                                    AUTH_ROLE.WAREHOUSE_STAFF,
+                                    AUTH_ROLE.ADMIN,
+                                    AUTH_ROLE.MANAGER,
+                                ]}
+                            >
+                                <ExportPrintSlipPage />
+                            </ProtectedRoute>
+                        }
+                    />
 
                     {/* Admin routes */}
                     {adminRoutes.map((route) => (
