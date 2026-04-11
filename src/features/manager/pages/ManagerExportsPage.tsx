@@ -5,9 +5,9 @@ import {
   useCancelExportMutation,
   useGetApprovedExportsQuery,
   useGetPendingApproveExportsQuery,
-  useLazyGetExportPrintDataQuery,
   useLazyGetExportReceiptByIdQuery,
 } from "../../export/api/export.api";
+import { ROUTES } from "../../../shared/constants/routes";
 
 function exportStatusLabel(status: string) {
   if (status === "ReadyToExport") return "Sẵn sàng xuất";
@@ -74,7 +74,6 @@ export default function ManagerExportsPage() {
 
   const [loadExport, { data: receipt, isFetching: isLoadingReceipt }] =
     useLazyGetExportReceiptByIdQuery();
-  const [loadPrintData] = useLazyGetExportPrintDataQuery();
   const [approveExport, { isLoading: isApproving }] = useApproveExportMutation();
   const [cancelExport, { isLoading: isCancelling }] = useCancelExportMutation();
 
@@ -168,104 +167,17 @@ export default function ManagerExportsPage() {
     }
   };
 
-  const buildExportPrintHtml = (d: {
-    exportCode: string;
-    orderId: number;
-    createdAt: string;
-    printWarningMessage?: string | null;
-    lines: { boxCode: string; quantity: number }[];
-  }) => {
-    const created = new Date(d.createdAt).toLocaleString("vi-VN");
-    const warning = (d.printWarningMessage ?? "").trim();
-    const rows = d.lines
-      .map(
-        (x, idx) => `
-          <tr>
-            <td class="c">${idx + 1}</td>
-            <td>${x.boxCode}</td>
-            <td class="r">${x.quantity}</td>
-          </tr>`,
-      )
-      .join("");
-
-    return `<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Phiếu xuất kho</title>
-    <style>
-      @page { size: A4; margin: 12mm; }
-      body { font-family: Arial, Helvetica, sans-serif; color: #0f172a; }
-      h1 { font-size: 18px; margin: 0; }
-      .muted { color: #475569; font-size: 12px; }
-      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-top: 10px; }
-      .box { border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; }
-      .warn { margin-top: 10px; padding: 10px; border: 1px solid #f59e0b44; background: #fffbeb; border-radius: 10px; color: #92400e; font-size: 12px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-      th, td { border: 1px solid #e2e8f0; padding: 8px; font-size: 12px; }
-      th { background: #f8fafc; text-align: left; }
-      .c { text-align: center; width: 48px; }
-      .r { text-align: right; }
-    </style>
-  </head>
-  <body>
-    <h1>Phiếu xuất kho</h1>
-    <div class="muted">In từ hệ thống • ${created}</div>
-
-    <div class="grid">
-      <div class="box">
-        <div class="muted">Mã phiếu</div>
-        <div style="font-size:16px;font-weight:700">${d.exportCode}</div>
-      </div>
-      <div class="box">
-        <div class="muted">Đơn hàng</div>
-        <div style="font-size:16px;font-weight:700">#${d.orderId}</div>
-      </div>
-    </div>
-
-    ${warning ? `<div class="warn"><b>Lưu ý:</b> ${warning}</div>` : ""}
-
-    <table>
-      <thead>
-        <tr>
-          <th class="c">STT</th>
-          <th>Box</th>
-          <th class="r">Khối lượng</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rows}
-      </tbody>
-    </table>
-  </body>
-</html>`;
-  };
-
   const onPrint = async () => {
     if (!currentExportId) return;
-    const t = toast.loading(`Đang tải dữ liệu in phiếu #${currentExportId}...`);
+    const t = toast.loading(`Đang mở phiếu #${currentExportId}...`);
     try {
-      const data = await loadPrintData(currentExportId).unwrap();
-      const html = buildExportPrintHtml({
-        exportCode: data.exportCode,
-        orderId: data.orderId,
-        createdAt: data.createdAt,
-        printWarningMessage: data.printWarningMessage,
-        lines: data.lines.map((l) => ({ boxCode: l.boxCode, quantity: Number(l.quantity) })),
-      });
-
-      const w = window.open("", "_blank", "noopener,noreferrer");
+      const q = new URLSearchParams({ exportId: String(currentExportId) });
+      const url = `${window.location.origin}${ROUTES.PRINT_EXPORT_SLIP}?${q.toString()}`;
+      const w = window.open(url, "_blank", "noopener,noreferrer");
       if (!w) throw new Error("Popup bị chặn. Hãy cho phép mở cửa sổ mới để in.");
-      w.document.open();
-      w.document.write(html);
-      w.document.close();
-      w.focus();
-      w.onload = () => w.print();
-
-      toast.success("Đã mở bản in.", { id: t });
+      toast.success("Đã mở tab phiếu — bấm In phiếu trên tab mới để chọn máy in.", { id: t });
     } catch (err) {
-      toast.error(getApiErrorMessage(err, "Không thể lấy dữ liệu in phiếu xuất."), { id: t });
+      toast.error(getApiErrorMessage(err, "Không thể mở phiếu in."), { id: t });
     }
   };
 
