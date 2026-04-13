@@ -3,9 +3,11 @@ import toast from "react-hot-toast";
 import {
   useApproveExportMutation,
   useCancelExportMutation,
+  useGetApprovedExportsQuery,
   useGetPendingApproveExportsQuery,
   useLazyGetExportReceiptByIdQuery,
 } from "../../export/api/export.api";
+import { ROUTES } from "../../../shared/constants/routes";
 
 function exportStatusLabel(status: string) {
   if (status === "ReadyToExport") return "Sẵn sàng xuất";
@@ -40,20 +42,35 @@ function getApiErrorMessage(err: unknown, fallback: string) {
 }
 
 export default function ManagerExportsPage() {
+  const [listTab, setListTab] = useState<"pending" | "approved">("pending");
   const [pageSize, setPageSize] = useState<20 | 50 | 100>(20);
   const [approvePage, setApprovePage] = useState(1);
+  const [approvedHistoryPage, setApprovedHistoryPage] = useState(1);
   const [approveSort, setApproveSort] = useState<"createdAtDesc" | "createdAtAsc">("createdAtDesc");
   const [exportIdManual, setExportIdManual] = useState("");
   const [currentExportId, setCurrentExportId] = useState<number | null>(null);
   const [msg, setMsg] = useState("");
 
   const approveSkip = (approvePage - 1) * pageSize;
+  const approvedSkip = (approvedHistoryPage - 1) * pageSize;
   const {
     data: pendingApproveRows = [],
     isLoading: isLoadingApprove,
     isFetching: isFetchingApprove,
     refetch: refetchPendingApprove,
-  } = useGetPendingApproveExportsQuery({ skip: approveSkip, take: pageSize, sort: approveSort });
+  } = useGetPendingApproveExportsQuery(
+    { skip: approveSkip, take: pageSize, sort: approveSort },
+    { skip: listTab !== "pending" },
+  );
+  const {
+    data: approvedHistoryRows = [],
+    isLoading: isLoadingApprovedHistory,
+    isFetching: isFetchingApprovedHistory,
+    refetch: refetchApprovedHistory,
+  } = useGetApprovedExportsQuery(
+    { skip: approvedSkip, take: pageSize, sort: approveSort },
+    { skip: listTab !== "approved" },
+  );
 
   const [loadExport, { data: receipt, isFetching: isLoadingReceipt }] =
     useLazyGetExportReceiptByIdQuery();
@@ -64,6 +81,16 @@ export default function ManagerExportsPage() {
   const canApprove = receiptNorm === "ReadyToExport";
   const canCancel = receiptNorm !== "Approved" && receiptNorm !== "Cancelled";
   const hasNextApprovePage = pendingApproveRows.length === pageSize;
+  const hasNextApprovedHistoryPage = approvedHistoryRows.length === pageSize;
+
+  /** Chỉ refetch list đang mở — query tab kia bị skip nên refetch sẽ lỗi RTK Query. */
+  const refetchActiveList = async () => {
+    if (listTab === "pending") {
+      await refetchPendingApprove();
+    } else {
+      await refetchApprovedHistory();
+    }
+  };
 
   const summary = useMemo(() => {
     if (!receipt) return null;
@@ -106,11 +133,15 @@ export default function ManagerExportsPage() {
     try {
       const res = await approveExport(id).unwrap();
       const st = normalizeExportStatus(res.status);
-      toast.success(`Duyệt xuất thành công - Phiếu #${id} -> ${exportStatusLabel(st || res.status)}.`, {
-        id: t,
-      });
+      toast.success(
+        `Duyệt xuất thành công — Phiếu #${id} → ${exportStatusLabel(st || res.status)}. Đã gửi thông báo trong hệ thống tới người tạo phiếu (kho).`,
+        {
+          id: t,
+          duration: 5000,
+        },
+      );
       if (currentExportId === id) await loadExport(id).unwrap();
-      await refetchPendingApprove();
+      await refetchActiveList();
     } catch (err) {
       const m = getApiErrorMessage(err, "Duyệt phiếu xuất thất bại.");
       toast.error(m, { id: t });
@@ -128,11 +159,25 @@ export default function ManagerExportsPage() {
         id: t,
       });
       await loadExport(currentExportId).unwrap();
-      await refetchPendingApprove();
+      await refetchActiveList();
     } catch (err) {
       const m = getApiErrorMessage(err, "Hủy phiếu xuất thất bại.");
       toast.error(m, { id: t });
       setMsg(m);
+    }
+  };
+
+  const onPrint = async () => {
+    if (!currentExportId) return;
+    const t = toast.loading(`Đang mở phiếu #${currentExportId}...`);
+    try {
+      const q = new URLSearchParams({ exportId: String(currentExportId) });
+      const url = `${window.location.origin}${ROUTES.PRINT_EXPORT_SLIP}?${q.toString()}`;
+      const w = window.open(url, "_blank", "noopener,noreferrer");
+      if (!w) throw new Error("Popup bị chặn. Hãy cho phép mở cửa sổ mới để in.");
+      toast.success("Đã mở tab phiếu — bấm In phiếu trên tab mới để chọn máy in.", { id: t });
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Không thể mở phiếu in."), { id: t });
     }
   };
 
@@ -141,15 +186,42 @@ export default function ManagerExportsPage() {
       <div className="rounded-xl border border-slate-200 bg-white p-4">
         <h1 className="text-lg font-bold text-slate-900">Phê duyệt xuất kho (Manager)</h1>
         <p className="mt-1 text-sm text-slate-600">
-          Theo dõi danh sách phiếu chờ duyệt, tra cứu nhanh theo mã và duyệt/hủy phiếu xuất.
+          Theo dõi phiếu chờ duyệt và lịch sử phiếu đã xuất thành công; tra cứu theo mã và duyệt/hủy phiếu.
         </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => setListTab("pending")}
+          className={`rounded-lg px-3 py-2 text-sm font-semibold border ${
+            listTab === "pending"
+              ? "bg-slate-900 text-white border-slate-900"
+              : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+          }`}
+        >
+          Chờ duyệt xuất
+        </button>
+        <button
+          type="button"
+          onClick={() => setListTab("approved")}
+          className={`rounded-lg px-3 py-2 text-sm font-semibold border ${
+            listTab === "approved"
+              ? "bg-slate-900 text-white border-slate-900"
+              : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+          }`}
+        >
+          Đã xuất thành công
+        </button>
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-slate-900">Danh sách phiếu chờ duyệt</h2>
+          <h2 className="text-sm font-semibold text-slate-900">
+            {listTab === "pending" ? "Danh sách phiếu chờ duyệt" : "Lịch sử phiếu đã duyệt xuất (Approved)"}
+          </h2>
           <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-700">
-            {pendingApproveRows.length} phiếu/trang
+            {(listTab === "pending" ? pendingApproveRows : approvedHistoryRows).length} phiếu/trang
           </span>
         </div>
         <div className="flex flex-wrap items-end gap-3">
@@ -160,6 +232,7 @@ export default function ManagerExportsPage() {
               onChange={(e) => {
                 setApproveSort(e.target.value as typeof approveSort);
                 setApprovePage(1);
+                setApprovedHistoryPage(1);
               }}
               className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
             >
@@ -174,6 +247,7 @@ export default function ManagerExportsPage() {
               onChange={(e) => {
                 setPageSize(Number(e.target.value) as 20 | 50 | 100);
                 setApprovePage(1);
+                setApprovedHistoryPage(1);
               }}
               className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
             >
@@ -185,8 +259,13 @@ export default function ManagerExportsPage() {
           <button
             type="button"
             onClick={async () => {
-              await refetchPendingApprove();
-              toast.success("Đã làm mới danh sách phiếu chờ duyệt.");
+              if (listTab === "pending") {
+                await refetchPendingApprove();
+                toast.success("Đã làm mới danh sách phiếu chờ duyệt.");
+              } else {
+                await refetchApprovedHistory();
+                toast.success("Đã làm mới lịch sử phiếu đã duyệt.");
+              }
             }}
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
@@ -194,7 +273,9 @@ export default function ManagerExportsPage() {
           </button>
         </div>
 
-        {isLoadingApprove ? (
+        {listTab === "pending" && isLoadingApprove ? (
+          <p className="text-sm text-slate-500">Đang tải...</p>
+        ) : listTab === "approved" && isLoadingApprovedHistory ? (
           <p className="text-sm text-slate-500">Đang tải...</p>
         ) : (
           <div className="overflow-auto max-h-[420px] rounded-lg border border-slate-200">
@@ -210,13 +291,19 @@ export default function ManagerExportsPage() {
                 </tr>
               </thead>
               <tbody>
-                {pendingApproveRows.length === 0 ? (
+                {listTab === "pending" && pendingApproveRows.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-3 py-6 text-center text-slate-500">
                       Không có phiếu chờ duyệt.
                     </td>
                   </tr>
-                ) : (
+                ) : listTab === "approved" && approvedHistoryRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-6 text-center text-slate-500">
+                      Không có phiếu trong lịch sử.
+                    </td>
+                  </tr>
+                ) : listTab === "pending" ? (
                   pendingApproveRows.map((r) => (
                     <tr key={r.exportId} className="border-b border-slate-100">
                       <td className="py-2 px-3 font-semibold">Phiếu {r.exportId} - {r.exportCode}</td>
@@ -253,27 +340,69 @@ export default function ManagerExportsPage() {
                       </td>
                     </tr>
                   ))
+                ) : (
+                  approvedHistoryRows.map((r) => (
+                    <tr key={r.exportId} className="border-b border-slate-100">
+                      <td className="py-2 px-3 font-semibold">Phiếu {r.exportId} - {r.exportCode}</td>
+                      <td className="py-2 px-3">Đơn hàng {r.orderId}</td>
+                      <td className="py-2 px-3">
+                        <span
+                          className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${exportStatusTone(
+                            normalizeExportStatus(r.status) || r.status,
+                          )}`}
+                        >
+                          {exportStatusLabel(normalizeExportStatus(r.status) || r.status)}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3">{r.boxCount}</td>
+                      <td className="py-2 px-3">{new Date(r.createdAt).toLocaleString("vi-VN")}</td>
+                      <td className="py-2 px-3">
+                        <button
+                          type="button"
+                          onClick={() => openExportDetail(r.exportId)}
+                          className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                          Chi tiết
+                        </button>
+                      </td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
           </div>
         )}
-        {isFetchingApprove && !isLoadingApprove && <p className="text-xs text-slate-500">Đang cập nhật...</p>}
+        {listTab === "pending" && isFetchingApprove && !isLoadingApprove && (
+          <p className="text-xs text-slate-500">Đang cập nhật...</p>
+        )}
+        {listTab === "approved" && isFetchingApprovedHistory && !isLoadingApprovedHistory && (
+          <p className="text-xs text-slate-500">Đang cập nhật...</p>
+        )}
 
         <div className="flex items-center justify-end gap-2">
           <button
             type="button"
-            onClick={() => setApprovePage((p) => Math.max(1, p - 1))}
-            disabled={approvePage <= 1}
+            onClick={() =>
+              listTab === "pending"
+                ? setApprovePage((p) => Math.max(1, p - 1))
+                : setApprovedHistoryPage((p) => Math.max(1, p - 1))
+            }
+            disabled={listTab === "pending" ? approvePage <= 1 : approvedHistoryPage <= 1}
             className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
             Trước
           </button>
-          <span className="text-sm text-slate-600">Trang {approvePage}</span>
+          <span className="text-sm text-slate-600">
+            Trang {listTab === "pending" ? approvePage : approvedHistoryPage}
+          </span>
           <button
             type="button"
-            onClick={() => setApprovePage((p) => p + 1)}
-            disabled={!hasNextApprovePage}
+            onClick={() =>
+              listTab === "pending"
+                ? setApprovePage((p) => p + 1)
+                : setApprovedHistoryPage((p) => p + 1)
+            }
+            disabled={listTab === "pending" ? !hasNextApprovePage : !hasNextApprovedHistoryPage}
             className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
           >
             Sau
@@ -343,7 +472,7 @@ export default function ManagerExportsPage() {
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-3">
               <button
                 type="button"
                 onClick={() => onApprove()}
@@ -360,6 +489,15 @@ export default function ManagerExportsPage() {
                 className="rounded-lg border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-60"
               >
                 {isCancelling ? "Đang hủy..." : "Hủy phiếu xuất"}
+              </button>
+
+              <button
+                type="button"
+                onClick={onPrint}
+                disabled={!receipt || receiptNorm === "Cancelled"}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              >
+                In phiếu xuất
               </button>
             </div>
           </div>

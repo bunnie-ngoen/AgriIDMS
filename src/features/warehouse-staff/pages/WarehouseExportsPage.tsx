@@ -1,14 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
-  useApproveExportMutation,
   useCancelExportMutation,
   useConfirmPickExportMutation,
   useCreateExportReceiptMutation,
-  useGetPendingApproveExportsQuery,
+  useGetApprovedExportsQuery,
+  useGetWarehousePostPickExportsQuery,
   useLazyGetExportReceiptByIdQuery,
 } from "../../export/api/export.api";
 import { useGetPaidPendingExportOrdersQuery } from "../../order/api/order.api";
+import { ROUTES } from "../../../shared/constants/routes";
 
 function vnd(n: number) {
   return n.toLocaleString("vi-VN");
@@ -57,10 +59,10 @@ function normalizeExportStatus(status?: string | null) {
 }
 
 export default function WarehouseExportsPage() {
-  // Màn kho chỉ xử lý thao tác của kho: tạo phiếu + xác nhận lấy hàng.
-  const canApproveExport = false;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openedExportFromUrl = useRef<number | null>(null);
 
-  const [activeTab, setActiveTab] = useState<"paidOrders" | "pendingApprove">("paidOrders");
+  const [activeTab, setActiveTab] = useState<"paidOrders" | "postPick" | "approvedHistory">("paidOrders");
 
   const [sortPaid, setSortPaid] = useState<
     "paidAtDesc" | "paidAtAsc" | "createdAtDesc" | "createdAtAsc"
@@ -69,8 +71,10 @@ export default function WarehouseExportsPage() {
   const [orderIdFilter, setOrderIdFilter] = useState("");
   const [pageSize, setPageSize] = useState<20 | 50 | 100>(20);
   const [paidPage, setPaidPage] = useState(1);
-  const [approvePage, setApprovePage] = useState(1);
-  const [approveSort, setApproveSort] = useState<"createdAtDesc" | "createdAtAsc">("createdAtDesc");
+  const [postPickPage, setPostPickPage] = useState(1);
+  const [postPickSort, setPostPickSort] = useState<"createdAtDesc" | "createdAtAsc">("createdAtDesc");
+  const [approvedPage, setApprovedPage] = useState(1);
+  const [approvedSort, setApprovedSort] = useState<"createdAtDesc" | "createdAtAsc">("createdAtDesc");
 
   const [exportIdManual, setExportIdManual] = useState("");
   const [currentExportId, setCurrentExportId] = useState<number | null>(null);
@@ -96,27 +100,36 @@ export default function WarehouseExportsPage() {
     refetch: refetchPaid,
   } = useGetPaidPendingExportOrdersQuery(paidQueryArg);
 
-  const approveSkip = (approvePage - 1) * pageSize;
+  const postPickSkip = (postPickPage - 1) * pageSize;
   const {
-    data: pendingApproveRows = [],
-    isLoading: isLoadingApprove,
-    isFetching: isFetchingApprove,
-    refetch: refetchPendingApprove,
-  } = useGetPendingApproveExportsQuery(
-    { skip: approveSkip, take: pageSize, sort: approveSort },
-    { skip: !canApproveExport || activeTab !== "pendingApprove" },
+    data: postPickRows = [],
+    isLoading: isLoadingPostPick,
+    isFetching: isFetchingPostPick,
+    refetch: refetchPostPick,
+  } = useGetWarehousePostPickExportsQuery(
+    { skip: postPickSkip, take: pageSize, sort: postPickSort },
+    { skip: activeTab !== "postPick" },
+  );
+
+  const approvedSkip = (approvedPage - 1) * pageSize;
+  const {
+    data: approvedRows = [],
+    isLoading: isLoadingApproved,
+    isFetching: isFetchingApproved,
+    refetch: refetchApproved,
+  } = useGetApprovedExportsQuery(
+    { skip: approvedSkip, take: pageSize, sort: approvedSort },
+    { skip: activeTab !== "approvedHistory" },
   );
 
   const [createExport, { isLoading: isCreating }] = useCreateExportReceiptMutation();
   const [loadExport, { data: receipt, isFetching: isLoadingReceipt }] =
     useLazyGetExportReceiptByIdQuery();
   const [confirmPick, { isLoading: isConfirmingPick }] = useConfirmPickExportMutation();
-  const [approveExport, { isLoading: isApproving }] = useApproveExportMutation();
   const [cancelExport, { isLoading: isCancelling }] = useCancelExportMutation();
 
   const receiptNorm = normalizeExportStatus(receipt?.status);
   const canConfirmPick = receiptNorm === "PendingPick";
-  const canApprove = receiptNorm === "ReadyToExport" && canApproveExport;
   const canCancel = receiptNorm !== "Approved" && receiptNorm !== "Cancelled";
 
   const summary = useMemo(() => {
@@ -129,11 +142,19 @@ export default function WarehouseExportsPage() {
   }, [receipt]);
 
   const hasNextPaidPage = paidRows.length === pageSize;
-  const hasNextApprovePage = pendingApproveRows.length === pageSize;
+  const hasNextPostPickPage = postPickRows.length === pageSize;
+  const hasNextApprovedPage = approvedRows.length === pageSize;
 
   const refreshLists = async () => {
     await refetchPaid();
-    if (canApproveExport) await refetchPendingApprove();
+    // postPick query is skipped unless the tab is active; calling refetch while skipped throws:
+    // "Cannot refetch a query that has not been started yet."
+    if (activeTab === "postPick") {
+      await refetchPostPick();
+    }
+    if (activeTab === "approvedHistory") {
+      await refetchApproved();
+    }
   };
 
   const openExportDetail = async (exportId: number, silentToast = false) => {
@@ -152,19 +173,39 @@ export default function WarehouseExportsPage() {
     }
   };
 
+  /** Mở phiếu khi vào từ thông báo: /warehouse/exports?exportId=… */
+  const exportIdFromUrl = searchParams.get("exportId");
+  useEffect(() => {
+    if (!exportIdFromUrl) return;
+    const id = Number(exportIdFromUrl);
+    if (!Number.isInteger(id) || id <= 0) return;
+    if (openedExportFromUrl.current === id) return;
+    openedExportFromUrl.current = id;
+    void openExportDetail(id, true);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("exportId");
+        return next;
+      },
+      { replace: true },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chỉ khi exportIdFromUrl đổi
+  }, [exportIdFromUrl]);
+
   const onCreateForOrder = async (orderId: number) => {
     setMsg("");
-    const t = toast.loading(`Đang tạo phiếu xuất cho đơn #${orderId}...`);
+    const t = toast.loading(`Đang lập phiếu xuất kho cho đơn #${orderId}...`);
     try {
       const res = await createExport({ orderId }).unwrap();
       toast.success(
-        `Tạo phiếu xuất thành công · #${res.id} · ${res.exportCode}. Đã mở chi tiết phiếu — bước tiếp: xác nhận lấy hàng.`,
+        `Lập phiếu xuất kho thành công · #${res.id} · ${res.exportCode}. Đã mở chi tiết phiếu — bước tiếp: xác nhận lấy hàng.`,
         { id: t },
       );
       await refreshLists();
       await openExportDetail(res.id, true);
     } catch (err) {
-      const m = getApiErrorMessage(err, "Tạo phiếu xuất thất bại.");
+      const m = getApiErrorMessage(err, "Lập phiếu xuất kho thất bại.");
       toast.error(m, { id: t });
       setMsg(m);
     }
@@ -211,32 +252,6 @@ export default function WarehouseExportsPage() {
     }
   };
 
-  const onApprove = async (exportId?: number) => {
-    const id = exportId ?? currentExportId;
-    if (!id) return;
-    const t = toast.loading(`Đang duyệt phiếu xuất #${id}...`);
-    try {
-      const res = await approveExport(id).unwrap();
-      const st = normalizeExportStatus(res.status);
-      toast.success(
-        `Duyệt xuất thành công · Phiếu #${id} → ${exportStatusLabel(st || res.status)}. Đơn chuyển sang Đang giao.`,
-        { id: t },
-      );
-      if (currentExportId === id) {
-        try {
-          await loadExport(id).unwrap();
-        } catch {
-          /* chi tiết có thể tải lại sau */
-        }
-      }
-      await refreshLists();
-    } catch (err) {
-      const m = getApiErrorMessage(err, "Duyệt phiếu xuất thất bại.");
-      toast.error(m, { id: t });
-      setMsg(m);
-    }
-  };
-
   const onCancel = async () => {
     if (!currentExportId) return;
     const t = toast.loading(`Đang hủy phiếu xuất #${currentExportId}...`);
@@ -252,6 +267,20 @@ export default function WarehouseExportsPage() {
       const m = getApiErrorMessage(err, "Hủy phiếu xuất thất bại.");
       toast.error(m, { id: t });
       setMsg(m);
+    }
+  };
+
+  const onPrint = async () => {
+    if (!currentExportId) return;
+    const t = toast.loading(`Đang mở phiếu #${currentExportId}...`);
+    try {
+      const q = new URLSearchParams({ exportId: String(currentExportId) });
+      const url = `${window.location.origin}${ROUTES.PRINT_EXPORT_SLIP}?${q.toString()}`;
+      const w = window.open(url, "_blank", "noopener,noreferrer");
+      if (!w) throw new Error("Popup bị chặn. Hãy cho phép mở cửa sổ mới để in.");
+      toast.success("Đã mở tab phiếu — bấm In phiếu trên tab mới để chọn máy in.", { id: t });
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Không thể mở phiếu in."), { id: t });
     }
   };
 
@@ -276,19 +305,28 @@ export default function WarehouseExportsPage() {
         >
           Đơn Paid chờ xuất
         </button>
-        {canApproveExport && (
-          <button
-            type="button"
-            onClick={() => setActiveTab("pendingApprove")}
-            className={`rounded-lg px-3 py-2 text-sm font-semibold border ${
-              activeTab === "pendingApprove"
-                ? "bg-slate-900 text-white border-slate-900"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-            }`}
-          >
-            Phiếu chờ duyệt xuất
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setActiveTab("postPick")}
+          className={`rounded-lg px-3 py-2 text-sm font-semibold border ${
+            activeTab === "postPick"
+              ? "bg-slate-900 text-white border-slate-900"
+              : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+          }`}
+        >
+          Đã xác nhận lấy hàng (chờ Manager)
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("approvedHistory")}
+          className={`rounded-lg px-3 py-2 text-sm font-semibold border ${
+            activeTab === "approvedHistory"
+              ? "bg-slate-900 text-white border-slate-900"
+              : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+          }`}
+        >
+          Đã duyệt xuất (in phiếu)
+        </button>
       </div>
 
       {activeTab === "paidOrders" && (
@@ -423,7 +461,7 @@ export default function WarehouseExportsPage() {
                                 disabled={isCreating}
                                 className="rounded-lg bg-slate-900 px-2 py-1 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
                               >
-                                Tạo phiếu
+                                Lập phiếu xuất kho
                               </button>
                             )}
                             {row.hasExportReceipt && row.exportReceiptId != null && (
@@ -469,16 +507,19 @@ export default function WarehouseExportsPage() {
         </div>
       )}
 
-      {activeTab === "pendingApprove" && canApproveExport && (
+      {activeTab === "postPick" && (
         <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+          <p className="text-sm text-slate-600">
+            Các phiếu đã xác nhận lấy hàng (ReadyToExport), đang chờ Admin/Manager duyệt xuất kho.
+          </p>
           <div className="flex flex-wrap items-end gap-3">
             <div>
               <label className="text-xs font-medium text-slate-600">Sắp xếp</label>
               <select
-                value={approveSort}
+                value={postPickSort}
                 onChange={(e) => {
-                  setApproveSort(e.target.value as typeof approveSort);
-                  setApprovePage(1);
+                  setPostPickSort(e.target.value as typeof postPickSort);
+                  setPostPickPage(1);
                 }}
                 className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               >
@@ -489,15 +530,15 @@ export default function WarehouseExportsPage() {
             <button
               type="button"
               onClick={async () => {
-                await refetchPendingApprove();
-                toast.success("Đã làm mới danh sách phiếu chờ duyệt.");
+                await refetchPostPick();
+                toast.success("Đã làm mới danh sách phiếu đã xác nhận lấy hàng.");
               }}
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               Làm mới
             </button>
           </div>
-          {isLoadingApprove ? (
+          {isLoadingPostPick ? (
             <p className="text-sm text-slate-500">Đang tải...</p>
           ) : (
             <div className="overflow-auto max-h-[400px] rounded-lg border border-slate-200">
@@ -512,14 +553,116 @@ export default function WarehouseExportsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {pendingApproveRows.length === 0 ? (
+                  {postPickRows.length === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-3 py-6 text-center text-slate-500">
-                        Không có phiếu chờ duyệt.
+                        Không có phiếu nào ở trạng thái đã xác nhận lấy hàng.
                       </td>
                     </tr>
                   ) : (
-                    pendingApproveRows.map((r) => (
+                    postPickRows.map((r) => (
+                      <tr key={r.exportId} className="border-b border-slate-100">
+                        <td className="py-2 px-3 font-semibold">
+                          #{r.exportId} · {r.exportCode}
+                        </td>
+                        <td className="py-2 px-3">Đơn hàng {r.orderId}</td>
+                        <td className="py-2 px-3">{r.boxCount}</td>
+                        <td className="py-2 px-3">{new Date(r.createdAt).toLocaleString("vi-VN")}</td>
+                        <td className="py-2 px-3">
+                          <button
+                            type="button"
+                            onClick={() => openExportDetail(r.exportId)}
+                            className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                          >
+                            Chi tiết
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {isFetchingPostPick && !isLoadingPostPick && (
+            <p className="text-xs text-slate-500">Đang cập nhật...</p>
+          )}
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setPostPickPage((p) => Math.max(1, p - 1))}
+              disabled={postPickPage <= 1}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Trước
+            </button>
+            <span className="text-sm text-slate-600">Trang {postPickPage}</span>
+            <button
+              type="button"
+              onClick={() => setPostPickPage((p) => p + 1)}
+              disabled={!hasNextPostPickPage}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Sau
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "approvedHistory" && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+          <p className="text-sm text-slate-600">
+            Phiếu xuất đã được Manager/Admin duyệt (Approved). Mở chi tiết để <span className="font-semibold">in phiếu xuất</span>.
+          </p>
+          <div className="flex flex-wrap items-end gap-3">
+            <div>
+              <label className="text-xs font-medium text-slate-600">Sắp xếp</label>
+              <select
+                value={approvedSort}
+                onChange={(e) => {
+                  setApprovedSort(e.target.value as typeof approvedSort);
+                  setApprovedPage(1);
+                }}
+                className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              >
+                <option value="createdAtDesc">Phiếu mới nhất</option>
+                <option value="createdAtAsc">Phiếu cũ nhất</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={async () => {
+                await refetchApproved();
+                toast.success("Đã làm mới danh sách phiếu đã duyệt.");
+              }}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Làm mới
+            </button>
+          </div>
+          {isLoadingApproved ? (
+            <p className="text-sm text-slate-500">Đang tải...</p>
+          ) : (
+            <div className="overflow-auto max-h-[400px] rounded-lg border border-slate-200">
+              <table className="w-full min-w-[860px] text-sm">
+                <thead className="sticky top-0 z-10 bg-slate-50">
+                  <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
+                    <th className="py-2 px-3">Phiếu</th>
+                    <th className="py-2 px-3">Đơn</th>
+                    <th className="py-2 px-3">Số box</th>
+                    <th className="py-2 px-3">Tạo lúc</th>
+                    <th className="py-2 px-3 w-[220px]">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {approvedRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-3 py-6 text-center text-slate-500">
+                        Chưa có phiếu đã duyệt xuất.
+                      </td>
+                    </tr>
+                  ) : (
+                    approvedRows.map((r) => (
                       <tr key={r.exportId} className="border-b border-slate-100">
                         <td className="py-2 px-3 font-semibold">
                           #{r.exportId} · {r.exportCode}
@@ -532,17 +675,9 @@ export default function WarehouseExportsPage() {
                             <button
                               type="button"
                               onClick={() => openExportDetail(r.exportId)}
-                              className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                              className="rounded-lg border border-indigo-300 px-2 py-1 text-xs font-semibold text-indigo-700 hover:bg-indigo-50"
                             >
                               Chi tiết
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onApprove(r.exportId)}
-                              disabled={isApproving}
-                              className="rounded-lg bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-                            >
-                              Duyệt xuất
                             </button>
                           </div>
                         </td>
@@ -553,20 +688,23 @@ export default function WarehouseExportsPage() {
               </table>
             </div>
           )}
+          {isFetchingApproved && !isLoadingApproved && (
+            <p className="text-xs text-slate-500">Đang cập nhật...</p>
+          )}
           <div className="flex items-center justify-end gap-2">
             <button
               type="button"
-              onClick={() => setApprovePage((p) => Math.max(1, p - 1))}
-              disabled={approvePage <= 1}
+              onClick={() => setApprovedPage((p) => Math.max(1, p - 1))}
+              disabled={approvedPage <= 1}
               className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
               Trước
             </button>
-            <span className="text-sm text-slate-600">Trang {approvePage}</span>
+            <span className="text-sm text-slate-600">Trang {approvedPage}</span>
             <button
               type="button"
-              onClick={() => setApprovePage((p) => p + 1)}
-              disabled={!hasNextApprovePage}
+              onClick={() => setApprovedPage((p) => p + 1)}
+              disabled={!hasNextApprovedPage}
               className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
             >
               Sau
@@ -616,12 +754,18 @@ export default function WarehouseExportsPage() {
 
             {receiptNorm === "ReadyToExport" && (
               <div className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-900">
-                Đã xác nhận lấy hàng. {canApproveExport ? "Bạn có thể bấm Duyệt xuất bên dưới." : "Chờ Admin/Manager duyệt xuất."}
+                Đã xác nhận lấy hàng. Chờ Admin/Manager duyệt xuất kho.
               </div>
             )}
             {receiptNorm === "PendingPick" && (
               <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                 Bước kho: bấm &quot;Kho xác nhận lấy hàng&quot; để chuyển sang Sẵn sàng xuất.
+              </div>
+            )}
+            {receiptNorm === "Approved" && (
+              <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                Phiếu đã duyệt xuất. Bạn có thể <span className="font-semibold">In phiếu xuất</span> bên dưới; tra cứu lại trong tab{" "}
+                <span className="font-semibold">Đã duyệt xuất (in phiếu)</span>.
               </div>
             )}
 
@@ -699,12 +843,19 @@ export default function WarehouseExportsPage() {
               >
                 {isCancelling ? "Đang hủy..." : "Hủy phiếu xuất"}
               </button>
+
+              <button
+                type="button"
+                onClick={onPrint}
+                disabled={!receipt || receiptNorm === "Cancelled"}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              >
+                In phiếu xuất
+              </button>
             </div>
-            {!canApproveExport && (
-              <p className="mt-2 text-xs text-amber-700">
-                Tài khoản kho chỉ tạo phiếu và xác nhận lấy hàng. Duyệt xuất do Admin/Manager.
-              </p>
-            )}
+            <p className="mt-2 text-xs text-amber-700">
+              Tài khoản kho chỉ tạo phiếu và xác nhận lấy hàng. Duyệt xuất do Admin/Manager.
+            </p>
           </div>
         </div>
       )}

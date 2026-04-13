@@ -110,13 +110,11 @@ export default function CreatePurchaseOrder() {
         })),
       }).unwrap();
 
-      const successMessage =
-        (res as { message?: string })?.message ?? "Tạo đơn mua thành công.";
+      const successMessage = res.message ?? "Tạo đơn mua thành công.";
       toast.success(successMessage);
 
-      // Sau khi tạo thành công, quay về danh sách đơn mua
       setTimeout(() => {
-        navigate(backLink);
+        navigate(detailLink(res.purchaseOrderId));
       }, 600);
     } catch (err: unknown) {
       const msg =

@@ -9,10 +9,8 @@ import {
 } from "../../../shared/lib/paymentStatus";
 import {
     useCancelOrderMutation,
-    useCancelShortageMutation,
-    useConfirmOrderMutation,
     useGetMyOrderByIdQuery,
-    useWaitBackorderMutation,
+    useSetOnlineOrderPaymentTimingMutation,
 } from "../api/order.api";
 import {
     useCancelPaymentMutation,
@@ -36,7 +34,7 @@ function orderStatusLabel(status: string) {
     if (status === "PartiallyAllocated") return "Giữ hàng một phần";
     if (status === "BackorderWaiting") return "Chờ backorder";
     if (status === "Confirmed") return "Đã xác nhận";
-    if (status === "Shipping") return "Đang giao";
+    if (status === "ApprovedExport") return "Đã duyệt xuất";
     if (status === "Delivered") return "Đã giao hàng";
     if (status === "FailedDelivery") return "Giao thất bại";
     if (status === "Returned") return "Hoàn hàng";
@@ -56,7 +54,7 @@ function orderStatusTone(status: string) {
     if (status === "PartiallyAllocated") return "bg-amber-100 text-amber-700 border-amber-200";
     if (status === "BackorderWaiting") return "bg-violet-100 text-violet-700 border-violet-200";
     if (status === "Confirmed") return "bg-teal-100 text-teal-700 border-teal-200";
-    if (status === "Shipping") return "bg-cyan-100 text-cyan-700 border-cyan-200";
+    if (status === "ApprovedExport") return "bg-cyan-100 text-cyan-700 border-cyan-200";
     if (status === "Delivered") return "bg-green-100 text-green-700 border-green-200";
     if (status === "FailedDelivery") return "bg-orange-100 text-orange-700 border-orange-200";
     if (status === "Returned") return "bg-slate-200 text-slate-700 border-slate-300";
@@ -220,20 +218,13 @@ export default function MyOrderDetailPage() {
     const { data: latestPayment, refetch: refetchPayment } = useGetLatestPaymentByOrderQuery(orderId, { skip: !valid });
     const [createPayment, { isLoading: isCreating }] = useCreatePaymentMutation();
     const [cancelPayment, { isLoading: isCancelling }] = useCancelPaymentMutation();
-    const [confirmOrder, { isLoading: isConfirmingOrder }] = useConfirmOrderMutation();
-    const [waitBackorder, { isLoading: isWaitingBackorder }] = useWaitBackorderMutation();
-    const [cancelShortage, { isLoading: isCancellingShortage }] = useCancelShortageMutation();
+    const [setOnlineOrderPaymentTiming, { isLoading: isSettingPaymentTiming }] = useSetOnlineOrderPaymentTimingMutation();
     const [cancelOrder, { isLoading: isCancellingOrder }] = useCancelOrderMutation();
 
     const [paymentMethod, setPaymentMethod] = useState<number>(paymentMethodEnum.COD);
     const [msg, setMsg] = useState<string>("");
 
     const total = useMemo(() => order?.totalAmount ?? 0, [order?.totalAmount]);
-    const fulfilledQty = useMemo(
-        () => (order?.items ?? []).reduce((sum, item) => sum + Number(item.fulfilledQuantity ?? 0), 0),
-        [order?.items],
-    );
-    const hasAnyFulfilled = fulfilledQty > 0;
     const latestPaymentStatus = latestPayment?.paymentStatus;
     const isLatestPaymentPaid = isPaymentSettled(latestPaymentStatus);
     const isLatestPaymentActive = isPaymentActive(latestPaymentStatus);
@@ -252,7 +243,8 @@ export default function MyOrderDetailPage() {
         if (!valid || !order) return;
         const shouldPoll =
             order.status === "Confirmed" ||
-            order.status === "Shipping" ||
+            order.status === "ApprovedExport" ||
+            order.shippingStatus === "ShippingInProgress" ||
             isPaymentActive(latestPaymentStatus);
         if (!shouldPoll) return;
 
@@ -274,7 +266,7 @@ export default function MyOrderDetailPage() {
             await refetchPayment();
             await refetch();
         } catch (err) {
-            setMsg(getApiErrorMessage(err, "Không tạo được thanh toán. Đơn cần đúng trạng thái Confirmed và chỉ hỗ trợ COD/chuyển khoản."));
+            setMsg(getApiErrorMessage(err, "Không tạo được thanh toán. Đơn cần đúng trạng thái Confirmed và chỉ hỗ trợ tiền mặt/chuyển khoản."));
         }
     };
 
@@ -291,42 +283,22 @@ export default function MyOrderDetailPage() {
         }
     };
 
-    const onConfirmOrder = async () => {
+    const onChoosePaymentTiming = async (paymentTiming: 0 | 1) => {
         if (!valid) return;
         setMsg("");
         try {
-            await confirmOrder(orderId).unwrap();
-            setMsg("Đã xác nhận đơn để giữ hàng.");
-            await refetch();
-        } catch {
-            setMsg("Không thể xác nhận giữ hàng lúc này.");
-        }
-    };
-
-    const onWaitBackorder = async () => {
-        if (!valid) return;
-        setMsg("");
-        try {
-            await waitBackorder(orderId).unwrap();
-            setMsg("Đã chọn chờ backorder.");
-            await refetch();
-        } catch {
-            setMsg("Không thể chuyển sang chờ backorder.");
-        }
-    };
-
-    const onCancelShortage = async () => {
-        if (!valid) return;
-        setMsg("");
-        try {
-            await cancelShortage(orderId).unwrap();
-            setMsg("Đã hủy phần thiếu của đơn.");
+            await setOnlineOrderPaymentTiming({ id: orderId, paymentTiming }).unwrap();
+            setMsg(
+                paymentTiming === 0
+                    ? "Đã chọn trả trước (PayBefore)."
+                    : "Đã chọn trả sau (PayAfter).",
+            );
             await refetch();
         } catch (err) {
             setMsg(
                 getApiErrorMessage(
                     err,
-                    "Không thể hủy phần thiếu lúc này.",
+                    "Không thể cập nhật hình thức thanh toán lúc này.",
                 ),
             );
         }
@@ -359,26 +331,40 @@ export default function MyOrderDetailPage() {
             ) : (
                 <div className="mt-4 grid lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-2 space-y-4">
-                        <div className="rounded-xl border border-slate-200 bg-white p-4">
-                            <h1 className="text-xl font-bold text-slate-900">Đơn #{order.orderId}</h1>
-                            <div className="mt-2 text-sm text-slate-700 flex flex-wrap gap-4">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span className="text-slate-600">Delivery:</span>
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div>
+                                    <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Chi tiết đơn hàng</p>
+                                    <h1 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">Đơn #{order.orderId}</h1>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
                                     <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${orderStatusTone(order.status)}`}>
                                         {orderStatusLabel(order.status)}
                                     </span>
-                                    <span className="text-slate-600">Payment:</span>
                                     <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${paymentStatusTone(order.latestPaymentStatus)}`}>
                                         {paymentStatusLabel(order.latestPaymentStatus)}
                                     </span>
                                 </div>
-                                <p>Hình thức mua: <span className="font-semibold">{sourceLabel(order.source)}</span></p>
-                                <p>Hình thức nhận hàng: <span className="font-semibold">{fulfillmentTypeLabel(order.fulfillmentType)}</span></p>
-                                <p className="flex flex-wrap gap-x-4 gap-y-1">
-                                    <span>Ngày tạo: <span className="font-semibold">{formatVietnamDate(order.createdAt)}</span></span>
-                                    <span>Giờ: <span className="font-semibold tabular-nums">{formatVietnamTime(order.createdAt)}</span></span>
-                                </p>
                             </div>
+
+                            <dl className="mt-4 grid grid-cols-1 gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 text-sm sm:grid-cols-2">
+                                <div>
+                                    <dt className="text-slate-500">Hình thức mua</dt>
+                                    <dd className="font-semibold text-slate-900">{sourceLabel(order.source)}</dd>
+                                </div>
+                                <div>
+                                    <dt className="text-slate-500">Hình thức nhận hàng</dt>
+                                    <dd className="font-semibold text-slate-900">{fulfillmentTypeLabel(order.fulfillmentType)}</dd>
+                                </div>
+                                <div>
+                                    <dt className="text-slate-500">Ngày tạo</dt>
+                                    <dd className="font-semibold text-slate-900">{formatVietnamDate(order.createdAt)}</dd>
+                                </div>
+                                <div>
+                                    <dt className="text-slate-500">Giờ tạo</dt>
+                                    <dd className="font-semibold tabular-nums text-slate-900">{formatVietnamTime(order.createdAt)}</dd>
+                                </div>
+                            </dl>
                         </div>
                         {order.recipient &&
                             (order.recipient.fullName ||
@@ -405,21 +391,49 @@ export default function MyOrderDetailPage() {
                                 </div>
                             )}
                         {order.items.map((i, idx) => (
-                            <div key={`${i.productVariantId}-${idx}`} className="rounded-xl border border-slate-200 bg-white p-4">
-                                <p className="font-semibold text-slate-900">{i.productName}</p>
-                                <p className="text-sm text-slate-600 mt-1">
-                                    {i.isPartial ? "Hộp lẻ" : "Hộp đầy"} - {i.boxWeight}kg · {i.grade}
-                                </p>
-                                <p className="text-sm mt-2">SL: <span className="font-semibold">{i.quantity}</span> · Đơn giá: <span className="font-semibold">{vnd(i.unitPrice)} ₫</span></p>
+                            <article
+                                key={`${i.productVariantId}-${idx}`}
+                                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300 hover:shadow-md"
+                            >
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <p className="truncate text-base font-bold text-slate-900">{i.productName}</p>
+                                        <p className="mt-1 text-xs text-slate-500">Mã biến thể: #{i.productVariantId}</p>
+                                    </div>
+                                    <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                        {i.grade}
+                                    </span>
+                                </div>
+
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-xs font-semibold text-sky-700">
+                                        {i.isPartial ? "Hộp lẻ" : "Hộp đầy"}
+                                    </span>
+                                    <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                        {i.boxWeight} kg
+                                    </span>
+                                </div>
+
+                                <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+                                    <div>
+                                        <p className="text-xs text-slate-500">Số lượng</p>
+                                        <p className="text-sm font-semibold text-slate-900">{i.quantity}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-slate-500">Đơn giá</p>
+                                        <p className="text-sm font-semibold text-slate-900">{vnd(i.unitPrice)} ₫</p>
+                                    </div>
+                                </div>
+
                                 <ReviewAction orderDetailId={i.orderDetailId} orderStatus={order.status} />
-                            </div>
+                            </article>
                         ))}
                     </div>
 
                     <div className="rounded-xl border border-slate-200 bg-white p-4 h-fit">
                         <h2 className="text-lg font-bold text-slate-900">Thanh toán & xử lý đơn</h2>
                         <p className="mt-1 text-sm text-slate-600">Thành tiền (VNĐ): <span className="font-semibold">{vnd(total)} ₫</span></p>
-                        {(order.status === "Shipping" || order.status === "Delivered" || order.status === "Completed") && (
+                        {(order.status === "ApprovedExport" || order.status === "Delivered" || order.status === "Completed") && (
                             <Link
                                 to={`${ROUTES.CUSTOMER_COMPLAINTS}?orderId=${order.orderId}`}
                                 className="mt-2 inline-flex text-sm font-semibold text-indigo-700 hover:text-indigo-800"
@@ -433,60 +447,35 @@ export default function MyOrderDetailPage() {
                             </div>
                         )}
                         <div className="mt-3 space-y-3">
-                            {isDelivery && order.status === "AwaitingAllocation" && (
-                                <button
-                                    type="button"
-                                    onClick={onConfirmOrder}
-                                    disabled={isConfirmingOrder}
-                                    className="w-full rounded-lg border border-indigo-300 px-3 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-60"
-                                >
-                                    {isConfirmingOrder ? "Đang xác nhận..." : "Xác nhận đơn để giữ hàng"}
-                                </button>
-                            )}
-                            {isDelivery && order.status === "PartiallyAllocated" && (
-                                <>
-                                    <div className="rounded-lg border border-sky-200 bg-sky-50 p-3">
-                                        <p className="text-sm font-semibold text-sky-800">Chờ hàng về (Backorder)</p>
-                                        <p className="mt-1 text-xs text-sky-700">Phần thiếu sẽ được giao sau khi kho có hàng.</p>
+                            {order.source === "Online" &&
+                                order.status === "Confirmed" &&
+                                !order.paymentTiming && (
+                                <div className="rounded-lg border border-sky-200 bg-sky-50 p-3">
+                                    <p className="text-sm font-semibold text-sky-800">Chọn hình thức thanh toán</p>
+                                    <p className="mt-1 text-xs text-sky-700">
+                                        Đơn online sau khi sale xác nhận cần chọn trả trước hoặc trả sau.
+                                    </p>
+                                    <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                                         <button
                                             type="button"
-                                            onClick={onWaitBackorder}
-                                            disabled={isWaitingBackorder}
-                                            className="mt-2 w-full rounded-lg border border-sky-300 px-3 py-2 text-sm font-semibold text-sky-800 hover:bg-sky-100 disabled:opacity-60"
+                                            onClick={() => onChoosePaymentTiming(0)}
+                                            disabled={isSettingPaymentTiming}
+                                            className="rounded-lg border border-sky-300 px-3 py-2 text-sm font-semibold text-sky-800 hover:bg-sky-100 disabled:opacity-60"
                                         >
-                                            {isWaitingBackorder ? "Đang xử lý..." : "Chờ backorder"}
+                                            Chọn trả trước
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => onChoosePaymentTiming(1)}
+                                            disabled={isSettingPaymentTiming}
+                                            className="rounded-lg border border-indigo-300 px-3 py-2 text-sm font-semibold text-indigo-800 hover:bg-indigo-100 disabled:opacity-60"
+                                        >
+                                            Chọn trả sau
                                         </button>
                                     </div>
-                                    {hasAnyFulfilled ? (
-                                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                                            <p className="text-sm font-semibold text-amber-800">Hủy phần thiếu</p>
-                                            <p className="mt-1 text-xs text-amber-700">Chỉ nhận phần hàng đã giữ được, không chờ phần thiếu.</p>
-                                            <button
-                                                type="button"
-                                                onClick={onCancelShortage}
-                                                disabled={isCancellingShortage}
-                                                className="mt-2 w-full rounded-lg border border-amber-300 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100 disabled:opacity-60"
-                                            >
-                                                {isCancellingShortage ? "Đang xử lý..." : "Hủy phần thiếu"}
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="rounded-lg border border-rose-200 bg-rose-50 p-3">
-                                            <p className="text-sm font-semibold text-rose-800">Hủy toàn bộ đơn</p>
-                                            <p className="mt-1 text-xs text-rose-700">Đơn chưa giữ được phần hàng nào, bạn có thể hủy toàn bộ đơn.</p>
-                                            <button
-                                                type="button"
-                                                onClick={onCancelOrder}
-                                                disabled={isCancellingOrder}
-                                                className="mt-2 w-full rounded-lg border border-rose-300 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-60"
-                                            >
-                                                {isCancellingOrder ? "Đang hủy..." : "Hủy cả đơn"}
-                                            </button>
-                                        </div>
-                                    )}
-                                </>
+                                </div>
                             )}
-                            {order.status !== "Shipping" &&
+                            {order.status !== "ApprovedExport" &&
                                 order.status !== "Delivered" &&
                                 order.status !== "FailedDelivery" &&
                                 order.status !== "Returned" &&
@@ -515,7 +504,7 @@ export default function MyOrderDetailPage() {
                                 disabled={!canCreatePayment || isCreating}
                                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
                             >
-                                <option value={paymentMethodEnum.COD}>COD (0)</option>
+                                <option value={paymentMethodEnum.COD}>Tiền mặt</option>
                                 <option value={paymentMethodEnum.BANKING}>Chuyển khoản/PayOS (3)</option>
                             </select>
                         </div>
@@ -562,8 +551,8 @@ export default function MyOrderDetailPage() {
                             <p>
                                 Bước 5 - Giao hàng/hoàn thành:{" "}
                                 <span className="font-semibold">
-                                    {order.status === "Shipping"
-                                        ? "Đang giao"
+                                    {order.status === "ApprovedExport"
+                                        ? "Đã duyệt xuất / đang vận chuyển"
                                         : order.status === "Delivered"
                                           ? "Đã giao hàng"
                                           : order.status === "FailedDelivery"
@@ -577,7 +566,7 @@ export default function MyOrderDetailPage() {
                                                   : "Chưa bắt đầu"}
                                 </span>
                             </p>
-                            {(order.status === "Shipping" || order.status === "Delivered" || order.status === "Completed") && (
+                            {(order.status === "ApprovedExport" || order.status === "Delivered" || order.status === "Completed") && (
                                 <p className="text-emerald-700">
                                     Đơn đã đủ điều kiện để tạo khiếu nại theo rule backend.
                                 </p>

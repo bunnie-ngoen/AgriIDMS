@@ -6,7 +6,6 @@ import {
     allocationProposalsResponseSchema,
     orderDetailSchema,
     orderListSchema,
-    overdueBackorderListSchema,
     paidPendingExportOrderListSchema,
     saleConfirmResponseSchema,
     type AllocationProposalResult,
@@ -14,10 +13,14 @@ import {
     type AllocationProposalsResponse,
     type OrderDetail,
     type OrderListItem,
-    type OverdueBackorderItem,
     type PaidPendingExportOrderListItem,
     type SaleConfirmResponse,
 } from "../schemas/order.schema";
+
+/** Backend `ShippingStatus` (AgriIDMS) — API nhận JSON số khi chưa bật JsonStringEnumConverter. */
+export const shippingStatusApiValue = {
+    shippingInProgress: 2,
+} as const;
 
 function toCamelCase(obj: unknown): unknown {
     if (obj === null || obj === undefined) return obj;
@@ -156,12 +159,12 @@ export const orderApi = api.injectEndpoints({
             },
         }),
 
-        getPendingCustomerDecisionOrders: builder.query<
+        getConfirmedAllocationOrders: builder.query<
             OrderListItem[],
             { customerUserId?: string; source?: string; skip?: number; take?: number } | void
         >({
             query: (arg) => ({
-                url: "Orders/staff/pending-customer-decision",
+                url: "Orders/staff/allocation-completed",
                 method: "GET",
                 params: {
                     customerUserId: arg?.customerUserId,
@@ -178,12 +181,12 @@ export const orderApi = api.injectEndpoints({
             },
         }),
 
-        getConfirmedAllocationOrders: builder.query<
+        getApprovedExportOrders: builder.query<
             OrderListItem[],
             { customerUserId?: string; source?: string; skip?: number; take?: number } | void
         >({
             query: (arg) => ({
-                url: "Orders/staff/allocation-completed",
+                url: "Orders/staff/approved-export",
                 method: "GET",
                 params: {
                     customerUserId: arg?.customerUserId,
@@ -213,6 +216,35 @@ export const orderApi = api.injectEndpoints({
             },
         }),
 
+        saleRejectOrder: builder.mutation<
+            { message?: string; orderId?: number; status?: string },
+            number
+        >({
+            query: (id) => ({
+                url: `Orders/${id}/sale-reject`,
+                method: "PATCH",
+            }),
+            transformResponse: (raw: unknown) =>
+                (toCamelCase(raw) as { message?: string; orderId?: number; status?: string }),
+        }),
+
+        setOnlineOrderPaymentTiming: builder.mutation<
+            OrderDetail,
+            { id: number; paymentTiming: 0 | 1 }
+        >({
+            query: ({ id, paymentTiming }) => ({
+                url: `Orders/${id}/online/payment-timing`,
+                method: "PATCH",
+                body: { paymentTiming },
+            }),
+            transformResponse: (raw: unknown) => {
+                const normalized = toCamelCase(raw);
+                const parsed = orderDetailSchema.safeParse(normalized);
+                if (!parsed.success) throw new Error("Invalid order detail");
+                return parsed.data;
+            },
+        }),
+
         createPosOrder: builder.mutation<
             {
                 orderId: number;
@@ -220,6 +252,7 @@ export const orderApi = api.injectEndpoints({
             },
             {
                 fulfillmentType?: 0 | 1;
+                paymentTiming?: 0 | 1;
                 customerUserId?: string;
                 customerName?: string;
                 customerPhone?: string;
@@ -251,7 +284,7 @@ export const orderApi = api.injectEndpoints({
 
         confirmOrder: builder.mutation<void, number>({
             query: (id) => ({
-                url: `Orders/${id}/ConfirmOrder`,
+                url: `Orders/${id}/allocate/staff`,
                 method: "PATCH",
             }),
         }),
@@ -302,45 +335,6 @@ export const orderApi = api.injectEndpoints({
             },
         }),
 
-        waitBackorder: builder.mutation<void, number>({
-            query: (id) => ({
-                url: `Orders/${id}/backorder/wait`,
-                method: "PATCH",
-            }),
-        }),
-
-        cancelShortage: builder.mutation<void, number>({
-            query: (id) => ({
-                url: `Orders/${id}/backorder/cancel-shortage`,
-                method: "PATCH",
-            }),
-        }),
-
-        waitBackorderAsStaff: builder.mutation<void, number>({
-            query: (id) => ({
-                url: `Orders/${id}/backorder/wait/staff`,
-                method: "PATCH",
-            }),
-        }),
-
-        cancelShortageAsStaff: builder.mutation<void, number>({
-            query: (id) => ({
-                url: `Orders/${id}/backorder/cancel-shortage/staff`,
-                method: "PATCH",
-            }),
-        }),
-
-        allocateBackorderAsStaff: builder.mutation<
-            void,
-            { id: number; expiredAction: 0 | 1 }
-        >({
-            query: ({ id, expiredAction }) => ({
-                url: `Orders/${id}/backorder/allocate`,
-                method: "PATCH",
-                body: { expiredAction },
-            }),
-        }),
-
         cancelOrder: builder.mutation<void, number>({
             query: (id) => ({
                 url: `Orders/${id}/cancel`,
@@ -369,18 +363,23 @@ export const orderApi = api.injectEndpoints({
             }),
         }),
 
-        getOverdueBackorders: builder.query<OverdueBackorderItem[], void>({
-            query: () => ({
-                url: "Orders/backorder/overdue",
-                method: "GET",
+        updateShippingStatusAsStaff: builder.mutation<
+            OrderDetail,
+            { id: number; shippingStatus: number }
+        >({
+            query: ({ id, shippingStatus }) => ({
+                url: `Orders/${id}/shipping/status`,
+                method: "PATCH",
+                body: { shippingStatus },
             }),
             transformResponse: (raw: unknown) => {
                 const normalized = toCamelCase(raw);
-                const parsed = overdueBackorderListSchema.safeParse(normalized);
-                if (!parsed.success) return [];
+                const parsed = orderDetailSchema.safeParse(normalized);
+                if (!parsed.success) throw new Error("Invalid order detail");
                 return parsed.data;
             },
         }),
+
     }),
 });
 
@@ -391,24 +390,21 @@ export const {
     useGetPendingAllocationOrdersQuery,
     useGetPaidPendingExportOrdersQuery,
     useGetPendingWarehouseConfirmOrdersQuery,
-    useGetPendingCustomerDecisionOrdersQuery,
     useGetConfirmedAllocationOrdersQuery,
+    useGetApprovedExportOrdersQuery,
     useCreatePosOrderMutation,
     useSaleConfirmOrderMutation,
+    useSaleRejectOrderMutation,
+    useSetOnlineOrderPaymentTimingMutation,
     useConfirmOrderMutation,
     useAllocateAsStaffMutation,
     useAutoProposeAllocationAsStaffMutation,
     useGetAllocationProposalsByOrderIdQuery,
     useConfirmAllocationAsStaffMutation,
-    useWaitBackorderMutation,
-    useCancelShortageMutation,
-    useWaitBackorderAsStaffMutation,
-    useCancelShortageAsStaffMutation,
-    useAllocateBackorderAsStaffMutation,
     useCancelOrderMutation,
     useConfirmDeliveredAsStaffMutation,
     useConfirmFailedDeliveryAsStaffMutation,
     useConfirmReturnedAsStaffMutation,
-    useGetOverdueBackordersQuery,
+    useUpdateShippingStatusAsStaffMutation,
 } = orderApi;
 
