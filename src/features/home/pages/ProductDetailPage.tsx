@@ -226,6 +226,27 @@ export default function ProductDetailPage() {
                         <p className="text-[#c0392b] text-2xl font-bold">
                             {product.price.toLocaleString("vi-VN")} ₫/kg
                         </p>
+                        {product.hasNearExpiryStock && product.nearExpiryPriceTiers.length > 0 ? (
+                            <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm space-y-1.5">
+                                <p className="font-semibold text-amber-700">Giá theo lô gần hết hạn</p>
+                                {product.nearExpiryPriceTiers.map((tier) => (
+                                    <div key={tier.maxDaysLeft} className="flex flex-wrap items-center gap-2">
+                                        <span className="rounded-full bg-amber-100 px-2 py-0.5 font-bold text-amber-800">
+                                            ≤ {tier.maxDaysLeft} ngày
+                                        </span>
+                                        <span className="font-semibold text-amber-800">
+                                            giảm {tier.discountPercent.toLocaleString("vi-VN")}%
+                                        </span>
+                                        <span className="font-bold text-amber-900">
+                                            {tier.pricePerKg.toLocaleString("vi-VN")} ₫/kg
+                                        </span>
+                                        <span className="text-xs text-amber-700">
+                                            ({tier.boxCount} hộp)
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : null}
                         <p className="mt-2 text-slate-600">
                             Hạn sử dụng: {product.shelfLifeDays} ngày
                         </p>

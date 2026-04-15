@@ -4,7 +4,7 @@ import {
   useGetGoodsReceiptByIdQuery,
   useGetGoodsReceiptForApprovalByIdQuery,
 } from "../api/goods-receipt.api";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, FileDown, Package } from "lucide-react";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 function toVietnameseReceiptStatus(status: string): string {
@@ -34,12 +34,14 @@ export default function GoodsReceiptDetail() {
   const receiptId = id ? Number(id) : 0;
 
   const { isAdmin, isManager, isWarehouseStaff } = useRoleGuard();
+  const canReviewApprovalStage = isAdmin() || isManager();
   const basePath = isWarehouseStaff()
     ? "/warehouse/goods-receipts"
     : isManager()
       ? "/manager/goods-receipts"
       : "/admin/goods-receipts";
   const canViewPrice = isAdmin() || isManager();
+  const printPath = `${basePath}/print?receiptId=${receiptId}&preview=true`;
 
   const {
     data: receipt,
@@ -89,6 +91,45 @@ export default function GoodsReceiptDetail() {
     if (status === "Rejected") return "text-red-600";
     return "text-slate-600";
   };
+  const canOpenQcScreen = isWarehouseStaff() && receipt.status === "Received";
+
+  const managerQcNav = (() => {
+    if (!canReviewApprovalStage) return null;
+    const s = receipt.status;
+    if (s === "Approved") return null;
+    if (s === "Draft") {
+      return {
+        label: "Duyệt bước 1 · mở màn QC",
+        disabled: false,
+        title:
+          "Duyệt phiếu để chuyển sang Đã nhận và cho phép nhân viên kho kiểm tra chất lượng.",
+      } as const;
+    }
+    if (s === "Received") {
+      return {
+        label: "Mở màn QC (theo dõi / chờ kiểm tra)",
+        disabled: false,
+        title:
+          "Bước 1 đã duyệt. Nhân viên kho thực hiện kiểm tra chất lượng tại đây; sau khi QC xong bạn quay lại để duyệt bước 2.",
+      } as const;
+    }
+    if (
+      s === "QCCompleted" ||
+      s === "PendingManagerApproval" ||
+      s === "PendingManagerApprovalQc"
+    ) {
+      return {
+        label: "Duyệt bước 2 · mở màn QC",
+        disabled: false,
+        title: "Hoàn tất duyệt nhập kho sau khi đã kiểm tra chất lượng.",
+      } as const;
+    }
+    return {
+      label: "Mở màn kiểm tra chất lượng & duyệt",
+      disabled: false,
+      title: undefined,
+    } as const;
+  })();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-5 py-6">
@@ -115,13 +156,54 @@ export default function GoodsReceiptDetail() {
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate(`${basePath}/${receipt.id}/qc`)}
-            className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
-          >
-            Mở màn kiểm tra chất lượng
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => window.open(printPath, "_blank", "noopener,noreferrer")}
+              className="inline-flex items-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+            >
+              <FileDown size={14} />
+              Xuất PDF phiếu nhập
+            </button>
+            {isWarehouseStaff() && receipt.status === "Approved" && (
+              <button
+                type="button"
+                onClick={() => navigate(`${basePath}/${receipt.id}/qc`)}
+                title="Chia tạo thùng theo lô, loại thùng và kích cỡ — cùng màn kiểm tra chất lượng."
+                className="inline-flex items-center gap-2 rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+              >
+                <Package size={14} />
+                Mở màn tạo thùng
+              </button>
+            )}
+            {managerQcNav && (
+              <button
+                type="button"
+                onClick={() =>
+                  !managerQcNav.disabled &&
+                  navigate(`${basePath}/${receipt.id}/qc`)
+                }
+                disabled={managerQcNav.disabled}
+                title={managerQcNav.title}
+                className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:cursor-default disabled:opacity-60"
+              >
+                {managerQcNav.label}
+              </button>
+            )}
+            {isWarehouseStaff() && receipt.status !== "Approved" && (
+              <button
+                type="button"
+                onClick={() => navigate(`${basePath}/${receipt.id}/qc`)}
+                disabled={!canOpenQcScreen}
+                title={!canOpenQcScreen ? "Phiếu cần được duyệt bước 1 trước khi kiểm tra chất lượng." : undefined}
+                className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {canOpenQcScreen
+                  ? "Mở màn kiểm tra chất lượng"
+                  : "Chờ duyệt bước 1 để kiểm tra chất lượng"}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Summary card */}

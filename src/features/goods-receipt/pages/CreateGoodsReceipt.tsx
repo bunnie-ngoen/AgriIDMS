@@ -10,6 +10,7 @@ import { useGetPurchaseOrdersQuery } from "../../purchase-order/api/purchase-ord
 import { useGetPurchaseOrderByIdQuery } from "../../purchase-order/api/purchase-order.api";
 import { useCreateGoodsReceiptMutation } from "../api/goods-receipt.api";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
+import { useGetProductVariantsQuery } from "../../product/api/product-variant.api";
 
 const Schema = z
   .object({
@@ -37,7 +38,8 @@ type FormValues = z.infer<typeof Schema>;
 
 export default function CreateGoodsReceipt() {
   const navigate = useNavigate();
-  const { isManager, isWarehouseStaff } = useRoleGuard();
+  const { isAdmin, isManager, isWarehouseStaff } = useRoleGuard();
+  const isPrivilegedCreator = isAdmin() || isManager();
   const basePath = isWarehouseStaff()
     ? "/warehouse/goods-receipts"
     : isManager()
@@ -51,6 +53,7 @@ export default function CreateGoodsReceipt() {
   } = useGetWarehousesQuery();
   const { data: purchaseOrders = [] } = useGetPurchaseOrdersQuery();
   const [createReceipt, { isLoading }] = useCreateGoodsReceiptMutation();
+  const { data: productVariants = [] } = useGetProductVariantsQuery();
   const [serverMessage, setServerMessage] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
@@ -107,6 +110,8 @@ export default function CreateGoodsReceipt() {
     () => warehouses.find((w) => w.id === watchedWarehouseId),
     [warehouses, watchedWarehouseId],
   );
+  const MAX_WAREHOUSE_UTILIZATION = 0.8;
+  const OPERATIONAL_BUFFER_RATIO = 0.8;
 
   const occupiedWeightOfWarehouse = useMemo(() => {
     if (!selectedWarehouse) return 0;
@@ -114,7 +119,8 @@ export default function CreateGoodsReceipt() {
       Number(selectedWarehouse.unassignedStockWeight ?? 0);
   }, [selectedWarehouse]);
 
-  const totalCapacityOfWarehouse = Number(selectedWarehouse?.totalCapacity ?? 0);
+  const totalCapacityOfWarehouse =
+    Number(selectedWarehouse?.totalCapacity ?? 0) * MAX_WAREHOUSE_UTILIZATION;
   const remainingCapacityOfWarehouse = Math.max(
     0,
     totalCapacityOfWarehouse - occupiedWeightOfWarehouse,
@@ -122,14 +128,38 @@ export default function CreateGoodsReceipt() {
 
   const EPS = 0.0001;
 
-  const totalIncomingWeight = useMemo(
-    () => detailLines.reduce((sum, line) => sum + Number(line.receivedWeight ?? 0), 0),
-    [detailLines],
+  const densityByVariantId = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const v of productVariants) {
+      map.set(v.id, Number(v.densityKgPerM3 ?? 0));
+    }
+    return map;
+  }, [productVariants]);
+
+  const missingDensityLines = useMemo(
+    () =>
+      detailLines.filter(
+        (line) => Number(densityByVariantId.get(line.productVariantId) ?? 0) <= 0,
+      ),
+    [detailLines, densityByVariantId],
+  );
+
+  const totalIncomingVolumeRaw = useMemo(() => {
+    return detailLines.reduce((sum, line) => {
+      const density = Number(densityByVariantId.get(line.productVariantId) ?? 0);
+      if (density <= 0) return sum;
+      return sum + Number(line.receivedWeight ?? 0) / density;
+    }, 0);
+  }, [detailLines, densityByVariantId]);
+  const totalIncomingVolume = useMemo(
+    () => (totalIncomingVolumeRaw > 0 ? totalIncomingVolumeRaw / OPERATIONAL_BUFFER_RATIO : 0),
+    [totalIncomingVolumeRaw],
   );
 
   const isOverCapacity =
     !!selectedWarehouse &&
-    totalIncomingWeight > remainingCapacityOfWarehouse + EPS;
+    missingDensityLines.length === 0 &&
+    totalIncomingVolume > remainingCapacityOfWarehouse + EPS;
 
   const onSubmit = async (values: FormValues) => {
     setServerMessage(null);
@@ -147,13 +177,16 @@ export default function CreateGoodsReceipt() {
           Number(warehouse.unassignedStockWeight ?? 0);
         const capacity = Number(warehouse.totalCapacity ?? 0);
         const remaining = Math.max(0, capacity - occupied);
-        const incoming = detailLines.reduce(
-          (sum, line) => sum + Number(line.receivedWeight ?? 0),
-          0,
-        );
+        if (missingDensityLines.length > 0) {
+          const msg = `Thiếu khối lượng riêng cho ${missingDensityLines.length} dòng sản phẩm. Vui lòng cấu hình khối lượng riêng trước khi chọn kho theo sức chứa m³.`;
+          form.setError("warehouseId", { type: "manual", message: msg });
+          toast.error(msg);
+          return;
+        }
+        const incoming = totalIncomingVolume;
 
         if (incoming > remaining + EPS) {
-          const msg = `Vượt sức chứa: cần ${incoming.toLocaleString("vi-VN")} kg, kho còn trống ${remaining.toLocaleString("vi-VN")} kg.`;
+          const msg = `Vượt sức chứa: cần khoảng ${incoming.toLocaleString("vi-VN")} m³, kho còn trống ${remaining.toLocaleString("vi-VN")} m³.`;
           form.setError("warehouseId", { type: "manual", message: msg });
           toast.error(msg);
           return;
@@ -229,20 +262,33 @@ export default function CreateGoodsReceipt() {
       return;
     }
 
-    const existing = detailLines.find((x) => x.purchaseOrderDetailId === matched.id);
-    const currentIncoming = detailLines.reduce(
-      (sum, line) => sum + Number(line.receivedWeight ?? 0),
-      0,
-    );
-    const nextIncoming =
-      currentIncoming - Number(existing?.receivedWeight ?? 0) + receivedWeight;
+    const densityOfSelected = Number(densityByVariantId.get(matched.productVariantId) ?? 0);
+    if (densityOfSelected <= 0) {
+      toast.error("Biến thể này chưa có khối lượng riêng (kg/m³), chưa thể kiểm tra sức chứa kho theo thể tích.");
+      return;
+    }
+    const nextLines = detailLines
+      .filter((line) => line.purchaseOrderDetailId !== matched.id)
+      .concat({
+        purchaseOrderDetailId: matched.id,
+        productVariantId: matched.productVariantId,
+        productName: matched.productName,
+        orderedWeight: matched.orderedWeight,
+        remainingWeight: matched.remainingWeight,
+        receivedWeight,
+      });
+    const nextIncomingVolume = nextLines.reduce((sum, line) => {
+      const density = Number(densityByVariantId.get(line.productVariantId) ?? 0);
+      if (density <= 0) return sum;
+      return sum + Number(line.receivedWeight ?? 0) / density;
+    }, 0);
 
     if (
       selectedWarehouse &&
-      nextIncoming > remainingCapacityOfWarehouse + 0.0001
+      nextIncomingVolume > remainingCapacityOfWarehouse + 0.0001
     ) {
       toast.error(
-        `Tổng KL nhận (${nextIncoming.toLocaleString("vi-VN")} kg) vượt sức chứa còn trống của kho (${remainingCapacityOfWarehouse.toLocaleString("vi-VN")} kg).`,
+        `Tổng thể tích ước tính (${nextIncomingVolume.toLocaleString("vi-VN")} m³) vượt sức chứa còn trống của kho (${remainingCapacityOfWarehouse.toLocaleString("vi-VN")} m³).`,
       );
       return;
     }
@@ -303,6 +349,23 @@ export default function CreateGoodsReceipt() {
             </h1>
             <p className="text-xs text-slate-400 mt-0.5">
               Nhập thông tin xe, nhà cung cấp, kho và đơn mua liên quan.
+            </p>
+            <p className="text-xs text-slate-600 mt-2 max-w-xl leading-relaxed">
+              {isPrivilegedCreator ? (
+                <>
+                  <span className="font-medium text-slate-800">Admin / Quản lý:</span>{" "}
+                  phiếu tạo xong sẽ bỏ qua duyệt bước 1 (sang trạng thái Đã nhận để
+                  kiểm tra chất lượng), nhưng vẫn phải QC và duyệt nhập kho (bước 2)
+                  như phiếu do kho tạo.
+                </>
+              ) : (
+                <>
+                  <span className="font-medium text-slate-800">Nhân viên kho:</span>{" "}
+                  phiếu mới ở trạng thái Nháp; cần Admin/Quản lý duyệt bước 1 trước
+                  khi kiểm tra chất lượng. Sau khi QC xong vẫn cần duyệt bước 2 để
+                  nhập kho.
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -592,17 +655,22 @@ export default function CreateGoodsReceipt() {
                     <div className="mt-2 space-y-1">
                       <p className="text-[11px] text-slate-500">
                         Đang chứa: {occupiedWeightOfWarehouse.toLocaleString("vi-VN")} /{" "}
-                        {totalCapacityOfWarehouse.toLocaleString("vi-VN")} kg
+                        {totalCapacityOfWarehouse.toLocaleString("vi-VN")} m³ (80%)
                       </p>
                       <p className="text-[11px] text-slate-500">
-                        Còn trống: {remainingCapacityOfWarehouse.toLocaleString("vi-VN")} kg ·
-                        Phiếu này: {totalIncomingWeight.toLocaleString("vi-VN")} kg
+                        Còn trống: {remainingCapacityOfWarehouse.toLocaleString("vi-VN")} m³ ·
+                        Phiếu này (ước tính vận hành): {totalIncomingVolume.toLocaleString("vi-VN")} m³
                       </p>
+                      {missingDensityLines.length > 0 && (
+                        <p className="text-[11px] text-amber-600 font-medium">
+                          Có {missingDensityLines.length} dòng chưa có khối lượng riêng, chưa thể quy đổi đầy đủ sang m³.
+                        </p>
+                      )}
                       {isOverCapacity && (
                         <p className="text-[11px] text-red-500 font-medium">
                           Vượt sức chứa: cần{" "}
-                          {totalIncomingWeight.toLocaleString("vi-VN")} kg, kho còn trống{" "}
-                          {remainingCapacityOfWarehouse.toLocaleString("vi-VN")} kg.
+                          {totalIncomingVolume.toLocaleString("vi-VN")} m³, kho còn trống{" "}
+                          {remainingCapacityOfWarehouse.toLocaleString("vi-VN")} m³.
                         </p>
                       )}
                     </div>
@@ -683,7 +751,7 @@ export default function CreateGoodsReceipt() {
             </button>
             <button
               type="submit"
-              disabled={isLoading || detailLines.length === 0 || isOverCapacity}
+              disabled={isLoading || detailLines.length === 0 || isOverCapacity || missingDensityLines.length > 0}
               className="flex-[2] rounded-2xl py-3.5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 disabled:opacity-50 flex items-center justify-center gap-2.5 transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:translate-y-0"
             >
               {isLoading ? (

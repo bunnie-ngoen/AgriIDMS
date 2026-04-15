@@ -22,6 +22,10 @@ import type { ZoneItem, RackItem, SlotItem } from "../types/warehouse.type";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 const MIN_NAME_LENGTH = 3;
+const toPositiveNumber = (value: string): number => {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+};
 
 type FormMode = "idle" | "create" | "edit";
 
@@ -33,6 +37,13 @@ const WarehouseConfig = () => {
 
   const { data: warehouses } = useGetWarehousesQuery();
   const warehouse = warehouses?.find((w) => w.id === warehouseId);
+  const warehouseOccupiedVolume = useMemo(
+    () =>
+      Number(warehouse?.storedInSlotsWeight ?? 0) +
+      Number(warehouse?.unassignedStockWeight ?? 0),
+    [warehouse?.storedInSlotsWeight, warehouse?.unassignedStockWeight],
+  );
+  const isWarehouseLockedForConfig = warehouseOccupiedVolume > 0;
 
   const { data: zones } = useGetZonesQuery(warehouseId, {
     skip: Number.isNaN(warehouseId),
@@ -70,40 +81,92 @@ const WarehouseConfig = () => {
 
   // UI state for pretty forms
   const [zoneFormMode, setZoneFormMode] = useState<FormMode>("idle");
-  const [zoneFormName, setZoneFormName] = useState("");
+  const [zoneForm, setZoneForm] = useState<{ name: string; lengthM: string; widthM: string }>({
+    name: "",
+    lengthM: "",
+    widthM: "",
+  });
   const [editingZone, setEditingZone] = useState<ZoneItem | null>(null);
   const [zoneDeleteTarget, setZoneDeleteTarget] = useState<ZoneItem | null>(null);
 
   const [rackFormMode, setRackFormMode] = useState<FormMode>("idle");
-  const [rackFormName, setRackFormName] = useState("");
+  const [rackForm, setRackForm] = useState<{ name: string; lengthM: string; widthM: string }>({
+    name: "",
+    lengthM: "",
+    widthM: "",
+  });
   const [editingRack, setEditingRack] = useState<RackItem | null>(null);
   const [rackDeleteTarget, setRackDeleteTarget] = useState<RackItem | null>(null);
 
   const [slotFormMode, setSlotFormMode] = useState<FormMode>("idle");
-  const [slotForm, setSlotForm] = useState<{ code: string; capacity: string }>({
+  const [slotForm, setSlotForm] = useState<{
+    code: string;
+    capacity: string;
+    lengthCm: string;
+    widthCm: string;
+    heightCm: string;
+  }>({
     code: "",
     capacity: "100",
+    lengthCm: "",
+    widthCm: "",
+    heightCm: "",
   });
   const [editingSlot, setEditingSlot] = useState<SlotItem | null>(null);
   const [slotDeleteTarget, setSlotDeleteTarget] = useState<SlotItem | null>(null);
 
   const resetZoneForm = () => {
     setZoneFormMode("idle");
-    setZoneFormName("");
+    setZoneForm({ name: "", lengthM: "", widthM: "" });
     setEditingZone(null);
   };
 
   const resetRackForm = () => {
     setRackFormMode("idle");
-    setRackFormName("");
+    setRackForm({ name: "", lengthM: "", widthM: "" });
     setEditingRack(null);
   };
 
   const resetSlotForm = () => {
     setSlotFormMode("idle");
-    setSlotForm({ code: "", capacity: "100" });
+    setSlotForm({
+      code: "",
+      capacity: "100",
+      lengthCm: "",
+      widthCm: "",
+      heightCm: "",
+    });
     setEditingSlot(null);
   };
+
+  const zoneFloorAreaM2 = useMemo(
+    () => toPositiveNumber(zoneForm.lengthM) * toPositiveNumber(zoneForm.widthM),
+    [zoneForm.lengthM, zoneForm.widthM],
+  );
+  const rackFloorAreaM2 = useMemo(
+    () => toPositiveNumber(rackForm.lengthM) * toPositiveNumber(rackForm.widthM),
+    [rackForm.lengthM, rackForm.widthM],
+  );
+  const slotVolumeM3 = useMemo(
+    () =>
+      (toPositiveNumber(slotForm.lengthCm) *
+        toPositiveNumber(slotForm.widthCm) *
+        toPositiveNumber(slotForm.heightCm)) /
+      1000000,
+    [slotForm.lengthCm, slotForm.widthCm, slotForm.heightCm],
+  );
+  const slotFootprintM2 = useMemo(
+    () => (toPositiveNumber(slotForm.lengthCm) * toPositiveNumber(slotForm.widthCm)) / 10000,
+    [slotForm.lengthCm, slotForm.widthCm],
+  );
+  const selectedZone = useMemo(
+    () => zones?.find((z) => z.id === selectedZoneId) ?? null,
+    [zones, selectedZoneId],
+  );
+  const selectedRack = useMemo(
+    () => racks?.find((r) => r.id === selectedRackId) ?? null,
+    [racks, selectedRackId],
+  );
 
   /** Payload QR = `SLOT-{id}` (khớp backend). */
   const uploadSlotQrForId = async (
@@ -150,7 +213,13 @@ const WarehouseConfig = () => {
 
   const handleSubmitZone = async (e: React.FormEvent) => {
     e.preventDefault();
-    const name = zoneFormName.trim();
+    if (isWarehouseLockedForConfig) {
+      toast.error("Kho đang có sản phẩm, không thể cấu hình.");
+      return;
+    }
+    const name = zoneForm.name.trim();
+    const lengthM = toPositiveNumber(zoneForm.lengthM);
+    const widthM = toPositiveNumber(zoneForm.widthM);
     if (Number.isNaN(warehouseId)) return;
     if (!name) {
       toast.error("Vui lòng nhập tên zone.");
@@ -160,19 +229,39 @@ const WarehouseConfig = () => {
       toast.error("Tên zone tối thiểu 3 ký tự.");
       return;
     }
+    if (lengthM <= 0 || widthM <= 0) {
+      toast.error("Zone phải có chiều dài và chiều rộng lớn hơn 0.");
+      return;
+    }
+    const warehouseArea = Number(warehouse?.floorAreaM2 ?? 0);
+    if (warehouseArea > 0) {
+      const maxZonesArea = warehouseArea * 0.7;
+      const otherZonesArea = (zones ?? [])
+        .filter((z) => !(zoneFormMode === "edit" && editingZone && z.id === editingZone.id))
+        .reduce((sum, z) => sum + Number(z.floorAreaM2 ?? 0), 0);
+      if (otherZonesArea + zoneFloorAreaM2 > maxZonesArea) {
+        toast.error(
+          `Tổng diện tích các zone không được vượt quá 70% diện tích kho (${maxZonesArea.toFixed(2)} m²).`,
+        );
+        return;
+      }
+    }
 
     const toastId = toast.loading(
       zoneFormMode === "create" ? "Đang tạo zone..." : "Đang cập nhật zone..."
     );
     try {
       if (zoneFormMode === "create") {
-        await createZone({ warehouseId, name }).unwrap();
+        await createZone({ warehouseId, name, lengthM, widthM, floorAreaM2: zoneFloorAreaM2 }).unwrap();
         toast.success("Tạo zone thành công.", { id: toastId });
       } else if (zoneFormMode === "edit" && editingZone) {
         await updateZone({
           warehouseId: editingZone.warehouseId,
           id: editingZone.id,
           name,
+          lengthM,
+          widthM,
+          floorAreaM2: zoneFloorAreaM2,
         }).unwrap();
         toast.success("Cập nhật zone thành công.", { id: toastId });
       }
@@ -191,7 +280,13 @@ const WarehouseConfig = () => {
 
   const handleSubmitRack = async (e: React.FormEvent) => {
     e.preventDefault();
-    const name = rackFormName.trim();
+    if (isWarehouseLockedForConfig) {
+      toast.error("Kho đang có sản phẩm, không thể cấu hình.");
+      return;
+    }
+    const name = rackForm.name.trim();
+    const lengthM = toPositiveNumber(rackForm.lengthM);
+    const widthM = toPositiveNumber(rackForm.widthM);
     if (!selectedZoneId) return;
     if (!name) {
       toast.error("Vui lòng nhập tên rack.");
@@ -201,19 +296,39 @@ const WarehouseConfig = () => {
       toast.error("Tên rack tối thiểu 3 ký tự.");
       return;
     }
+    if (lengthM <= 0 || widthM <= 0) {
+      toast.error("Rack phải có chiều dài và chiều rộng lớn hơn 0.");
+      return;
+    }
+    const zoneArea = Number(selectedZone?.floorAreaM2 ?? 0);
+    if (zoneArea > 0) {
+      const maxRacksArea = zoneArea * 0.7;
+      const otherRacksArea = (racks ?? [])
+        .filter((r) => !(rackFormMode === "edit" && editingRack && r.id === editingRack.id))
+        .reduce((sum, r) => sum + Number(r.floorAreaM2 ?? 0), 0);
+      if (otherRacksArea + rackFloorAreaM2 > maxRacksArea) {
+        toast.error(
+          `Tổng diện tích các rack không được vượt quá 70% diện tích zone (${maxRacksArea.toFixed(2)} m²).`,
+        );
+        return;
+      }
+    }
 
     const toastId = toast.loading(
       rackFormMode === "create" ? "Đang tạo rack..." : "Đang cập nhật rack..."
     );
     try {
       if (rackFormMode === "create") {
-        await createRack({ zoneId: selectedZoneId, name }).unwrap();
+        await createRack({ zoneId: selectedZoneId, name, lengthM, widthM, floorAreaM2: rackFloorAreaM2 }).unwrap();
         toast.success("Tạo rack thành công.", { id: toastId });
       } else if (rackFormMode === "edit" && editingRack) {
         await updateRack({
           zoneId: editingRack.zoneId,
           id: editingRack.id,
           name,
+          lengthM,
+          widthM,
+          floorAreaM2: rackFloorAreaM2,
         }).unwrap();
         toast.success("Cập nhật rack thành công.", { id: toastId });
       }
@@ -232,8 +347,15 @@ const WarehouseConfig = () => {
 
   const handleSubmitSlot = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isWarehouseLockedForConfig) {
+      toast.error("Kho đang có sản phẩm, không thể cấu hình.");
+      return;
+    }
     const code = slotForm.code.trim();
     const capacity = Number(slotForm.capacity);
+    const lengthCm = toPositiveNumber(slotForm.lengthCm);
+    const widthCm = toPositiveNumber(slotForm.widthCm);
+    const heightCm = toPositiveNumber(slotForm.heightCm);
     if (!selectedRackId) return;
     if (!code) {
       toast.error("Vui lòng nhập mã slot.");
@@ -242,6 +364,28 @@ const WarehouseConfig = () => {
     if (Number.isNaN(capacity) || capacity <= 0) {
       toast.error("Sức chứa phải lớn hơn 0.");
       return;
+    }
+    if (lengthCm <= 0 || widthCm <= 0 || heightCm <= 0) {
+      toast.error("Slot phải nhập đủ dài, rộng, cao lớn hơn 0.");
+      return;
+    }
+    const rackArea = Number(selectedRack?.floorAreaM2 ?? 0);
+    if (rackArea > 0 && slotFootprintM2 > rackArea) {
+      toast.error(`Diện tích đáy slot không được lớn hơn diện tích rack (${rackArea.toFixed(2)} m²).`);
+      return;
+    }
+    if (rackArea > 0) {
+      const otherSlotsBaseArea = (slots ?? [])
+        .filter((s) => !(slotFormMode === "edit" && editingSlot && s.id === editingSlot.id))
+        .reduce((sum, s) => {
+          const l = Number(s.lengthCm ?? 0);
+          const w = Number(s.widthCm ?? 0);
+          return sum + (l > 0 && w > 0 ? (l * w) / 10000 : 0);
+        }, 0);
+      if (otherSlotsBaseArea + slotFootprintM2 > rackArea) {
+        toast.error(`Tổng diện tích đáy các slot không được vượt quá diện tích rack (${rackArea.toFixed(2)} m²).`);
+        return;
+      }
     }
 
     const toastId = toast.loading(
@@ -253,6 +397,10 @@ const WarehouseConfig = () => {
           rackId: selectedRackId,
           code,
           capacity,
+          lengthCm,
+          widthCm,
+          heightCm,
+          volumeM3: slotVolumeM3,
         }).unwrap();
         toast.success("Tạo slot thành công.", { id: toastId });
         resetSlotForm();
@@ -272,6 +420,10 @@ const WarehouseConfig = () => {
           id: editingSlot.id,
           code,
           capacity,
+          lengthCm,
+          widthCm,
+          heightCm,
+          volumeM3: slotVolumeM3,
         }).unwrap();
         toast.success("Cập nhật slot thành công.", { id: toastId });
         resetSlotForm();
@@ -331,6 +483,11 @@ const WarehouseConfig = () => {
                 {warehouse.name} — {warehouse.location}
               </p>
             )}
+            {isWarehouseLockedForConfig && (
+              <p className="text-xs text-amber-600 mt-1 font-medium">
+                Kho đang có sản phẩm ({warehouseOccupiedVolume.toFixed(4)} m³), tạm khóa cấu hình.
+              </p>
+            )}
           </div>
           <Link
             to={warehouseBasePath}
@@ -349,12 +506,13 @@ const WarehouseConfig = () => {
               </h2>
               <button
                 type="button"
+                disabled={isWarehouseLockedForConfig}
                 onClick={() => {
                   setZoneFormMode("create");
-                  setZoneFormName("");
+                  setZoneForm({ name: "", lengthM: "", widthM: "" });
                   setEditingZone(null);
                 }}
-                className="text-xs px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                className="text-xs px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 + Thêm
               </button>
@@ -375,27 +533,38 @@ const WarehouseConfig = () => {
                         : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
                     }`}
                   >
-                    <span className="truncate">{z.name}</span>
+                    <span className="truncate">
+                      {z.name}
+                      {z.floorAreaM2 ? ` • ${z.floorAreaM2.toFixed(2)} m²` : ""}
+                    </span>
                     <span className="flex gap-1">
                       <button
                         type="button"
+                        disabled={isWarehouseLockedForConfig}
                         onClick={(e) => {
                           e.stopPropagation();
+                          if (isWarehouseLockedForConfig) return;
                           setZoneFormMode("edit");
                           setEditingZone(z);
-                          setZoneFormName(z.name);
+                          setZoneForm({
+                            name: z.name,
+                            lengthM: z.lengthM ? String(z.lengthM) : "",
+                            widthM: z.widthM ? String(z.widthM) : "",
+                          });
                         }}
-                        className="text-[10px] text-slate-500 hover:text-emerald-700"
+                        className="text-[10px] text-slate-500 hover:text-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Sửa
                       </button>
                       <button
                         type="button"
+                        disabled={isWarehouseLockedForConfig}
                         onClick={(e) => {
                           e.stopPropagation();
+                          if (isWarehouseLockedForConfig) return;
                           setZoneDeleteTarget(z);
                         }}
-                        className="text-[10px] text-red-500 hover:text-red-700"
+                        className="text-[10px] text-red-500 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Xóa
                       </button>
@@ -416,14 +585,35 @@ const WarehouseConfig = () => {
                 className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/60 p-3 space-y-2"
               >
                 <p className="text-[11px] font-semibold text-emerald-800">
-                  {zoneFormMode === "create" ? "Thêm zone mới" : "Đổi tên zone"}
+                  {zoneFormMode === "create" ? "Thêm zone mới" : "Chỉnh sửa zone"}
                 </p>
                 <input
-                  value={zoneFormName}
-                  onChange={(e) => setZoneFormName(e.target.value)}
+                  value={zoneForm.name}
+                  onChange={(e) => setZoneForm((prev) => ({ ...prev, name: e.target.value }))}
                   placeholder="Tên zone"
                   className="w-full p-2 rounded-md border border-emerald-200 bg-white text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    value={zoneForm.lengthM}
+                    onChange={(e) => setZoneForm((prev) => ({ ...prev, lengthM: e.target.value }))}
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    placeholder="Dài (m)"
+                    className="w-full p-2 rounded-md border border-emerald-200 bg-white text-xs"
+                  />
+                  <input
+                    value={zoneForm.widthM}
+                    onChange={(e) => setZoneForm((prev) => ({ ...prev, widthM: e.target.value }))}
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    placeholder="Rộng (m)"
+                    className="w-full p-2 rounded-md border border-emerald-200 bg-white text-xs"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-600">Diện tích sàn: {zoneFloorAreaM2.toFixed(2)} m²</p>
                 <div className="flex justify-end gap-2 pt-1">
                   <button
                     type="button"
@@ -459,7 +649,9 @@ const WarehouseConfig = () => {
                   </button>
                   <button
                     type="button"
+                    disabled={isWarehouseLockedForConfig}
                     onClick={async () => {
+                      if (isWarehouseLockedForConfig) return;
                       const toastId = toast.loading("Đang xóa zone...");
                       try {
                         await deleteZone({
@@ -482,7 +674,7 @@ const WarehouseConfig = () => {
                         toast.error(msg, { id: toastId });
                       }
                     }}
-                    className="px-3 py-1 rounded-md bg-red-600 text-white hover:bg-red-700"
+                    className="px-3 py-1 rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Xóa
                   </button>
@@ -499,13 +691,14 @@ const WarehouseConfig = () => {
               </h2>
               <button
                 type="button"
+                disabled={isWarehouseLockedForConfig}
                 onClick={() => {
                   if (!selectedZoneId) return;
                   setRackFormMode("create");
-                  setRackFormName("");
+                  setRackForm({ name: "", lengthM: "", widthM: "" });
                   setEditingRack(null);
                 }}
-                className="text-xs px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                className="text-xs px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 + Thêm
               </button>
@@ -524,27 +717,38 @@ const WarehouseConfig = () => {
                           : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
                       }`}
                     >
-                      <span className="truncate">{r.name}</span>
+                      <span className="truncate">
+                        {r.name}
+                        {r.floorAreaM2 ? ` • ${r.floorAreaM2.toFixed(2)} m²` : ""}
+                      </span>
                       <span className="flex gap-1">
                         <button
                           type="button"
+                          disabled={isWarehouseLockedForConfig}
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (isWarehouseLockedForConfig) return;
                             setRackFormMode("edit");
                             setEditingRack(r);
-                            setRackFormName(r.name);
+                            setRackForm({
+                              name: r.name,
+                              lengthM: r.lengthM ? String(r.lengthM) : "",
+                              widthM: r.widthM ? String(r.widthM) : "",
+                            });
                           }}
-                          className="text-[10px] text-slate-500 hover:text-emerald-700"
+                          className="text-[10px] text-slate-500 hover:text-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Sửa
                         </button>
                         <button
                           type="button"
+                          disabled={isWarehouseLockedForConfig}
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (isWarehouseLockedForConfig) return;
                             setRackDeleteTarget(r);
                           }}
-                          className="text-[10px] text-red-500 hover:text-red-700"
+                          className="text-[10px] text-red-500 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Xóa
                         </button>
@@ -570,14 +774,35 @@ const WarehouseConfig = () => {
                 className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/60 p-3 space-y-2"
               >
                 <p className="text-[11px] font-semibold text-emerald-800">
-                  {rackFormMode === "create" ? "Thêm rack mới" : "Đổi tên rack"}
+                  {rackFormMode === "create" ? "Thêm rack mới" : "Chỉnh sửa rack"}
                 </p>
                 <input
-                  value={rackFormName}
-                  onChange={(e) => setRackFormName(e.target.value)}
+                  value={rackForm.name}
+                  onChange={(e) => setRackForm((prev) => ({ ...prev, name: e.target.value }))}
                   placeholder="Tên rack"
                   className="w-full p-2 rounded-md border border-emerald-200 bg-white text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 />
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    value={rackForm.lengthM}
+                    onChange={(e) => setRackForm((prev) => ({ ...prev, lengthM: e.target.value }))}
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    placeholder="Dài (m)"
+                    className="w-full p-2 rounded-md border border-emerald-200 bg-white text-xs"
+                  />
+                  <input
+                    value={rackForm.widthM}
+                    onChange={(e) => setRackForm((prev) => ({ ...prev, widthM: e.target.value }))}
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    placeholder="Rộng (m)"
+                    className="w-full p-2 rounded-md border border-emerald-200 bg-white text-xs"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-600">Diện tích sàn: {rackFloorAreaM2.toFixed(2)} m²</p>
                 <div className="flex justify-end gap-2 pt-1">
                   <button
                     type="button"
@@ -613,7 +838,9 @@ const WarehouseConfig = () => {
                   </button>
                   <button
                     type="button"
+                    disabled={isWarehouseLockedForConfig}
                     onClick={async () => {
+                      if (isWarehouseLockedForConfig) return;
                       const toastId = toast.loading("Đang xóa rack...");
                       try {
                         await deleteRack({
@@ -635,7 +862,7 @@ const WarehouseConfig = () => {
                         toast.error(msg, { id: toastId });
                       }
                     }}
-                    className="px-3 py-1 rounded-md bg-red-600 text-white hover:bg-red-700"
+                    className="px-3 py-1 rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Xóa
                   </button>
@@ -663,13 +890,20 @@ const WarehouseConfig = () => {
                 ) : null}
                 <button
                   type="button"
+                  disabled={isWarehouseLockedForConfig}
                   onClick={() => {
                     if (!selectedRackId) return;
                     setSlotFormMode("create");
-                    setSlotForm({ code: "", capacity: "100" });
+                    setSlotForm({
+                      code: "",
+                      capacity: "100",
+                      lengthCm: "",
+                      widthCm: "",
+                      heightCm: "",
+                    });
                     setEditingSlot(null);
                   }}
-                  className="text-xs px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                  className="text-xs px-2 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   + Thêm
                 </button>
@@ -688,29 +922,41 @@ const WarehouseConfig = () => {
                           {s.code}
                         </p>
                         <p className="text-[11px] text-slate-500">
-                          Sức chứa: {s.capacity} • Đang chứa:{" "}
-                          {s.currentCapacity}
+                          Sức chứa: {s.capacity} m³ • Đang chứa:{" "}
+                          {s.currentCapacity} m³
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          KT: {s.lengthCm ?? 0} x {s.widthCm ?? 0} x {s.heightCm ?? 0} cm • {s.volumeM3 ?? 0} m³
                         </p>
                       </div>
                       <div className="flex gap-1">
                         <button
                           type="button"
+                          disabled={isWarehouseLockedForConfig}
                           onClick={() => {
+                            if (isWarehouseLockedForConfig) return;
                             setSlotFormMode("edit");
                             setEditingSlot(s);
                             setSlotForm({
                               code: s.code,
                               capacity: String(s.capacity || 0),
+                              lengthCm: s.lengthCm ? String(s.lengthCm) : "",
+                              widthCm: s.widthCm ? String(s.widthCm) : "",
+                              heightCm: s.heightCm ? String(s.heightCm) : "",
                             });
                           }}
-                          className="text-[10px] text-slate-500 hover:text-emerald-700"
+                          className="text-[10px] text-slate-500 hover:text-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Sửa
                         </button>
                         <button
                           type="button"
-                          onClick={() => setSlotDeleteTarget(s)}
-                          className="text-[10px] text-red-500 hover:text-red-700"
+                          disabled={isWarehouseLockedForConfig}
+                          onClick={() => {
+                            if (isWarehouseLockedForConfig) return;
+                            setSlotDeleteTarget(s);
+                          }}
+                          className="text-[10px] text-red-500 hover:text-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Xóa
                         </button>
@@ -759,7 +1005,7 @@ const WarehouseConfig = () => {
                   </div>
                   <div className="flex flex-col gap-1">
                     <label className="text-[11px] text-slate-600">
-                      Sức chứa (kg)
+                      Sức chứa (m³)
                     </label>
                     <input
                       value={slotForm.capacity}
@@ -776,6 +1022,36 @@ const WarehouseConfig = () => {
                     />
                   </div>
                 </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <input
+                    value={slotForm.lengthCm}
+                    onChange={(e) => setSlotForm((prev) => ({ ...prev, lengthCm: e.target.value }))}
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    placeholder="Dài (cm)"
+                    className="w-full p-2 rounded-md border border-emerald-200 bg-white text-xs"
+                  />
+                  <input
+                    value={slotForm.widthCm}
+                    onChange={(e) => setSlotForm((prev) => ({ ...prev, widthCm: e.target.value }))}
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    placeholder="Rộng (cm)"
+                    className="w-full p-2 rounded-md border border-emerald-200 bg-white text-xs"
+                  />
+                  <input
+                    value={slotForm.heightCm}
+                    onChange={(e) => setSlotForm((prev) => ({ ...prev, heightCm: e.target.value }))}
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    placeholder="Cao (cm)"
+                    className="w-full p-2 rounded-md border border-emerald-200 bg-white text-xs"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-600">Thể tích: {slotVolumeM3.toFixed(4)} m³</p>
                 <div className="flex justify-end gap-2 pt-1">
                   <button
                     type="button"
@@ -810,7 +1086,9 @@ const WarehouseConfig = () => {
                   </button>
                   <button
                     type="button"
+                    disabled={isWarehouseLockedForConfig}
                     onClick={async () => {
+                      if (isWarehouseLockedForConfig) return;
                       const toastId = toast.loading("Đang xóa slot...");
                       try {
                         await deleteSlot({
@@ -829,7 +1107,7 @@ const WarehouseConfig = () => {
                         toast.error(msg, { id: toastId });
                       }
                     }}
-                    className="px-3 py-1 rounded-md bg-red-600 text-white hover:bg-red-700"
+                    className="px-3 py-1 rounded-md bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Xóa
                   </button>

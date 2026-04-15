@@ -22,6 +22,10 @@ export type ProductVariant = {
    */
   minReceiptWeight?: number | null;
   /**
+   * Khối lượng riêng (kg/m3) để quy đổi từ thể tích box sang kg.
+   */
+  densityKgPerM3: number;
+  /**
    * Số box khả dụng trong kho cho biến thể này.
    */
   availableBoxCount?: number;

@@ -50,8 +50,9 @@ const EditProductVariant = () => {
           shelfLifeDays: variant.shelfLifeDays,
           imageUrl: variant.imageUrl || "",
           minReceiptWeight: variant.minReceiptWeight ?? undefined,
+          densityKgPerM3: variant.densityKgPerM3,
         }
-      : { imageUrl: "", minReceiptWeight: undefined },
+      : { imageUrl: "", minReceiptWeight: undefined, densityKgPerM3: undefined },
   });
 
   useEffect(() => {
@@ -255,10 +256,10 @@ const EditProductVariant = () => {
               <div className="h-7 w-7 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-sm">
                 <BadgeDollarSign size={13} className="text-white" />
               </div>
-              <span className="text-sm font-semibold text-slate-700">Giá, Hạn sử dụng & Định mức nhập</span>
+              <span className="text-sm font-semibold text-slate-700">Giá, Hạn sử dụng & Quy đổi khối lượng</span>
             </div>
             <div className="p-6">
-              <div className="grid grid-cols-3 gap-5">
+              <div className="grid grid-cols-2 gap-5">
                 <Field label="Giá bán (VNĐ) *" error={form.formState.errors.price?.message}>
                   <div className="relative">
                     <input
@@ -298,6 +299,22 @@ const EditProductVariant = () => {
                     placeholder="Nhập định mức tối thiểu (kg)"
                     className={inputCls(
                       !!form.formState.errors.minReceiptWeight,
+                    )}
+                  />
+                </Field>
+                <Field
+                  label="Khối lượng riêng (kg/m3) *"
+                  error={form.formState.errors.densityKgPerM3?.message}
+                >
+                  <input
+                    type="number"
+                    step="0.01"
+                    {...form.register("densityKgPerM3", {
+                      valueAsNumber: true,
+                    })}
+                    placeholder="VD: 650"
+                    className={inputCls(
+                      !!form.formState.errors.densityKgPerM3,
                     )}
                   />
                 </Field>

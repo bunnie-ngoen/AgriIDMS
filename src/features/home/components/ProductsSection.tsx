@@ -47,6 +47,19 @@ function ProductCard({ product }: ProductCardProps) {
                 <p className="text-[#c0392b] font-bold text-base">
                     {product.price.toLocaleString("vi-VN")} ₫/kg
                 </p>
+                {product.hasNearExpiryStock && product.nearExpiryPriceTiers.length > 0 ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 space-y-1">
+                        <p className="text-[11px] font-semibold text-amber-700">
+                            Có lô gần hết hạn
+                        </p>
+                        {product.nearExpiryPriceTiers.map((tier) => (
+                            <p key={tier.maxDaysLeft} className="text-[11px] text-amber-800">
+                                ≤ {tier.maxDaysLeft} ngày: giảm {tier.discountPercent.toLocaleString("vi-VN")}% ·{" "}
+                                {tier.pricePerKg.toLocaleString("vi-VN")} ₫/kg
+                            </p>
+                        ))}
+                    </div>
+                ) : null}
 
                 <button
                     type="button"
