@@ -15,6 +15,17 @@ import type { Category } from "../../category/types/category.type";
 const PAGE_SIZE = 10;
 const DESC_PREVIEW_LEN = 50; // Số ký tự mô tả hiển thị trên bảng (1 dòng)
 
+function formatProductCreatedAt(iso: string | undefined | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
 export default function ProductList() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialPage = Number(searchParams.get("page") ?? "1") || 1;
@@ -239,9 +250,7 @@ export default function ProductList() {
                 ))
               ) : paged.length > 0 ? (
                 paged.map((p) => {
-                  const createdAt = p.createdAt
-                    ? new Date(p.createdAt).toLocaleString("vi-VN")
-                    : "-";
+                  const createdAt = formatProductCreatedAt(p.createdAt);
                   return (
                     <tr key={p.id} className="hover:bg-slate-50/60 transition-colors group">
                       <td className="px-5 py-3.5">
@@ -278,14 +287,14 @@ export default function ProductList() {
                       </td>
                       <td className="px-5 py-3.5">
                         {p.isActive !== false ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                            Active
+                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                            Hoạt động
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
-                            <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-                            Inactive
+                          <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-slate-100 border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+                            Vô hiệu
                           </span>
                         )}
                       </td>
@@ -460,16 +469,16 @@ export default function ProductList() {
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">Trạng thái</p>
                 <span
-                  className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${
+                  className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${
                     detailProduct.isActive !== false
                       ? "bg-emerald-50 border-emerald-200 text-emerald-700"
                       : "bg-slate-100 border-slate-200 text-slate-500"
                   }`}
                 >
                   {detailProduct.isActive !== false ? (
-                    <><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />Đang hoạt động</>
+                    <><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />Đang hoạt động</>
                   ) : (
-                    <><span className="h-1.5 w-1.5 rounded-full bg-slate-400" />Đã vô hiệu</>
+                    <><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />Đã vô hiệu</>
                   )}
                 </span>
               </div>
@@ -477,7 +486,7 @@ export default function ProductList() {
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5">Ngày tạo</p>
                   <p className="text-sm text-slate-600">
-                    {new Date(detailProduct.createdAt).toLocaleString("vi-VN")}
+                    {formatProductCreatedAt(detailProduct.createdAt)}
                   </p>
                 </div>
               )}

@@ -11,6 +11,15 @@ export const homeProductSchema = z.object({
     grade: z.number(), // 1 = Grade1, 2 = Grade2, 3 = Grade3
     price: z.number(),
     imageUrl: z.string().optional().nullable(),
+    hasNearExpiryStock: z.boolean().optional().default(false),
+    nearExpiryDiscountPercent: z.number().optional().nullable(),
+    nearExpiryPricePerKg: z.number().optional().nullable(),
+    nearExpiryPriceTiers: z.array(z.object({
+        maxDaysLeft: z.number(),
+        discountPercent: z.number(),
+        pricePerKg: z.number(),
+        boxCount: z.number(),
+    })).optional().default([]),
 });
 
 export const homeProductListSchema = z.array(homeProductSchema);

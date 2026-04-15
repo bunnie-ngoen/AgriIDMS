@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   BadgePercent,
   Trash2,
+  Ruler,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
@@ -65,6 +66,11 @@ const mainMenu: MenuItem[] = [
         name: "Cấu hình giảm giá (gần hết hạn)",
         path: "near-expiry-discount-config",
         icon: BadgePercent,
+      },
+      {
+        name: "Cấu hình loại box",
+        path: "box-type-config",
+        icon: Ruler,
       },
     ],
   },

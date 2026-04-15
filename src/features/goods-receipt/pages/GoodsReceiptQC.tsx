@@ -16,12 +16,14 @@ import {
   useUpdateBoxQrImageMutation,
 } from "../api/goods-receipt.api";
 import { uploadQrPayloadToCloudinary } from "../../../shared/lib/qrImageCloudinary";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Sparkles, Upload, Camera } from "lucide-react";
 import toast from "react-hot-toast";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 import { useGetWarehousesQuery } from "../../admin/api/create-user.api";
+import { useGetProductVariantsQuery } from "../../product/api/product-variant.api";
 import { BoxTypeEnum } from "../types/goods-receipt.type";
+import { useGetBoxTypeSpecsQuery } from "../../admin/api/create-user.api";
 
 type QCForm = {
   usableWeight: number;
@@ -31,7 +33,32 @@ type CreateBoxesForm = {
   lotId: number;
   boxSize: number;
   boxType: BoxTypeEnum;
+  boxTypeSpecId: number;
 };
+
+type AiQcResponse = {
+  decision: "PASS" | "FAIL" | string;
+  label?: string;
+  label_vi?: string;
+  confidence?: number;
+  confidence_pct?: number;
+  message_vi?: string;
+  min_confidence?: number;
+};
+
+function stripPercentInMessage(message?: string): string {
+  if (!message) return "—";
+  return message
+    .replace(/\s*\(\d+(?:[.,]\d+)?%\)\.?/gi, "")
+    .replace(/\s*\(độ tin cậy:\s*\d+(?:[.,]\d+)?%\)\.?/gi, "")
+    .trim();
+}
+
+function confidencePercent(result: AiQcResponse): number {
+  if (typeof result.confidence_pct === "number") return result.confidence_pct;
+  if (typeof result.confidence === "number") return result.confidence * 100;
+  return 0;
+}
 
 async function runWithConcurrency<T>(
   items: T[],
@@ -86,6 +113,7 @@ function toVietnameseQcResult(qcResult?: string | null): string {
   if (!qcResult) return "Chưa kiểm tra chất lượng";
   if (qcResult === "Passed") return "Đạt";
   if (qcResult === "Rejected") return "Loại";
+  if (qcResult === "Pending") return "Chờ kiểm tra chất lượng";
   return qcResult;
 }
 
@@ -142,6 +170,8 @@ export default function GoodsReceiptQC() {
     useUpdateGoodsReceiptWarehouseMutation();
 
   const { data: warehouses = [] } = useGetWarehousesQuery();
+  const { data: productVariants = [] } = useGetProductVariantsQuery();
+  const { data: boxTypeSpecs = [] } = useGetBoxTypeSpecsQuery();
 
   // Pagination for receipt boxes table.
   const [boxesPage, setBoxesPage] = useState(1);
@@ -174,6 +204,46 @@ export default function GoodsReceiptQC() {
     number | null
   >(null);
 
+  const [isAiQcModalOpen, setIsAiQcModalOpen] = useState(false);
+  const [aiQcImageFile, setAiQcImageFile] = useState<File | null>(null);
+  const [aiQcImagePreview, setAiQcImagePreview] = useState<string>("");
+  const [aiQcResult, setAiQcResult] = useState<AiQcResponse | null>(null);
+  const [isAiQcRunning, setIsAiQcRunning] = useState(false);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isStartingCamera, setIsStartingCamera] = useState(false);
+  const cameraVideoRef = useRef<HTMLVideoElement | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (aiQcImagePreview) URL.revokeObjectURL(aiQcImagePreview);
+      if (cameraStreamRef.current) {
+        cameraStreamRef.current.getTracks().forEach((t) => t.stop());
+        cameraStreamRef.current = null;
+      }
+    };
+  }, [aiQcImagePreview]);
+
+  useEffect(() => {
+    if (!isCameraOpen) return;
+    const video = cameraVideoRef.current;
+    const stream = cameraStreamRef.current;
+    if (!video || !stream) return;
+    video.srcObject = stream;
+    const onLoaded = () => {
+      void video.play().catch(() => {
+        // no-op: user gesture policies differ by browser
+      });
+    };
+    video.addEventListener("loadedmetadata", onLoaded);
+    void video.play().catch(() => {
+      // no-op
+    });
+    return () => {
+      video.removeEventListener("loadedmetadata", onLoaded);
+    };
+  }, [isCameraOpen]);
+
   const [isWarehouseModalOpen, setIsWarehouseModalOpen] = useState(false);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number>(0);
 
@@ -188,6 +258,7 @@ export default function GoodsReceiptQC() {
       lotId: 0,
       boxSize: 0,
       boxType: BoxTypeEnum.StyrofoamBox,
+      boxTypeSpecId: 0,
     },
   });
 
@@ -195,7 +266,40 @@ export default function GoodsReceiptQC() {
     if (!lots) return [];
     return [...lots].sort((a, b) => b.id - a.id);
   }, [lots]);
+  const lotInputLabel = (lot: (typeof lotsSorted)[number]) =>
+    `#${lot.id} - ${lot.lotCode} - còn ${lot.remainingQuantity} kg`;
+  const [lotInputValue, setLotInputValue] = useState("");
   const selectedBoxType = createBoxesForm.watch("boxType");
+  const selectedLotId = createBoxesForm.watch("lotId");
+  const selectedSpecId = createBoxesForm.watch("boxTypeSpecId");
+  const selectedLot = useMemo(
+    () => lotsSorted.find((x) => x.id === selectedLotId) ?? null,
+    [lotsSorted, selectedLotId],
+  );
+  const selectedVariant = useMemo(
+    () =>
+      productVariants.find(
+        (v) => v.id === Number(selectedLot?.productVariantId ?? 0),
+      ) ?? null,
+    [productVariants, selectedLot?.productVariantId],
+  );
+  const filteredSpecs = useMemo(() => {
+    const map: Record<number, number> = {
+      [BoxTypeEnum.StyrofoamBox]: 1,
+      [BoxTypeEnum.Carton]: 2,
+      [BoxTypeEnum.MeshBag]: 3,
+    };
+    const boxTypeId = map[Number(selectedBoxType)] ?? 0;
+    return boxTypeSpecs.filter((s) => s.boxType === boxTypeId);
+  }, [boxTypeSpecs, selectedBoxType]);
+  const selectedSpec = useMemo(
+    () => filteredSpecs.find((s) => s.id === Number(selectedSpecId)) ?? null,
+    [filteredSpecs, selectedSpecId],
+  );
+  const computedBoxWeightKg = useMemo(() => {
+    if (!selectedSpec || !selectedVariant) return 0;
+    return Number((selectedSpec.volumeM3 * selectedVariant.densityKgPerM3).toFixed(2));
+  }, [selectedSpec, selectedVariant]);
 
   /** Sau khi phiếu được duyệt và có lot: tạo ảnh QR (qrserver → Cloudinary) rồi PUT API lưu DB. */
   const syncMissingLotQrImages = async () => {
@@ -265,6 +369,33 @@ export default function GoodsReceiptQC() {
     }
   }, [lotsSorted, createBoxesForm]);
 
+  useEffect(() => {
+    if (!lotsSorted.length) {
+      setLotInputValue("");
+      return;
+    }
+    const current = lotsSorted.find((l) => l.id === selectedLotId) ?? null;
+    if (current) {
+      setLotInputValue(lotInputLabel(current));
+    }
+  }, [selectedLotId, lotsSorted]);
+
+  useEffect(() => {
+    if (filteredSpecs.length === 0) {
+      createBoxesForm.setValue("boxTypeSpecId", 0);
+      return;
+    }
+    if (!filteredSpecs.some((x) => x.id === selectedSpecId)) {
+      createBoxesForm.setValue("boxTypeSpecId", filteredSpecs[0].id);
+    }
+  }, [filteredSpecs, selectedSpecId, createBoxesForm]);
+
+  useEffect(() => {
+    if (computedBoxWeightKg > 0) {
+      createBoxesForm.setValue("boxSize", computedBoxWeightKg);
+    }
+  }, [computedBoxWeightKg, createBoxesForm]);
+
   const statusClass = (status: string) => {
     if (status === "Approved") return "text-emerald-600";
     if (
@@ -277,12 +408,16 @@ export default function GoodsReceiptQC() {
     return "text-slate-600";
   };
 
-  const canQC =
-    receipt?.status === "Draft" || receipt?.status === "Received";
+  const canReviewApprovalStage = isAdmin() || isManager();
+  const canQC = receipt?.status === "Received";
+  const canInitialApprove = canReviewApprovalStage && receipt?.status === "Draft";
   const canApprove =
-    receipt?.status === "QCCompleted" || receipt?.status === "PendingManagerApproval";
-  const canManagerToleranceAction = receipt?.status === "PendingManagerApproval";
-  const canManagerMinWeightAction = receipt?.status === "PendingManagerApprovalQc";
+    canReviewApprovalStage &&
+    (receipt?.status === "QCCompleted" || receipt?.status === "PendingManagerApproval");
+  const canManagerToleranceAction =
+    canReviewApprovalStage && receipt?.status === "PendingManagerApproval";
+  const canManagerMinWeightAction =
+    canReviewApprovalStage && receipt?.status === "PendingManagerApprovalQc";
   const canViewPrice = isAdmin() || isManager();
   const moneyFmt = useMemo(
     () => new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }),
@@ -295,6 +430,16 @@ export default function GoodsReceiptQC() {
   } = useGetGoodsReceiptForApprovalByIdQuery(receiptId, {
     skip: !canViewPrice || !receiptId || Number.isNaN(receiptId),
   });
+
+  const handleBackToPreviousStep = () => {
+    // Ưu tiên quay lại đúng màn vừa đi trước đó (thường là bước 1).
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    // Fallback khi người dùng mở thẳng link QC.
+    navigate(`${basePath}/${receiptId}`);
+  };
 
   if (Number.isNaN(receiptId) || receiptId < 1) {
     return <Navigate to={basePath} replace />;
@@ -322,6 +467,111 @@ export default function GoodsReceiptQC() {
     qcForm.reset({
       usableWeight: currentUsable,
     });
+    // Reset AI QC state per line
+    setAiQcResult(null);
+    setAiQcImageFile(null);
+    setAiQcImagePreview("");
+    setIsAiQcModalOpen(false);
+    setIsCameraOpen(false);
+  };
+
+  const AI_QC_BASE_URL =
+    (import.meta as any)?.env?.VITE_AI_QC_BASE_URL || "http://localhost:8000";
+
+  const runAiQc = async (file: File) => {
+    if (!file) return;
+    setIsAiQcRunning(true);
+    setAiQcResult(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const resp = await fetch(`${AI_QC_BASE_URL}/predict`, {
+        method: "POST",
+        body: fd,
+      });
+      const json = (await resp.json()) as AiQcResponse;
+      if (!resp.ok) {
+        throw new Error(
+          (json as any)?.message_vi ||
+            (json as any)?.detail ||
+            "Kiểm tra chất lượng bằng AI thất bại.",
+        );
+      }
+      setAiQcResult(json);
+    } catch (e: any) {
+      toast.error(e?.message || "Kiểm tra chất lượng bằng AI thất bại.");
+    } finally {
+      setIsAiQcRunning(false);
+    }
+  };
+
+  const stopCamera = () => {
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach((t) => t.stop());
+      cameraStreamRef.current = null;
+    }
+    setIsCameraOpen(false);
+  };
+
+  const startCamera = async () => {
+    setIsStartingCamera(true);
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        toast.error("Trình duyệt không hỗ trợ mở camera trực tiếp.");
+        return;
+      }
+      stopCamera();
+      let stream: MediaStream | null = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false,
+        });
+      } catch {
+        // Fallback for desktop webcams / browsers not supporting facingMode.
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
+      }
+      cameraStreamRef.current = stream;
+      setIsCameraOpen(true);
+    } catch (e: any) {
+      toast.error(
+        e?.message || "Không mở được camera. Vui lòng kiểm tra quyền truy cập camera.",
+      );
+    } finally {
+      setIsStartingCamera(false);
+    }
+  };
+
+  const captureFromCamera = async () => {
+    const video = cameraVideoRef.current;
+    if (!video || video.videoWidth <= 0 || video.videoHeight <= 0) {
+      toast.error("Camera chưa sẵn sàng để chụp.");
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      toast.error("Không tạo được ảnh từ camera.");
+      return;
+    }
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.92),
+    );
+    if (!blob) {
+      toast.error("Không chụp được ảnh từ camera.");
+      return;
+    }
+    const file = new File([blob], `qc-${Date.now()}.jpg`, { type: "image/jpeg" });
+    setAiQcImageFile(file);
+    if (aiQcImagePreview) URL.revokeObjectURL(aiQcImagePreview);
+    setAiQcImagePreview(URL.createObjectURL(file));
+    await runAiQc(file);
   };
 
   const handleSubmitQc = async (values: QCForm) => {
@@ -389,7 +639,10 @@ export default function GoodsReceiptQC() {
       // Nếu lỗi do kho không đủ dung lượng, mở popup cho chọn lại kho
       if (
         typeof msg === "string" &&
-        (msg.includes("Không đủ dung lượng") || msg.includes("kg trống"))
+        (msg.includes("Không đủ dung lượng") ||
+          msg.includes("kg trống") ||
+          msg.includes("m³ trống") ||
+          msg.includes("m3 trống"))
       ) {
         const firstOther = otherWarehouses[0]?.id ?? 0;
         setSelectedWarehouseId(firstOther);
@@ -519,32 +772,36 @@ export default function GoodsReceiptQC() {
   const handleSubmitCreateBoxes = async (values: CreateBoxesForm) => {
     if (!lots || lots.length === 0) {
       toast.error(
-        "Phiếu nhập này chưa có Lot nào. Vui lòng tạo Lot trước khi tạo box.",
+        "Phiếu nhập này chưa có lô nào. Vui lòng tạo lô trước khi tạo thùng.",
       );
       return;
     }
 
     if (!values.lotId || values.lotId <= 0) {
-      toast.error("Vui lòng chọn Lot hợp lệ.");
+      toast.error("Vui lòng chọn lô hợp lệ.");
+      return;
+    }
+    if (!values.boxTypeSpecId || values.boxTypeSpecId <= 0) {
+      toast.error("Vui lòng chọn kích cỡ thùng.");
       return;
     }
     if (!values.boxSize || values.boxSize <= 0) {
-      toast.error("Kích thước box phải > 0.");
+      toast.error("Không thể tính khối lượng thùng. Kiểm tra khối lượng riêng hoặc thể tích thùng.");
       return;
     }
     if (Number(values.boxType) === BoxTypeEnum.Unknown) {
-      toast.error("Vui lòng chọn BoxType khác Unknown khi tạo box.");
+      toast.error("Vui lòng chọn loại thùng hợp lệ khi tạo thùng.");
       return;
     }
 
-    const toastId = toast.loading("Đang tạo box cho lot...");
+    const toastId = toast.loading("Đang tạo thùng cho lô...");
     try {
       const created = await createBoxes({
         lotId: Number(values.lotId),
         boxSize: Number(values.boxSize),
         boxType: values.boxType,
       }).unwrap();
-      toast.success("Tạo box thành công.", { id: toastId });
+      toast.success("Tạo thùng thành công.", { id: toastId });
       createBoxesForm.reset({
         lotId: 0,
         boxSize: 0,
@@ -553,7 +810,7 @@ export default function GoodsReceiptQC() {
 
       if (created.boxes?.length) {
         const qrToast = toast.loading(
-          `Đang tạo & lưu ảnh QR cho ${created.boxes.length} box...`,
+          `Đang tạo và lưu ảnh QR cho ${created.boxes.length} thùng...`,
         );
         const { success, failed } = await runWithConcurrency(
           created.boxes,
@@ -570,27 +827,24 @@ export default function GoodsReceiptQC() {
           },
         );
         if (failed === 0) {
-          toast.success(`Đã lưu ảnh QR box: ${success}/${created.boxes.length}.`, {
+          toast.success(`Đã lưu ảnh QR thùng: ${success}/${created.boxes.length}.`, {
             id: qrToast,
           });
         } else if (success > 0) {
           toast.error(
-            `Đã lưu ảnh QR box: ${success}/${created.boxes.length}. ${failed} box lỗi, vui lòng thử lại.`,
+            `Đã lưu ảnh QR thùng: ${success}/${created.boxes.length}. ${failed} thùng lỗi, vui lòng thử lại.`,
             { id: qrToast },
           );
         } else {
           toast.error(
-            "Tạo box xong nhưng lưu ảnh QR thất bại. Kiểm tra .env Cloudinary.",
+            "Tạo thùng xong nhưng lưu ảnh QR thất bại. Kiểm tra .env Cloudinary.",
             { id: qrToast },
           );
         }
       }
       await refetchReceiptBoxes();
+      await refetchLots();
       await syncMissingLotQrImages();
-      // Sau khi tạo box thành công, quay về danh sách phiếu nhập
-      setTimeout(() => {
-        navigate(basePath);
-      }, 600);
     } catch (err: any) {
       const msg =
         err?.data?.message ||
@@ -600,7 +854,7 @@ export default function GoodsReceiptQC() {
         err?.data?.detail ||
         err?.data?.Detail ||
         (typeof err?.data === "string" ? err.data : null) ||
-        "Tạo box thất bại.";
+        "Tạo thùng thất bại.";
       toast.error(msg, { id: toastId });
     }
   };
@@ -612,7 +866,7 @@ export default function GoodsReceiptQC() {
         <div className="flex items-center gap-4 mb-2">
           <button
             type="button"
-            onClick={() => navigate(`${basePath}/${receipt.id}`)}
+            onClick={handleBackToPreviousStep}
             className="h-10 w-10 rounded-2xl border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:border-slate-300 shadow-sm"
           >
             <ArrowLeft size={16} />
@@ -662,102 +916,6 @@ export default function GoodsReceiptQC() {
               </p>
             </div>
           </div>
-          <div className="px-6 py-3 border-t border-slate-100 space-y-1.5">
-            <p className="text-xs font-semibold text-slate-600">
-              Bước 3 · Duyệt phiếu / Quản lí duyệt
-            </p>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs text-slate-500">
-                Trạng thái hiện tại:{" "}
-                <span className={statusClass(receipt.status)}>
-                  {toVietnameseReceiptStatus(receipt.status)}
-                </span>
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {canApprove && (
-                  <button
-                    type="button"
-                    onClick={handleApprove}
-                    disabled={isApproving}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold text-white px-3 py-1.5 disabled:opacity-60"
-                  >
-                    {isApproving && (
-                      <Loader2 size={12} className="animate-spin" />
-                    )}
-                    Duyệt phiếu (Admin)
-                  </button>
-                )}
-                {canManagerToleranceAction && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => handleManagerReviewTolerance(true)}
-                      disabled={isManagerReviewingTolerance}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-xs font-semibold text-white px-3 py-1.5 disabled:opacity-60"
-                    >
-                      {isManagerReviewingTolerance && (
-                        <Loader2 size={12} className="animate-spin" />
-                      )}
-                      Quản lí duyệt (dung sai)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleManagerReviewTolerance(false)}
-                      disabled={isManagerReviewingTolerance}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-xs font-semibold text-white px-3 py-1.5 disabled:opacity-60"
-                    >
-                      {isManagerReviewingTolerance && (
-                        <Loader2 size={12} className="animate-spin" />
-                      )}
-                      Quản lí từ chối
-                    </button>
-                  </>
-                )}
-
-                {canManagerMinWeightAction && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => handleManagerReviewMinWeight(true)}
-                      disabled={isManagerReviewingMin}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-xs font-semibold text-white px-3 py-1.5 disabled:opacity-60"
-                    >
-                      {isManagerReviewingMin && (
-                        <Loader2 size={12} className="animate-spin" />
-                      )}
-                      Cho phép kiểm tra chất lượng tiếp
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleManagerReviewMinWeight(false)}
-                      disabled={isManagerReviewingMin}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-xs font-semibold text-white px-3 py-1.5 disabled:opacity-60"
-                    >
-                      {isManagerReviewingMin && (
-                        <Loader2 size={12} className="animate-spin" />
-                      )}
-                      Từ chối
-                    </button>
-                  </>
-                )}
-
-                {/* Trường hợp đặc biệt: cho phép quay lại kiểm tra chất lượng khi đang PendingManagerApproval */}
-                {canManagerToleranceAction && (
-                  <button
-                    type="button"
-                    onClick={handleManagerAllowQc}
-                    disabled={isManagerAllowingQc}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 px-3 py-1.5 hover:bg-slate-50 disabled:opacity-60"
-                  >
-                    {isManagerAllowingQc && (
-                      <Loader2 size={12} className="animate-spin" />
-                    )}
-                    Cho phép kiểm tra chất lượng lại
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Kiểm tra chất lượng table + form */}
@@ -769,7 +927,7 @@ export default function GoodsReceiptQC() {
               </h2>
               {!canQC && (
                 <p className="text-[11px] text-slate-400">
-                  Kiểm tra chất lượng chỉ thực hiện trước khi phiếu được duyệt / tạo box.
+                  Kiểm tra chất lượng chỉ thực hiện trước khi phiếu được duyệt / tạo thùng.
                 </p>
               )}
             </div>
@@ -864,7 +1022,7 @@ export default function GoodsReceiptQC() {
                             }
                             className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200"
                           >
-                            Kiểm tra chất lượng dòng
+                            Kiểm tra chất lượng
                           </button>
                         ) : (
                           <span className="text-[11px] text-slate-400">
@@ -882,9 +1040,19 @@ export default function GoodsReceiptQC() {
           {/* Kiểm tra chất lượng form */}
           {selectedDetailIdForQc && canQC && (
             <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/60">
-              <h3 className="text-xs font-semibold text-slate-800 mb-3">
-                Kiểm tra chất lượng cho dòng chi tiết #{selectedDetailIdForQc}
-              </h3>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h3 className="text-xs font-semibold text-slate-800">
+                  Kiểm tra chất lượng cho dòng chi tiết #{selectedDetailIdForQc}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setIsAiQcModalOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                >
+                  <Sparkles size={14} />
+                  Kiểm tra chất lượng bằng AI
+                </button>
+              </div>
               <form
                 onSubmit={qcForm.handleSubmit(handleSubmitQc)}
                 className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm items-end"
@@ -923,6 +1091,251 @@ export default function GoodsReceiptQC() {
                   </button>
                 </div>
               </form>
+
+              {/* AI QC modal */}
+              {isAiQcModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+                  <div className="w-full max-w-lg rounded-3xl bg-white shadow-xl border border-slate-100 overflow-hidden">
+                    <div className="px-6 py-4 border-b border-slate-100">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h4 className="text-sm font-semibold text-slate-900">
+                            Kiểm tra chất lượng bằng AI
+                          </h4>
+                          <p className="text-xs text-slate-500 mt-1">
+                            Tải ảnh lên hoặc chụp ảnh để AI đánh giá. Kết quả sẽ hiển thị bên dưới.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            stopCamera();
+                            setIsAiQcModalOpen(false);
+                          }}
+                          className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                          Đóng
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="px-6 py-4 space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                          <Upload size={14} />
+                          Tải ảnh lên
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const f = e.target.files?.[0] ?? null;
+                              if (!f) return;
+                              setAiQcImageFile(f);
+                              if (aiQcImagePreview) URL.revokeObjectURL(aiQcImagePreview);
+                              setAiQcImagePreview(URL.createObjectURL(f));
+                              await runAiQc(f);
+                            }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={startCamera}
+                          disabled={isStartingCamera}
+                          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                        >
+                          <Camera size={14} />
+                          {isStartingCamera ? "Đang mở camera..." : "Mở camera"}
+                        </button>
+                      </div>
+
+                      {isCameraOpen ? (
+                        <div className="space-y-2">
+                          <video
+                            ref={cameraVideoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            className="h-52 w-full rounded-xl border border-slate-200 bg-black object-cover"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={captureFromCamera}
+                              className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                            >
+                              <Camera size={14} />
+                              Chụp ảnh
+                            </button>
+                            <button
+                              type="button"
+                              onClick={stopCamera}
+                              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                            >
+                              Tắt camera
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {aiQcImageFile ? (
+                        <div className="space-y-2">
+                          <div className="text-xs text-slate-600">
+                            Ảnh đã chọn:{" "}
+                            <span className="font-semibold text-slate-800">
+                              {aiQcImageFile.name}
+                            </span>
+                          </div>
+                          {aiQcImagePreview ? (
+                            <img
+                              src={aiQcImagePreview}
+                              alt="Ảnh kiểm tra chất lượng"
+                              className="h-40 w-auto max-w-full rounded-xl border border-slate-200 object-contain bg-white"
+                            />
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {isAiQcRunning ? (
+                        <div className="flex items-center gap-2 text-xs text-slate-600">
+                          <Loader2 size={14} className="animate-spin" />
+                          Đang kiểm tra bằng AI...
+                        </div>
+                      ) : null}
+
+                      {aiQcResult ? (
+                        <div
+                          className={`rounded-2xl border px-4 py-3 text-sm ${
+                            String(aiQcResult.decision).toUpperCase() === "PASS"
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                              : "border-rose-200 bg-rose-50 text-rose-900"
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            <div className="text-xs">
+                              Độ tin cậy:{" "}
+                              <span className="font-semibold">
+                                {Number(
+                                  confidencePercent(aiQcResult),
+                                ).toFixed(0)}
+                                %
+                              </span>
+                            </div>
+                          </div>
+                          {confidencePercent(aiQcResult) >= 80 ? (
+                            <div className="mt-1 text-sm font-semibold">
+                              {aiQcResult.label_vi || aiQcResult.label || "—"}
+                            </div>
+                          ) : null}
+                          <div className="mt-1 text-sm">
+                            {stripPercentInMessage(aiQcResult.message_vi)}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Create boxes section */}
+          {canReviewApprovalStage && (
+            <div className="px-6 py-4 border-t border-slate-100 space-y-1.5 bg-slate-50/40">
+              <p className="text-xs font-semibold text-slate-700">
+                Bước 3 · Duyệt phiếu / Quản lí duyệt
+              </p>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-slate-500">
+                  Trạng thái hiện tại:{" "}
+                  <span className={statusClass(receipt.status)}>
+                    {toVietnameseReceiptStatus(receipt.status)}
+                  </span>
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {(canInitialApprove || canApprove) && (
+                    <button
+                      type="button"
+                      onClick={handleApprove}
+                      disabled={isApproving}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold text-white px-3 py-1.5 disabled:opacity-60"
+                    >
+                      {isApproving && (
+                        <Loader2 size={12} className="animate-spin" />
+                      )}
+                      {canInitialApprove
+                        ? "Duyệt bước 1 (mở kiểm tra chất lượng)"
+                        : "Duyệt phiếu"}
+                    </button>
+                  )}
+                  {canManagerToleranceAction && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleManagerReviewTolerance(true)}
+                        disabled={isManagerReviewingTolerance}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-xs font-semibold text-white px-3 py-1.5 disabled:opacity-60"
+                      >
+                        {isManagerReviewingTolerance && (
+                          <Loader2 size={12} className="animate-spin" />
+                        )}
+                        Quản lí duyệt (dung sai)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleManagerReviewTolerance(false)}
+                        disabled={isManagerReviewingTolerance}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-xs font-semibold text-white px-3 py-1.5 disabled:opacity-60"
+                      >
+                        {isManagerReviewingTolerance && (
+                          <Loader2 size={12} className="animate-spin" />
+                        )}
+                        Quản lí từ chối
+                      </button>
+                    </>
+                  )}
+
+                  {canManagerMinWeightAction && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleManagerReviewMinWeight(true)}
+                        disabled={isManagerReviewingMin}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-xs font-semibold text-white px-3 py-1.5 disabled:opacity-60"
+                      >
+                        {isManagerReviewingMin && (
+                          <Loader2 size={12} className="animate-spin" />
+                        )}
+                        Cho phép kiểm tra chất lượng tiếp
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleManagerReviewMinWeight(false)}
+                        disabled={isManagerReviewingMin}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-xs font-semibold text-white px-3 py-1.5 disabled:opacity-60"
+                      >
+                        {isManagerReviewingMin && (
+                          <Loader2 size={12} className="animate-spin" />
+                        )}
+                        Từ chối
+                      </button>
+                    </>
+                  )}
+                  {canManagerToleranceAction && (
+                    <button
+                      type="button"
+                      onClick={handleManagerAllowQc}
+                      disabled={isManagerAllowingQc}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 px-3 py-1.5 hover:bg-slate-50 disabled:opacity-60"
+                    >
+                      {isManagerAllowingQc && (
+                        <Loader2 size={12} className="animate-spin" />
+                      )}
+                      Cho phép kiểm tra chất lượng lại
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -930,71 +1343,85 @@ export default function GoodsReceiptQC() {
           {receipt.status === "Approved" && (
             <div className="px-6 py-4 border-t border-slate-100 bg-emerald-50/40">
               <h3 className="text-xs font-semibold text-slate-800 mb-2">
-                Tạo box từ Lot
+                Tạo thùng từ lô
               </h3>
               {lotsError && (
                 <p className="text-xs text-rose-600 mb-2">
-                  Không tải được danh sách Lot cho phiếu nhập này.
+                  Không tải được danh sách lô cho phiếu nhập này.
                 </p>
               )}
               {lots.length === 0 && !isLoadingLots && !lotsError && (
                 <p className="text-xs text-slate-500 mb-2">
-                  Chưa có Lot nào được tạo cho phiếu nhập này.
+                  Chưa có lô nào được tạo cho phiếu nhập này.
                 </p>
               )}
               <form
                 onSubmit={createBoxesForm.handleSubmit(
                   handleSubmitCreateBoxes,
                 )}
-                className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm items-end"
+                className="grid grid-cols-1 md:grid-cols-12 gap-3 text-sm items-start rounded-2xl border border-emerald-100 bg-white p-3"
               >
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Chọn Lot
-                  </label>
-                  <select
-                    {...createBoxesForm.register("lotId", {
-                      valueAsNumber: true,
-                    })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
-                    disabled={isLoadingLots || lots.length === 0}
-                  >
-                    {isLoadingLots && (
-                      <option value="">Đang tải danh sách Lot...</option>
-                    )}
-                    {!isLoadingLots &&
-                      lotsSorted.map((lot) => (
-                        <option key={lot.id} value={lot.id}>
-                          #{lot.id} · {lot.lotCode} · còn{" "}
-                          {lot.remainingQuantity} kg
-                        </option>
-                      ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Box size (kg)
+                <div className="md:col-span-3">
+                  <label className="flex h-5 items-center text-xs font-medium text-slate-600 mb-1">
+                    Chọn lô
                   </label>
                   <input
-                    type="number"
-                    min={0.01}
-                    step="0.01"
-                    {...createBoxesForm.register("boxSize", {
-                      valueAsNumber: true,
-                    })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
-                    placeholder="VD: 5 (kg mỗi box)"
+                    list="lot-options"
+                    value={lotInputValue}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setLotInputValue(val);
+                      const normalized = val.trim().toLowerCase();
+                      const matched = lotsSorted.find(
+                        (lot) =>
+                          lotInputLabel(lot).toLowerCase() === normalized ||
+                          lot.lotCode.toLowerCase() === normalized ||
+                          `#${lot.id}`.toLowerCase() === normalized,
+                      );
+                      if (matched) {
+                        createBoxesForm.setValue("lotId", matched.id, {
+                          shouldValidate: true,
+                        });
+                      }
+                    }}
+                    onBlur={() => {
+                      const normalized = lotInputValue.trim().toLowerCase();
+                      const matched = lotsSorted.find(
+                        (lot) =>
+                          lotInputLabel(lot).toLowerCase() === normalized ||
+                          lot.lotCode.toLowerCase() === normalized ||
+                          `#${lot.id}`.toLowerCase() === normalized,
+                      );
+                      if (matched) {
+                        createBoxesForm.setValue("lotId", matched.id, {
+                          shouldValidate: true,
+                        });
+                        setLotInputValue(lotInputLabel(matched));
+                      }
+                    }}
+                    className="w-full h-11 rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
+                    disabled={isLoadingLots || lots.length === 0}
+                    placeholder={
+                      isLoadingLots
+                        ? "Đang tải danh sách lô..."
+                        : "Gõ mã lô hoặc chọn từ gợi ý"
+                    }
                   />
+                  <datalist id="lot-options">
+                    {lotsSorted.map((lot) => (
+                      <option key={lot.id} value={lotInputLabel(lot)} />
+                    ))}
+                  </datalist>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Loại box
+                <div className="md:col-span-3">
+                  <label className="flex h-5 items-center text-xs font-medium text-slate-600 mb-1">
+                    Loại thùng
                   </label>
                   <select
                     {...createBoxesForm.register("boxType", {
                       valueAsNumber: true,
                     })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
+                    className="w-full h-11 rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
                   >
                     <option value={BoxTypeEnum.StyrofoamBox}>Thùng xốp</option>
                     <option value={BoxTypeEnum.Carton}>Thùng carton</option>
@@ -1003,22 +1430,61 @@ export default function GoodsReceiptQC() {
                   </select>
                   {Number(selectedBoxType) === BoxTypeEnum.Unknown && (
                     <p className="mt-1 text-[11px] text-rose-600">
-                      BoxType không được để Unknown.
+                      Loại thùng không được để "Không xác định".
                     </p>
                   )}
                 </div>
-                <div className="flex justify-end">
+                <div className="md:col-span-3">
+                  <label className="flex h-5 items-center text-xs font-medium text-slate-600 mb-1">
+                    Kích cỡ thùng
+                  </label>
+                  <select
+                    {...createBoxesForm.register("boxTypeSpecId", {
+                      valueAsNumber: true,
+                    })}
+                    className="w-full h-11 rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
+                  >
+                    <option value={0}>Chọn kích cỡ</option>
+                    {filteredSpecs.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.displayName} · {s.lengthCm}x{s.widthCm}x{s.heightCm} cm · {s.volumeM3} m3
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="md:col-span-3">
+                  <label className="flex h-5 items-center text-xs font-medium text-slate-600 mb-1">
+                    Khối lượng thùng (kg)
+                  </label>
+                  <input
+                    type="number"
+                    min={0.01}
+                    step="0.01"
+                    {...createBoxesForm.register("boxSize", {
+                      valueAsNumber: true,
+                    })}
+                    readOnly
+                    className="w-full h-11 rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:outline-none"
+                    placeholder="Tự động theo khối lượng riêng nhân thể tích thùng"
+                  />
+                  <p className="mt-1 text-[11px] text-slate-500 min-h-[16px]">
+                    {selectedVariant
+                      ? `Khối lượng riêng: ${selectedVariant.densityKgPerM3} kg/m³`
+                      : "Lô chưa xác định được biến thể sản phẩm"}
+                  </p>
+                </div>
+                <div className="md:col-span-12 flex justify-start pt-1">
                   <button
                     type="submit"
                     disabled={
                       isCreatingBoxes || isLoadingLots || lots.length === 0
                     }
-                    className="px-4 py-2 rounded-xl bg-emerald-600 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 flex items-center gap-2"
+                    className="px-5 py-2.5 rounded-xl bg-emerald-600 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 flex items-center gap-2 shadow-sm"
                   >
                     {isCreatingBoxes && (
                       <Loader2 size={14} className="animate-spin" />
                     )}
-                    Tạo box
+                    Tạo thùng
                   </button>
                 </div>
               </form>
@@ -1026,7 +1492,7 @@ export default function GoodsReceiptQC() {
               <div className="mt-4 rounded-2xl border border-emerald-100 bg-white p-3">
                 <div className="flex items-center justify-between gap-2">
                   <h4 className="text-xs font-semibold text-slate-800">
-                    Danh sách QR box theo phiếu nhập
+                      Danh sách mã QR thùng theo phiếu nhập
                   </h4>
                   {isFetchingReceiptBoxes ? (
                     <span className="text-[11px] text-slate-500">
@@ -1037,7 +1503,7 @@ export default function GoodsReceiptQC() {
 
                 {receiptBoxes.length === 0 ? (
                   <p className="mt-2 text-xs text-slate-500">
-                    Chưa có box nào cho phiếu nhập này.
+                    Chưa có thùng nào cho phiếu nhập này.
                   </p>
                 ) : (
                   <div className="mt-2 overflow-x-auto">
@@ -1045,10 +1511,10 @@ export default function GoodsReceiptQC() {
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200">
                           <th className="px-3 py-2 text-left font-semibold text-slate-500 uppercase tracking-wider">
-                            Box
+                            Thùng
                           </th>
                           <th className="px-3 py-2 text-left font-semibold text-slate-500 uppercase tracking-wider">
-                            Lot
+                            Lô
                           </th>
                           <th className="px-3 py-2 text-right font-semibold text-slate-500 uppercase tracking-wider">
                             KL (kg)
@@ -1074,7 +1540,7 @@ export default function GoodsReceiptQC() {
                               {b.weight}
                             </td>
                             <td className="px-3 py-2 text-slate-700">
-                              {b.slotCode ?? "Chưa xếp slot"}
+                              {b.slotCode ?? "Chưa xếp vị trí"}
                             </td>
                             <td className="px-3 py-2">
                               {b.qrImageUrl ? (
@@ -1116,7 +1582,7 @@ export default function GoodsReceiptQC() {
                         <span className="font-semibold text-slate-700">
                           {Math.min(safeBoxesPage * boxesPageSize, receiptBoxes.length)}
                         </span>{" "}
-                        / {receiptBoxes.length} box
+                        / {receiptBoxes.length} thùng
                       </div>
                       <div className="flex items-center gap-2">
                         <select

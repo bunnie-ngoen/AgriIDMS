@@ -41,6 +41,9 @@ export type LotSummary = {
   lotCode: string;
   /** URL ảnh QR (Cloudinary) — do FE upload */
   qrImageUrl?: string | null;
+  productVariantId?: number | null;
+  productVariantName?: string | null;
+  productName?: string | null;
   totalQuantity: number;
   remainingQuantity: number;
   receivedDate: string;
@@ -66,6 +69,7 @@ export type LotBoxItem = {
   boxId: number;
   boxCode: string;
   weight: number;
+  volumeM3?: number;
   status: string;
   slotId?: number | null;
   slotCode?: string | null;
@@ -118,6 +122,7 @@ export type BoxByQrResponse = {
   qrCode: string | null;
   qrImageUrl?: string | null;
   weight: number;
+  volumeM3?: number;
   status: string;
   slotId: number | null;
   warehouseId: number | null;
@@ -259,5 +264,55 @@ export type DisposeHistoryItem = {
   createdBy: string;
   createdByName?: string | null;
   createdAt: string;
+};
+
+export type GoodsReceiptPrintLine = {
+  lineNo: number;
+  detailId: number;
+  productName: string;
+  grade: string;
+  itemCode?: string | null;
+  unit?: string | null;
+  orderedWeightKg?: number | null;
+  receivedWeightKg: number;
+  usableWeightKg?: number | null;
+  unitPrice?: number | null;
+  lineTotal?: number | null;
+  qcResult: string;
+  qcNote?: string | null;
+  inspectedBy?: string | null;
+  inspectedAtUtc?: string | null;
+};
+
+export type GoodsReceiptPrintData = {
+  schemaVersion: string;
+  documentTitle: string;
+  snapshotAtUtc: string;
+  snapshotPhase: string;
+  isPreview: boolean;
+  requiresManagerAttention: boolean;
+  printWarningMessage?: string | null;
+  receiptType: string;
+  nonPoReason?: string | null;
+  receiptId: number;
+  receiptCode: string;
+  receiptStatus: string;
+  purchaseOrderId?: number | null;
+  purchaseOrderCode?: string | null;
+  supplierName: string;
+  warehouseName: string;
+  vehicleNumber: string;
+  driverName?: string | null;
+  transportCompany?: string | null;
+  sourceWarehouseName?: string | null;
+  sourceWarehouseAddress?: string | null;
+  receivedDate: string;
+  totalReceivedWeight: number;
+  totalUsableWeight: number;
+  totalAmount?: number | null;
+  amountInWords?: string | null;
+  approvedByUserName?: string | null;
+  approvedAtUtc?: string | null;
+  lines: GoodsReceiptPrintLine[];
 };
 
