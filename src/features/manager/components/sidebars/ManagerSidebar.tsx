@@ -62,9 +62,20 @@ const mainMenu: MenuItem[] = [
       { name: "Hàng hư hỏng / quá hạn", path: "inventory-issues", icon: AlertTriangle },
       { name: "Duyệt yêu cầu tiêu hủy", path: "disposal-requests", icon: Trash2 },
       {
-        name: "Cấu hình giảm giá (gần hết hạn)",
-        path: "near-expiry-discount-config",
+        name: "Cấu hình giảm giá",
         icon: BadgePercent,
+        children: [
+          {
+            name: "Giảm giá theo ngày gần hết hạn",
+            path: "near-expiry-discount-config",
+            icon: BadgePercent,
+          },
+          {
+            name: "Giảm giá theo mặt hàng",
+            path: "variant-discount-config",
+            icon: BadgePercent,
+          },
+        ],
       },
     ],
   },

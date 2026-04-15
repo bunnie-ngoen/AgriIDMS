@@ -89,6 +89,9 @@ const InventoryIssueManagementPage = lazy(
 const NearExpiryDiscountConfigPage = lazy(
   () => import("./pages/NearExpiryDiscountConfigPage"),
 );
+const VariantDiscountOverrideConfigPage = lazy(
+  () => import("./pages/VariantDiscountOverrideConfigPage"),
+);
 const DisposalRequestsPage = lazy(
   () => import("../admin/pages/DisposalRequestsPage"),
 );
@@ -119,6 +122,7 @@ export const managerRoutes = [
       { path: "putaway", element: <PutBoxIntoSlotPage /> },
       { path: "inventory-issues", element: <InventoryIssueManagementPage /> },
       { path: "near-expiry-discount-config", element: <NearExpiryDiscountConfigPage /> },
+      { path: "variant-discount-config", element: <VariantDiscountOverrideConfigPage /> },
       { path: "disposal-requests", element: <DisposalRequestsPage /> },
 
       // Nha cung cap
