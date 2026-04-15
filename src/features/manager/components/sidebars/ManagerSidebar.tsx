@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   BadgePercent,
   Trash2,
+  Ruler,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
@@ -76,6 +77,11 @@ const mainMenu: MenuItem[] = [
             icon: BadgePercent,
           },
         ],
+      },
+      {
+        name: "Cấu hình loại box",
+        path: "box-type-config",
+        icon: Ruler,
       },
     ],
   },

@@ -79,16 +79,16 @@ export default function AdminHeaderQrMiniScan() {
     try {
       if (mode === "lot") {
         await triggerLot(trimmed).unwrap();
-        toast.success("Đã tra cứu Lot.");
+        toast.success("Đã tra cứu lô.");
         return;
       }
       if (mode === "box") {
         await triggerBox(trimmed).unwrap();
-        toast.success("Đã tra cứu Box.");
+        toast.success("Đã tra cứu thùng.");
         return;
       }
       await triggerSlot(trimmed).unwrap();
-      toast.success("Đã tra cứu Slot.");
+      toast.success("Đã tra cứu vị trí.");
     } catch (err: any) {
       const msg =
         err?.data?.message ||
@@ -119,7 +119,7 @@ export default function AdminHeaderQrMiniScan() {
   const handleClickBoxInSlot = async (box: any) => {
     const payload = (box?.qrCode ?? box?.boxCode ?? "").toString().trim();
     if (!payload) {
-      toast.error("Box không có QR để tra cứu.");
+      toast.error("Thùng không có QR để tra cứu.");
       return;
     }
 
@@ -238,10 +238,10 @@ export default function AdminHeaderQrMiniScan() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-sm font-semibold text-gray-900 truncate">
-                    LOT: {(currentResult as any)?.lotCode ?? "—"}
+                    LÔ: {(currentResult as any)?.lotCode ?? "—"}
                   </div>
                   <div className="text-xs text-gray-600 mt-1">
-                    ID: {(currentResult as any)?.id ?? "—"} · Trạng thái:{" "}
+                    Mã: {(currentResult as any)?.id ?? "—"} · Trạng thái:{" "}
                     {(currentResult as any)?.status ?? "—"}
                   </div>
                 </div>
@@ -274,7 +274,7 @@ export default function AdminHeaderQrMiniScan() {
           ) : mode === "box" ? (
             <div>
               <div className="text-sm font-semibold text-gray-900">
-                BOX: {(currentResult as any)?.boxCode ?? "—"}
+                THÙNG: {(currentResult as any)?.boxCode ?? "—"}
               </div>
               <div className="text-xs text-gray-600 mt-1">
                 Trạng thái: {(currentResult as any)?.status ?? "—"}
@@ -282,15 +282,15 @@ export default function AdminHeaderQrMiniScan() {
               <div className="mt-2 text-xs text-gray-700 space-y-1">
                 <div>Khối lượng (KG): {(currentResult as any)?.weight ?? 0}</div>
                 <div>
-                  Warehouse: {(currentResult as any)?.warehouseName ??
+                  Kho: {(currentResult as any)?.warehouseName ??
                     (currentResult as any)?.warehouseId ??
                     "—"}
                 </div>
                 <div>
-                  Code slot: {(currentResult as any)?.slotCode ?? (currentResult as any)?.slotId ?? "—"}
+                  Mã vị trí: {(currentResult as any)?.slotCode ?? (currentResult as any)?.slotId ?? "—"}
                 </div>
                 <div>
-                  Lot code: {(currentResult as any)?.lotCode ?? (currentResult as any)?.lotId ?? "—"}
+                  Mã lô: {(currentResult as any)?.lotCode ?? (currentResult as any)?.lotId ?? "—"}
                 </div>
                 <div>
                   Sản phẩm: {(currentResult as any)?.productName ?? "—"} · Biến thể:{" "}
@@ -311,10 +311,10 @@ export default function AdminHeaderQrMiniScan() {
           ) : (
             <div>
               <div className="text-sm font-semibold text-gray-900">
-                SLOT: {(currentResult as any)?.code ?? (currentResult as any)?.qrCode ?? "—"}
+                VỊ TRÍ: {(currentResult as any)?.code ?? (currentResult as any)?.qrCode ?? "—"}
               </div>
               <div className="text-xs text-gray-600 mt-1">
-                Rack:{" "}
+                Kệ:{" "}
                 {(currentResult as any)?.rackName ??
                   (currentResult as any)?.rackId ??
                   "—"}
@@ -328,13 +328,13 @@ export default function AdminHeaderQrMiniScan() {
               <div className="mt-3 border-t pt-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-xs font-semibold text-gray-900">
-                    Slot đang chứa gì
+                    Vị trí đang chứa gì
                   </div>
                   {isFetchingSlotContents ? (
                     <div className="text-xs text-gray-500">Đang tải...</div>
                   ) : (
                     <div className="text-xs text-gray-500">
-                      {(slotContents as any)?.boxCount ?? (slotContents as any)?.boxes?.length ?? 0} box
+                      {(slotContents as any)?.boxCount ?? (slotContents as any)?.boxes?.length ?? 0} thùng
                     </div>
                   )}
                 </div>
@@ -356,7 +356,7 @@ export default function AdminHeaderQrMiniScan() {
                           {b.boxCode}
                         </div>
                         <div className="text-[11px] text-gray-600 truncate">
-                          Lot: {b.lotCode ?? "—"} · HSD: {formatDateVi(b.expiryDate)}
+                          Lô: {b.lotCode ?? "—"} · HSD: {formatDateVi(b.expiryDate)}
                         </div>
                         <div className="text-[11px] text-gray-600">
                           Khối lượng: {b.weight ?? 0}
@@ -364,7 +364,7 @@ export default function AdminHeaderQrMiniScan() {
                       </button>
                     ))}
                     {(slotContents as any)?.boxes?.length === 0 ? (
-                      <div className="text-xs text-gray-500">Chưa có box.</div>
+                      <div className="text-xs text-gray-500">Chưa có thùng.</div>
                     ) : null}
                   </div>
                 ) : (
@@ -374,12 +374,12 @@ export default function AdminHeaderQrMiniScan() {
                 {slotContents && (slotContents as any)?.boxes?.length > 0 ? (
                   isLoadingSlotBoxDetail ? (
                     <div className="mt-2 text-xs text-gray-500">
-                      Đang tải chi tiết box...
+                      Đang tải chi tiết thùng...
                     </div>
                   ) : slotBoxDetail ? (
                     <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 p-2">
                       <div className="text-xs font-semibold text-gray-900 truncate">
-                        BOX: {slotBoxDetail.boxCode ?? "—"}
+                        THÙNG: {slotBoxDetail.boxCode ?? "—"}
                       </div>
                       <div className="text-[11px] text-gray-600 mt-1">
                         Trạng thái: {slotBoxDetail.status ?? "—"}
@@ -388,17 +388,17 @@ export default function AdminHeaderQrMiniScan() {
                         Khối lượng: {slotBoxDetail.weight ?? 0} kg
                       </div>
                       <div className="text-[11px] text-gray-600 mt-1">
-                        Warehouse:{" "}
+                        Kho:{" "}
                         {slotBoxDetail.warehouseName ??
                           slotBoxDetail.warehouseId ??
                           "—"}
                       </div>
                       <div className="text-[11px] text-gray-600 mt-1">
-                        Code slot:{" "}
+                        Mã vị trí:{" "}
                         {slotBoxDetail.slotCode ?? slotBoxDetail.slotId ?? "—"}
                       </div>
                       <div className="text-[11px] text-gray-600 mt-1">
-                        Lot: {slotBoxDetail.lotCode ?? "—"}
+                        Lô: {slotBoxDetail.lotCode ?? "—"}
                       </div>
                       <div className="text-[11px] text-gray-700 mt-2">
                         Sản phẩm: {slotBoxDetail.productName ?? "—"} · Biến thể:{" "}

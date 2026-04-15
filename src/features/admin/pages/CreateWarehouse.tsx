@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -56,6 +56,8 @@ const CreateWarehouse = () => {
       districtCode: 0,
       wardCode: 0,
       detailAddress: "",
+      lengthM: 0,
+      widthM: 0,
       titleWarehouse: "Normal",
     },
   });
@@ -69,6 +71,14 @@ const CreateWarehouse = () => {
 
   const provinceCode = form.watch("provinceCode");
   const districtCode = form.watch("districtCode");
+  const lengthM = form.watch("lengthM");
+  const widthM = form.watch("widthM");
+  const floorAreaM2 = useMemo(() => {
+    const l = Number(lengthM || 0);
+    const w = Number(widthM || 0);
+    if (l <= 0 || w <= 0) return 0;
+    return l * w;
+  }, [lengthM, widthM]);
 
   useEffect(() => {
     let mounted = true;
@@ -147,6 +157,9 @@ const CreateWarehouse = () => {
         name: values.name,
         location,
         titleWarehouse: values.titleWarehouse,
+        lengthM: values.lengthM,
+        widthM: values.widthM,
+        floorAreaM2,
       }).unwrap();
 
       const successMessage = res.message ?? "Tạo kho thành công";
@@ -159,6 +172,8 @@ const CreateWarehouse = () => {
         districtCode: 0,
         wardCode: 0,
         detailAddress: "",
+        lengthM: 0,
+        widthM: 0,
         titleWarehouse: "Normal",
       });
 
@@ -230,6 +245,37 @@ const CreateWarehouse = () => {
                   <ChevronDown size={15} className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 </div>
               </Field>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Chiều dài (m) *" error={form.formState.errors.lengthM?.message}>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    {...form.register("lengthM", { valueAsNumber: true })}
+                    className={inputCls(!!form.formState.errors.lengthM)}
+                    placeholder="Ví dụ: 120"
+                  />
+                </Field>
+                <Field label="Chiều rộng (m) *" error={form.formState.errors.widthM?.message}>
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.1}
+                    {...form.register("widthM", { valueAsNumber: true })}
+                    className={inputCls(!!form.formState.errors.widthM)}
+                    placeholder="Ví dụ: 60"
+                  />
+                </Field>
+              </div>
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-wider text-emerald-700 font-semibold">
+                  Diện tích sàn kho
+                </p>
+                <p className="text-lg font-bold text-emerald-800 mt-1">
+                  {floorAreaM2.toFixed(2)} m²
+                </p>
+              </div>
             </div>
           </div>
 
