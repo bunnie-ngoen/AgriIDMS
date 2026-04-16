@@ -44,6 +44,10 @@ export const productVariantApi = api.injectEndpoints({
                             (row.minReceiptWeight as number | null | undefined) ??
                             (row.MinReceiptWeight as number | null | undefined) ??
                             null,
+                        densityKgPerM3:
+                            (row.densityKgPerM3 as number | undefined) ??
+                            (row.DensityKgPerM3 as number | undefined) ??
+                            0,
                         availableBoxCount:
                             (row.availableBoxCount as number | undefined) ??
                             (row.AvailableBoxCount as number | undefined) ??

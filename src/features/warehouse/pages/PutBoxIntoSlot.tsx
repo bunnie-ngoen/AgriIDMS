@@ -156,7 +156,9 @@ export default function PutBoxIntoSlot() {
     return undefined;
   }, [slots, selectedSlotId]);
 
-  const slotCapacity = selectedSlot?.capacity ?? slot?.capacity ?? 0;
+  const MAX_SLOT_UTILIZATION = 0.8;
+  const slotRawCapacity = selectedSlot?.capacity ?? slot?.capacity ?? 0;
+  const slotCapacity = slotRawCapacity * MAX_SLOT_UTILIZATION;
   const slotCurrent = selectedSlot?.currentCapacity ?? slot?.currentCapacity ?? 0;
   const slotRemaining = Math.max(0, slotCapacity - slotCurrent);
   const lockWarehouse = Boolean(
@@ -168,7 +170,10 @@ export default function PutBoxIntoSlot() {
   const selectedLotBoxes = availableLotBoxes.filter((b) =>
     selectedLotBoxIds.includes(b.boxId),
   );
-  const selectedLotTotalWeight = selectedLotBoxes.reduce((sum, b) => sum + (b.weight ?? 0), 0);
+  const selectedLotTotalVolume = selectedLotBoxes.reduce(
+    (sum, b) => sum + Number(b.volumeM3 ?? 0),
+    0,
+  );
   const hasBulkSelection = selectedLotBoxIds.length > 0;
 
   const handleLoadBox = async (qrOverride?: string) => {
@@ -408,9 +413,9 @@ export default function PutBoxIntoSlot() {
     }
 
     const tolerance = 0.0001;
-    if (selectedLotTotalWeight - slotRemaining > tolerance) {
+    if (selectedLotTotalVolume - slotRemaining > tolerance) {
       toast.error(
-        `Vị trí không đủ dung lượng: còn ${slotRemaining.toFixed(3)} kg, đã chọn ${selectedLotTotalWeight.toFixed(3)} kg.`,
+        `Vị trí không đủ dung lượng: còn ${slotRemaining.toFixed(4)} m³, đã chọn ${selectedLotTotalVolume.toFixed(4)} m³.`,
       );
       return;
     }
@@ -612,7 +617,9 @@ export default function PutBoxIntoSlot() {
                         </div>
                         <div>
                           <p className="text-[11px] font-medium text-slate-500">Khối lượng</p>
-                          <p className="font-semibold text-slate-900">{box.weight} kg</p>
+                          <p className="font-semibold text-slate-900">
+                            {Number(box.volumeM3 ?? 0).toFixed(4)} m³
+                          </p>
                         </div>
                         <div>
                           <p className="text-[11px] font-medium text-slate-500">Trạng thái</p>
@@ -724,7 +731,8 @@ export default function PutBoxIntoSlot() {
                       </div>
                     </div>
                     <div className="mt-2 text-xs text-slate-500">
-                      Đã chọn {selectedLotBoxIds.length} hàng · Tổng KL {selectedLotTotalWeight.toFixed(3)} kg
+                      Đã chọn {selectedLotBoxIds.length} hàng · Tổng thể tích{" "}
+                      {selectedLotTotalVolume.toFixed(4)} m³
                     </div>
                     {isFetchingLotDetail ? (
                       <div className="text-xs text-slate-500 mt-2 inline-flex items-center gap-2">
@@ -983,7 +991,7 @@ export default function PutBoxIntoSlot() {
                       {slots.map((s) => (
                         <option key={s.id} value={s.id}>
                           #{s.id} · {s.code} · còn{" "}
-                          {Math.max(0, s.capacity - s.currentCapacity)} kg
+                          {Math.max(0, s.capacity * MAX_SLOT_UTILIZATION - s.currentCapacity)} m³
                         </option>
                       ))}
                     </select>
@@ -1008,7 +1016,7 @@ export default function PutBoxIntoSlot() {
                     </div>
                     <div>
                       <p className="text-[11px] font-medium text-slate-500">
-                        Dung lượng trống (kg)
+                        Dung lượng trống (m³)
                       </p>
                       <p className="font-semibold text-slate-900">
                         {slotRemaining}
@@ -1016,21 +1024,21 @@ export default function PutBoxIntoSlot() {
                     </div>
                     <div className="col-span-2">
                       <p className="text-[11px] font-medium text-slate-500">
-                        Dung lượng
+                        Dung lượng vận hành (80%)
                       </p>
                       <p className="font-semibold text-slate-900">
-                        {slotCurrent} / {slotCapacity} kg
+                        {slotCurrent} / {slotCapacity} m³
                       </p>
-                      {((box?.weight != null && box.weight > 0) || selectedLotTotalWeight > 0) &&
+                      {((box?.volumeM3 != null && box.volumeM3 > 0) || selectedLotTotalVolume > 0) &&
                         slotCapacity > 0 && (
                         <p className="text-xs text-slate-500 mt-1">
                           {hasBulkSelection
-                            ? `Tổng hàng đã chọn nặng ${selectedLotTotalWeight.toFixed(3)} kg`
-                            : `Hàng nặng ${box?.weight ?? 0} kg`}{" "}
+                            ? `Tổng thể tích hàng đã chọn ${selectedLotTotalVolume.toFixed(4)} m³`
+                            : `Thể tích hàng ${Number(box?.volumeM3 ?? 0).toFixed(4)} m³`}{" "}
                           ·{" "}
                           {(hasBulkSelection
-                            ? selectedLotTotalWeight
-                            : box?.weight ?? 0) > slotRemaining ? (
+                            ? selectedLotTotalVolume
+                            : Number(box?.volumeM3 ?? 0)) > slotRemaining ? (
                             <span className="text-rose-600 font-semibold">
                               Vị trí có thể không đủ dung lượng (BE sẽ kiểm tra).
                             </span>

@@ -142,6 +142,10 @@ const ProductVariantDetail = () => {
               }
             />
             <DetailRow
+              label="Khối lượng riêng (kg/m3)"
+              value={variant.densityKgPerM3 > 0 ? `${variant.densityKgPerM3} kg/m3` : "—"}
+            />
+            <DetailRow
               label="Box khả dụng"
               value={
                 typeof variant.availableBoxCount === "number"

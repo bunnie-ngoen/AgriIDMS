@@ -1,6 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { RootState } from '../../app/store';
 
+
 /** URL API backend — đặt qua env `VITE_API_BASE_URL`. Dev có fallback localhost, production bắt buộc phải cấu hình env. */
 const apiBaseUrl = (() => {
     const raw = import.meta.env.VITE_API_BASE_URL?.trim();

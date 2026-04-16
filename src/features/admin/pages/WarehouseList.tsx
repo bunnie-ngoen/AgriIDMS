@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   useGetWarehousesQuery,
   useDeleteWarehouseMutation,
@@ -10,8 +10,16 @@ import EditWarehouseModal from "../components/EditWarehouseModal";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 const PAGE_SIZE = 10;
-const formatKg = (value: number | undefined) =>
-  Number(value ?? 0).toLocaleString("vi-VN");
+const formatVolume = (value: number | undefined) =>
+  Number(value ?? 0).toLocaleString("vi-VN", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 4,
+  });
+const formatArea = (value: number | null | undefined) =>
+  Number(value ?? 0).toLocaleString("vi-VN", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
 
 const WarehouseList = () => {
   const { isManager, isWarehouseStaff } = useRoleGuard();
@@ -21,6 +29,7 @@ const WarehouseList = () => {
       ? "/manager/warehouses"
       : "/admin/warehouses";
   const readOnlyActions = isWarehouseStaff();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialPage = Number(searchParams.get("page") ?? "1") || 1;
 
@@ -61,6 +70,28 @@ const WarehouseList = () => {
     }
   };
 
+  const handleOpenEdit = (warehouse: WarehouseItem) => {
+    const occupied =
+      Number(warehouse.storedInSlotsWeight ?? 0) +
+      Number(warehouse.unassignedStockWeight ?? 0);
+    if (occupied > 0) {
+      window.alert("Kho đang có sản phẩm. Vui lòng dọn trống kho trước khi cập nhật thông tin.");
+      return;
+    }
+    setEditingWarehouseId(warehouse.id);
+  };
+
+  const handleOpenConfig = (warehouse: WarehouseItem) => {
+    const occupied =
+      Number(warehouse.storedInSlotsWeight ?? 0) +
+      Number(warehouse.unassignedStockWeight ?? 0);
+    if (occupied > 0) {
+      window.alert("Kho đang có sản phẩm. Vui lòng dọn trống kho trước khi cấu hình.");
+      return;
+    }
+    navigate(`${warehouseBasePath}/${warehouse.id}/config`);
+  };
+
   const filtered = useMemo(() => {
     if (!data) return [];
 
@@ -97,8 +128,8 @@ const WarehouseList = () => {
           : "Không tải được danh sách kho. Vui lòng thử lại.";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-4 sm:px-6 py-6">
-      <div className="w-full max-w-[1600px] mx-auto">
+    <div className="min-h-screen min-w-0 bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-4 sm:px-6 py-6">
+      <div className="w-full min-w-0 max-w-[1600px] mx-auto">
         {/* Header — giống Tạo kho */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
@@ -126,7 +157,7 @@ const WarehouseList = () => {
         </div>
 
         {/* Card nội dung */}
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="min-w-0 bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
           {/* Bộ lọc */}
           <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center gap-3">
             <input
@@ -172,8 +203,8 @@ const WarehouseList = () => {
             </div>
           )}
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
+          <div className="w-full min-w-0 overflow-x-auto overscroll-x-contain">
+            <table className="w-full min-w-[920px] text-sm">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-100">
                   <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[160px]">
@@ -184,6 +215,9 @@ const WarehouseList = () => {
                   </th>
                   <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[120px]">
                     Loại kho
+                  </th>
+                  <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[180px]">
+                    Diện tích sàn
                   </th>
                   <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[240px]">
                     Tổng trong kho / Sức chứa
@@ -197,7 +231,7 @@ const WarehouseList = () => {
                 {isLoading ? (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       className="px-5 py-10 text-center text-slate-500"
                     >
                       Đang tải dữ liệu...
@@ -232,11 +266,37 @@ const WarehouseList = () => {
                       </td>
                       <td className="px-5 py-4 align-top text-right text-slate-700">
                         {(() => {
+                          const fromApi = Number(warehouse.floorAreaM2 ?? 0);
+                          const fromDimensions =
+                            Number(warehouse.lengthM ?? 0) * Number(warehouse.widthM ?? 0);
+                          const area = fromApi > 0 ? fromApi : fromDimensions;
+                          return area > 0 ? (
+                            <div className="flex flex-col items-end gap-1">
+                              <span className="font-semibold tabular-nums text-slate-800">
+                                {formatArea(area)} m²
+                              </span>
+                              {Number(warehouse.lengthM ?? 0) > 0 &&
+                              Number(warehouse.widthM ?? 0) > 0 ? (
+                                <span className="text-[11px] text-slate-500">
+                                  {formatArea(warehouse.lengthM)} × {formatArea(warehouse.widthM)} m
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400">Chưa có</span>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-5 py-4 align-top text-right text-slate-700">
+                        {(() => {
                           const storedInSlots = Number(warehouse.storedInSlotsWeight ?? 0);
                           const unassigned = Number(warehouse.unassignedStockWeight ?? 0);
                           const occupied = storedInSlots + unassigned;
                           const capacity = Number(warehouse.totalCapacity ?? 0);
-                          const overflow = Math.max(0, occupied - capacity);
+                          const capacityUnset = capacity <= 0;
+                          const overflow = capacityUnset
+                            ? 0
+                            : Math.max(0, occupied - capacity);
                           const isOverflow = overflow > 0;
 
                           return (
@@ -246,19 +306,36 @@ const WarehouseList = () => {
                               isOverflow ? "text-rose-700" : "text-slate-800"
                             }`}
                           >
-                            {formatKg(occupied)} / {formatKg(capacity)} kg
+                            {capacityUnset && occupied <= 0 ? (
+                              <span className="font-medium text-slate-500">
+                                Chưa có hàng · sức chứa: chưa cấu
+                              </span>
+                            ) : capacityUnset ? (
+                              <>
+                                {formatVolume(occupied)} m³{" "}
+                                <span className="font-normal text-amber-800">
+                                  (tổng sức chứa slot chưa cấu)
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                {formatVolume(occupied)} / {formatVolume(capacity)} m³
+                              </>
+                            )}
                           </span>
+                          {(storedInSlots > 0 || unassigned > 0) && (
                           <div className="flex flex-wrap justify-end gap-1">
                             <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
-                              Trong slot: {formatKg(storedInSlots)} kg
+                              Trong slot: {formatVolume(storedInSlots)} m³
                             </span>
                             <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700">
-                              Chưa xếp: {formatKg(unassigned)} kg
+                              Chưa xếp: {formatVolume(unassigned)} m³
                             </span>
                           </div>
+                          )}
                           {isOverflow && (
                             <span className="inline-flex rounded-full bg-rose-50 px-2 py-0.5 text-[11px] text-rose-700 font-medium">
-                              Vượt sức chứa: {formatKg(overflow)} kg
+                              Vượt sức chứa: {formatVolume(overflow)} m³
                             </span>
                           )}
                         </div>
@@ -271,18 +348,19 @@ const WarehouseList = () => {
                             <>
                               <button
                                 type="button"
-                                onClick={() => setEditingWarehouseId(warehouse.id)}
+                                onClick={() => handleOpenEdit(warehouse)}
                                 className="inline-flex items-center gap-1 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                               >
                                 <Pencil size={12} />
                                 Sửa
                               </button>
-                              <Link
-                                to={`${warehouseBasePath}/${warehouse.id}/config`}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenConfig(warehouse)}
                                 className="inline-flex items-center whitespace-nowrap rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
                               >
                                 Cấu hình
-                              </Link>
+                              </button>
                             </>
                           ) : null}
                           <Link
@@ -309,7 +387,7 @@ const WarehouseList = () => {
                 ) : (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       className="px-5 py-10 text-center text-slate-500"
                     >
                       Không tìm thấy kho phù hợp.

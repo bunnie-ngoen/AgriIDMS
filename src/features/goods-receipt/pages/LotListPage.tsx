@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, QrCode, Eye } from "lucide-react";
+import { Loader2, QrCode, Eye, FileDown } from "lucide-react";
 import toast from "react-hot-toast";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 import { useGetAllLotsQuery, useUpdateLotQrImageMutation } from "../api/goods-receipt.api";
@@ -20,6 +20,14 @@ function toStatusTone(status: string): string {
   return "text-slate-600";
 }
 
+function escHtml(s: string): string {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 export default function LotListPage() {
   const navigate = useNavigate();
   const { isManager, isWarehouseStaff } = useRoleGuard();
@@ -31,8 +39,9 @@ export default function LotListPage() {
 
   const { data: lots = [], isLoading, isError, refetch } = useGetAllLotsQuery();
   const [updateLotQrImage] = useUpdateLotQrImageMutation();
-  const [isBackfillingQr, setIsBackfillingQr] = useState(false);
+  const [, setIsBackfillingQr] = useState(false);
   const attemptedLotIdsRef = useRef<Set<number>>(new Set());
+  const backfillInFlightRef = useRef(false);
 
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "Active" | "Blocked" | "Expired">("ALL");
@@ -40,6 +49,94 @@ export default function LotListPage() {
   const [qrFilter, setQrFilter] = useState<"ALL" | "HAS_QR" | "NO_QR">("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  const exportLotQrToPdf = (lot: (typeof lots)[number]) => {
+    const ts = new Date()
+      .toISOString()
+      .replace(/[-:]/g, "")
+      .replace("T", "-")
+      .slice(0, 13);
+    const lotCode = lot.lotCode || `#${lot.lotId}`;
+    const fileName = `qr-lo-${lotCode}-${ts}.pdf`;
+    const html = `<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <title>${escHtml(fileName)}</title>
+    <style>
+      @page { size: A4; margin: 12mm; }
+      body { font-family: Arial, sans-serif; color: #0f172a; margin: 0; }
+      .sheet {
+        min-height: calc(100vh - 24mm);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+      .title { font-size: 22px; font-weight: 700; margin: 0; }
+      .code { font-size: 18px; font-weight: 600; margin: 0; }
+      .qr {
+        width: 300px;
+        height: 300px;
+        border: 1px solid #cbd5e1;
+        object-fit: contain;
+        background: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sheet">
+      <h1 class="title">QR lô hàng</h1>
+      <p class="code">${escHtml(lotCode)}</p>
+      ${
+        lot.qrImageUrl
+          ? `<img class="qr" src="${escHtml(lot.qrImageUrl)}" alt="QR ${escHtml(
+              lot.lotCode || String(lot.lotId),
+            )}" />`
+          : `<div class="qr" style="display:flex;align-items:center;justify-content:center;font-size:12px;color:#64748b">Chưa có ảnh QR</div>`
+      }
+    </div>
+    <script>window.onload = () => window.print();</script>
+  </body>
+</html>`;
+
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.setAttribute("aria-hidden", "true");
+    document.body.appendChild(iframe);
+
+    const printDoc = iframe.contentDocument;
+    const printWin = iframe.contentWindow;
+    if (!printDoc || !printWin) {
+      document.body.removeChild(iframe);
+      toast.error("Không thể mở trình in lúc này.");
+      return;
+    }
+
+    printDoc.open();
+    printDoc.write(html);
+    printDoc.close();
+
+    const cleanup = () => {
+      setTimeout(() => {
+        if (iframe.parentNode) {
+          iframe.parentNode.removeChild(iframe);
+        }
+      }, 1000);
+    };
+
+    printWin.onafterprint = cleanup;
+    setTimeout(() => {
+      printWin.focus();
+      printWin.print();
+    }, 100);
+  };
 
   const warehouseOptions = useMemo(() => {
     const map = new Map<string, string>();
@@ -83,16 +180,18 @@ export default function LotListPage() {
       .filter((l) => !attemptedLotIdsRef.current.has(l.lotId))
       .slice(0, 20);
 
-    if (missingLots.length === 0 || isBackfillingQr) return;
+    if (missingLots.length === 0 || backfillInFlightRef.current) return;
 
     let cancelled = false;
 
     const run = async () => {
+      backfillInFlightRef.current = true;
       setIsBackfillingQr(true);
       missingLots.forEach((l) => attemptedLotIdsRef.current.add(l.lotId));
-      const toastId = toast.loading(
-        `Đang tự bổ sung ảnh QR cho ${missingLots.length} lot mới...`,
-      );
+      const toastId = "lot-qr-backfill";
+      toast.loading(`Đang tự bổ sung ảnh QR cho ${missingLots.length} lot mới...`, {
+        id: toastId,
+      });
 
       let success = 0;
       let failed = 0;
@@ -137,13 +236,14 @@ export default function LotListPage() {
       }
 
       setIsBackfillingQr(false);
+      backfillInFlightRef.current = false;
     };
 
     void run();
     return () => {
       cancelled = true;
     };
-  }, [lots, isBackfillingQr, updateLotQrImage, refetch]);
+  }, [lots, updateLotQrImage, refetch]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -317,14 +417,24 @@ export default function LotListPage() {
                         {toVietnameseLotStatus(lot.status)}
                       </td>
                       <td className="px-5 py-3.5 text-right">
-                        <button
-                          type="button"
-                          onClick={() => navigate(`${lotBasePath}/${lot.lotId}`)}
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200"
-                        >
-                          <Eye size={14} className="text-emerald-600" />
-                          Xem chi tiết lot
-                        </button>
+                        <div className="inline-flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => exportLotQrToPdf(lot)}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-sky-50 hover:border-sky-200"
+                          >
+                            <FileDown size={14} className="text-sky-600" />
+                            Xuất PDF QR
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`${lotBasePath}/${lot.lotId}`)}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:border-emerald-200"
+                          >
+                            <Eye size={14} className="text-emerald-600" />
+                            Xem chi tiết lot
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

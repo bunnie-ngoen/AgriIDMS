@@ -150,6 +150,7 @@ const ProductVariantList = () => {
                 <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Giá</th>
                 <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Hạn SD</th>
                 <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Định mức tối thiểu (kg)</th>
+                <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Khối lượng riêng (kg/m3)</th>
                 <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Box khả dụng</th>
                 <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Trạng thái</th>
                 <th className="px-5 py-3.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Thao tác</th>
@@ -209,6 +210,13 @@ const ProductVariantList = () => {
                     </td>
                     <td className="px-5 py-3.5">
                       <p className="text-xs text-slate-600">
+                        {variant.densityKgPerM3 > 0
+                          ? `${variant.densityKgPerM3} kg/m3`
+                          : "—"}
+                      </p>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <p className="text-xs text-slate-600">
                         {typeof variant.availableBoxCount === "number"
                           ? variant.availableBoxCount.toLocaleString()
                           : "0"}
@@ -218,14 +226,14 @@ const ProductVariantList = () => {
                       <button
                         type="button"
                         onClick={() => handleToggleStatus(variant)}
-                        className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold border transition-all hover:scale-105 ${variant.isActive
+                        className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1 text-[11px] font-semibold border transition-all hover:scale-105 ${variant.isActive
                             ? "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
                             : "bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200"
                           }`}
                         title="Click để đổi trạng thái"
                       >
-                        <span className={`h-1.5 w-1.5 rounded-full ${variant.isActive ? "bg-emerald-500" : "bg-slate-400"}`} />
-                        {variant.isActive ? "Active" : "Inactive"}
+                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${variant.isActive ? "bg-emerald-500" : "bg-slate-400"}`} />
+                        {variant.isActive ? "Hoạt động" : "Vô hiệu"}
                       </button>
                     </td>
                     <td className="px-5 py-3.5 text-right">
@@ -260,7 +268,7 @@ const ProductVariantList = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="px-5 py-16 text-center">
+                  <td colSpan={10} className="px-5 py-16 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <div className="h-16 w-16 rounded-2xl bg-slate-100 flex items-center justify-center">
                         <PackageOpen size={28} className="text-slate-300" />

@@ -8,15 +8,20 @@ import {
 } from "../api/near-expiry-discount.api";
 
 type DiscountRule = {
+  name: string;
+  minDays: number | null;
   maxDays: number;
   discountPercent: number;
+  priority: number;
   isActive: boolean;
+  startAtUtc: string | null;
+  endAtUtc: string | null;
 };
 
 const defaultRules: DiscountRule[] = [
-  { maxDays: 1, discountPercent: 20, isActive: true },
-  { maxDays: 3, discountPercent: 15, isActive: true },
-  { maxDays: 7, discountPercent: 10, isActive: true },
+  { name: "0-2 ngày", minDays: 0, maxDays: 2, discountPercent: 30, priority: 1, isActive: true, startAtUtc: null, endAtUtc: null },
+  { name: "3-5 ngày", minDays: 3, maxDays: 5, discountPercent: 20, priority: 2, isActive: true, startAtUtc: null, endAtUtc: null },
+  { name: "6-10 ngày", minDays: 6, maxDays: 10, discountPercent: 10, priority: 3, isActive: true, startAtUtc: null, endAtUtc: null },
 ];
 
 export default function NearExpiryDiscountConfigPage() {
@@ -24,7 +29,7 @@ export default function NearExpiryDiscountConfigPage() {
   const [daysThreshold, setDaysThreshold] = useState(7);
 
   const sortedRules = useMemo(
-    () => [...rules].sort((a, b) => a.maxDays - b.maxDays),
+    () => [...rules].sort((a, b) => a.priority - b.priority || a.maxDays - b.maxDays),
     [rules],
   );
 
@@ -43,7 +48,9 @@ export default function NearExpiryDiscountConfigPage() {
   );
 
   const getDiscountPercent = (daysLeft: number): number => {
-    const matched = sortedRules.find((r) => daysLeft <= r.maxDays);
+    const matched = sortedRules.find(
+      (r) => (r.minDays == null || daysLeft >= r.minDays) && daysLeft <= r.maxDays,
+    );
     return matched?.discountPercent ?? 0;
   };
 
@@ -51,9 +58,14 @@ export default function NearExpiryDiscountConfigPage() {
     setRules((prev) => [
       ...prev,
       {
+        name: "Rule mới",
+        minDays: 0,
         maxDays: 1,
         discountPercent: 5,
+        priority: rules.length + 1,
         isActive: true,
+        startAtUtc: null,
+        endAtUtc: null,
       },
     ]);
   };
@@ -64,7 +76,7 @@ export default function NearExpiryDiscountConfigPage() {
 
   const updateRule = (
     idx: number,
-    field: "maxDays" | "discountPercent",
+    field: "maxDays" | "discountPercent" | "priority",
     value: number,
   ) => {
     setRules((prev) =>
@@ -82,16 +94,25 @@ export default function NearExpiryDiscountConfigPage() {
   const saveRules = async () => {
     const cleaned = sortedRules.map((r) => ({
       ...r,
+      name: (r.name || "").trim(),
+      minDays:
+        r.minDays == null ? null : Math.max(0, Math.floor(Number(r.minDays))),
       maxDays: Math.max(0, Math.floor(r.maxDays)),
       discountPercent: Math.max(0, Math.min(100, Number(r.discountPercent))),
+      priority: Math.max(1, Math.floor(Number(r.priority || 1))),
     }));
     setRules(cleaned);
     try {
       await updateRules(
         cleaned.map((r) => ({
+          name: r.name,
+          minDaysLeft: r.minDays,
           maxDaysLeft: r.maxDays,
           discountPercent: r.discountPercent,
+          priority: r.priority,
           isActive: r.isActive,
+          startAtUtc: r.startAtUtc,
+          endAtUtc: r.endAtUtc,
         })),
       ).unwrap();
       toast.success("Đã lưu cấu hình giảm giá gần hết hạn.");
@@ -111,13 +132,19 @@ export default function NearExpiryDiscountConfigPage() {
       rulesData
         .map((r) => ({
           maxDays: Math.max(0, Math.floor(Number(r.maxDaysLeft ?? 0))),
+          name: r.name ?? "",
+          minDays:
+            r.minDaysLeft == null ? null : Math.max(0, Math.floor(Number(r.minDaysLeft))),
           discountPercent: Math.max(
             0,
             Math.min(100, Number(r.discountPercent ?? 0)),
           ),
+          priority: Math.max(1, Math.floor(Number(r.priority ?? 1))),
           isActive: Boolean(r.isActive),
+          startAtUtc: r.startAtUtc ?? null,
+          endAtUtc: r.endAtUtc ?? null,
         }))
-        .sort((a, b) => a.maxDays - b.maxDays),
+        .sort((a, b) => a.priority - b.priority || a.maxDays - b.maxDays),
     );
   }, [rulesData]);
 
@@ -200,8 +227,38 @@ export default function NearExpiryDiscountConfigPage() {
           {sortedRules.map((r, idx) => (
             <div
               key={`${r.maxDays}-${idx}`}
-              className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3"
+              className="grid grid-cols-1 md:grid-cols-7 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3"
             >
+              <div>
+                <label className="text-[11px] text-slate-500">Tên rule</label>
+                <input
+                  value={r.name}
+                  onChange={(e) =>
+                    setRules((prev) =>
+                      prev.map((x, i) => (i === idx ? { ...x, name: e.target.value } : x)),
+                    )
+                  }
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-slate-500">MinDaysLeft</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={r.minDays ?? 0}
+                  onChange={(e) =>
+                    setRules((prev) =>
+                      prev.map((x, i) =>
+                        i === idx
+                          ? { ...x, minDays: Math.max(0, Number(e.target.value || 0)) }
+                          : x,
+                      ),
+                    )
+                  }
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
+                />
+              </div>
               <div>
                 <label className="text-[11px] text-slate-500">
                   Áp dụng khi số ngày còn lại {"<="}
@@ -217,6 +274,16 @@ export default function NearExpiryDiscountConfigPage() {
                 />
               </div>
               <div>
+                <label className="text-[11px] text-slate-500">Priority</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={r.priority}
+                  onChange={(e) => updateRule(idx, "priority", Number(e.target.value))}
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
+                />
+              </div>
+              <div>
                 <label className="text-[11px] text-slate-500">Giảm giá (%)</label>
                 <input
                   type="number"
@@ -228,6 +295,49 @@ export default function NearExpiryDiscountConfigPage() {
                   }
                   className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
                 />
+              </div>
+              <div>
+                <label className="text-[11px] text-slate-500">Thời gian hiệu lực</label>
+                <div className="mt-1 grid grid-cols-1 gap-1">
+                  <input
+                    type="datetime-local"
+                    value={r.startAtUtc ? r.startAtUtc.slice(0, 16) : ""}
+                    onChange={(e) =>
+                      setRules((prev) =>
+                        prev.map((x, i) =>
+                          i === idx
+                            ? {
+                                ...x,
+                                startAtUtc: e.target.value
+                                  ? new Date(e.target.value).toISOString()
+                                  : null,
+                              }
+                            : x,
+                        ),
+                      )
+                    }
+                    className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs outline-none focus:border-sky-500"
+                  />
+                  <input
+                    type="datetime-local"
+                    value={r.endAtUtc ? r.endAtUtc.slice(0, 16) : ""}
+                    onChange={(e) =>
+                      setRules((prev) =>
+                        prev.map((x, i) =>
+                          i === idx
+                            ? {
+                                ...x,
+                                endAtUtc: e.target.value
+                                  ? new Date(e.target.value).toISOString()
+                                  : null,
+                              }
+                            : x,
+                        ),
+                      )
+                    }
+                    className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs outline-none focus:border-sky-500"
+                  />
+                </div>
               </div>
               <div className="flex items-end">
                 <button

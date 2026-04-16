@@ -27,6 +27,14 @@ function formatDateVi(input: string | Date | undefined | null): string {
   return d.toLocaleDateString("vi-VN");
 }
 
+function escHtml(s: string): string {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 export default function AdminQrScanPanel() {
   const [mode, setMode] = useState<ScanMode>("lot");
   const [qrInput, setQrInput] = useState("");
@@ -85,20 +93,20 @@ export default function AdminQrScanPanel() {
       if (mode === "lot") {
       setActiveSlotId(null);
         await triggerLot(trimmed).unwrap();
-        toast.success("Đã tra cứu Lot.");
+        toast.success("Đã tra cứu lô.");
         return;
       }
 
       if (mode === "box") {
         setActiveSlotId(null);
         await triggerBox(trimmed).unwrap();
-        toast.success("Đã tra cứu Box.");
+        toast.success("Đã tra cứu thùng.");
         return;
       }
 
       setActiveSlotId(null);
       await triggerSlot(trimmed).unwrap();
-      toast.success("Đã tra cứu Slot.");
+      toast.success("Đã tra cứu vị trí.");
     } catch (err: any) {
       const msg =
         err?.data?.message ||
@@ -130,7 +138,7 @@ export default function AdminQrScanPanel() {
   const handleClickBoxInSlot = async (box: any) => {
     const payload = (box?.qrCode ?? box?.boxCode ?? "").toString().trim();
     if (!payload) {
-      toast.error("Box không có QR để tra cứu.");
+      toast.error("Thùng không có QR để tra cứu.");
       return;
     }
 
@@ -180,7 +188,7 @@ export default function AdminQrScanPanel() {
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-sm font-bold text-slate-900 truncate">
-                LOT: {lot.lotCode ?? "—"}
+                LÔ: {lot.lotCode ?? "—"}
               </div>
               <div className="mt-1 text-xs text-slate-600">
                 Mã: {lot.id ?? "—"} · Trạng thái: {lot.status ?? "—"}
@@ -216,7 +224,7 @@ export default function AdminQrScanPanel() {
       return (
         <div className="mt-2 rounded-lg border border-slate-200 bg-white p-3">
           <div className="text-sm font-bold text-slate-900">
-            BOX: {box.boxCode ?? "—"}
+            THÙNG: {box.boxCode ?? "—"}
           </div>
           <div className="mt-1 text-xs text-slate-600">
             Tình trạng: {box.status ?? "—"}
@@ -225,13 +233,13 @@ export default function AdminQrScanPanel() {
           <div className="mt-2 text-xs text-slate-700 space-y-1">
             <div>Khối lượng (KG): {box.weight ?? 0}</div>
             <div>
-              Warehouse: {box.warehouseName ?? box.warehouseId ?? "—"}
+              Kho: {box.warehouseName ?? box.warehouseId ?? "—"}
             </div>
             <div>
-              Code slot: {box.slotCode ?? box.slotId ?? "—"}
+              Mã vị trí: {box.slotCode ?? box.slotId ?? "—"}
             </div>
             <div>
-              Lot code: {box.lotCode ?? box.lotId ?? "—"}
+              Mã lô: {box.lotCode ?? box.lotId ?? "—"}
             </div>
             <div>
               Sản phẩm: {box.productName ?? "—"} · Biến thể:{" "}
@@ -256,10 +264,10 @@ export default function AdminQrScanPanel() {
     return (
       <div className="mt-2 rounded-lg border border-slate-200 bg-white p-3">
         <div className="text-sm font-bold text-slate-900">
-          SLOT: {slot.code ?? slot.qrCode ?? "—"}
+          VỊ TRÍ: {slot.code ?? slot.qrCode ?? "—"}
         </div>
         <div className="mt-1 text-xs text-slate-600">
-          Rack: {slot.rackName ?? slot.rackId ?? "—"}
+          Kệ: {slot.rackName ?? slot.rackId ?? "—"}
         </div>
 
         <div className="mt-2 text-xs text-slate-700 space-y-1">
@@ -270,13 +278,13 @@ export default function AdminQrScanPanel() {
         <div className="mt-3 border-t border-slate-200 pt-3">
           <div className="flex items-center justify-between gap-2">
             <div className="text-xs font-semibold text-slate-900">
-              Slot đang chứa gì
+              Vị trí đang chứa gì
             </div>
             {isFetchingSlotContents ? (
               <div className="text-xs text-slate-500">Đang tải...</div>
             ) : (
               <div className="text-xs text-slate-500">
-                {slotContents?.boxCount ?? 0} box
+                {slotContents?.boxCount ?? 0} thùng
               </div>
             )}
           </div>
@@ -304,7 +312,7 @@ export default function AdminQrScanPanel() {
                         {b.boxCode}
                       </div>
                       <div className="text-[11px] text-slate-600 truncate">
-                        Lot: {b.lotCode ?? "—"} · HSD:{" "}
+                        Lô: {b.lotCode ?? "—"} · HSD:{" "}
                         {formatDateVi(b.expiryDate)}
                       </div>
                       <div className="text-[11px] text-slate-600">
@@ -317,12 +325,12 @@ export default function AdminQrScanPanel() {
 
               {isLoadingSlotBoxDetail ? (
                 <div className="mt-2 text-xs text-slate-500">
-                  Đang tải chi tiết box...
+                  Đang tải chi tiết thùng...
                 </div>
               ) : slotBoxDetail ? (
                 <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2">
                   <div className="text-xs font-semibold text-slate-900 truncate">
-                    BOX: {slotBoxDetail.boxCode ?? "—"}
+                    THÙNG: {slotBoxDetail.boxCode ?? "—"}
                   </div>
                   <div className="text-[11px] text-slate-600 mt-1">
                     Trạng thái: {slotBoxDetail.status ?? "—"}
@@ -331,17 +339,17 @@ export default function AdminQrScanPanel() {
                     Khối lượng: {slotBoxDetail.weight ?? 0} kg
                   </div>
                   <div className="text-[11px] text-slate-600 mt-1">
-                    Warehouse:{" "}
+                    Kho:{" "}
                     {slotBoxDetail.warehouseName ??
                       slotBoxDetail.warehouseId ??
                       "—"}
                   </div>
                   <div className="text-[11px] text-slate-600 mt-1">
-                    Code slot:{" "}
+                    Mã vị trí:{" "}
                     {slotBoxDetail.slotCode ?? slotBoxDetail.slotId ?? "—"}
                   </div>
                   <div className="text-[11px] text-slate-600 mt-1">
-                    Lot: {slotBoxDetail.lotCode ?? "—"}
+                    Lô: {slotBoxDetail.lotCode ?? "—"}
                   </div>
                   <div className="text-[11px] text-slate-700 mt-2">
                     Sản phẩm: {slotBoxDetail.productName ?? "—"} · Biến thể:{" "}
@@ -358,6 +366,112 @@ export default function AdminQrScanPanel() {
     );
   };
 
+  const handleExportQrPdf = () => {
+    if (!currentResult) {
+      toast.error("Chưa có dữ liệu QR để xuất.");
+      return;
+    }
+
+    const now = new Date();
+    const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+
+    let fileBase = "qr";
+    let title = "Thông tin QR";
+    let qrImageUrl = "";
+    let rows: Array<{ label: string; value: string }> = [];
+
+    if (mode === "lot") {
+      const lot = currentResult as any;
+      fileBase = `qr-lo-${lot.lotCode ?? lot.id ?? "unknown"}`;
+      title = "QR Lô hàng";
+      qrImageUrl = String(lot.qrImageUrl ?? "");
+      rows = [
+        { label: "Loại", value: "Lô" },
+        { label: "Mã lô", value: lot.lotCode ?? "—" },
+        { label: "ID lô", value: lot.id ?? "—" },
+        { label: "Mã QR", value: lot.lotCode ?? "—" },
+        { label: "Mã thùng", value: "—" },
+        { label: "Mã vị trí", value: "—" },
+      ];
+    } else if (mode === "box") {
+      const box = currentResult as any;
+      fileBase = `qr-thung-${box.boxCode ?? box.id ?? "unknown"}`;
+      title = "QR Thùng";
+      qrImageUrl = String(box.qrImageUrl ?? "");
+      rows = [
+        { label: "Loại", value: "Thùng" },
+        { label: "Mã thùng", value: box.boxCode ?? "—" },
+        { label: "Mã QR", value: box.qrCode ?? box.boxCode ?? "—" },
+        { label: "Mã lô", value: box.lotCode ?? box.lotId ?? "—" },
+        { label: "Mã vị trí", value: box.slotCode ?? box.slotId ?? "—" },
+      ];
+    } else {
+      const slot = currentResult as any;
+      fileBase = `qr-vi-tri-${slot.code ?? slot.id ?? "unknown"}`;
+      title = "QR Vị trí";
+      qrImageUrl = String(slot.qrImageUrl ?? "");
+      const firstBox = slotContents?.boxes?.[0];
+      rows = [
+        { label: "Loại", value: "Vị trí (slot)" },
+        { label: "Mã vị trí", value: slot.code ?? slot.id ?? "—" },
+        { label: "Mã QR", value: slot.qrCode ?? slot.code ?? "—" },
+        { label: "Mã thùng (đầu tiên)", value: firstBox?.boxCode ?? "—" },
+        { label: "Mã lô (đầu tiên)", value: firstBox?.lotCode ?? "—" },
+      ];
+    }
+
+    const rowHtml = rows
+      .map(
+        (r) =>
+          `<tr><td class="lbl">${escHtml(r.label)}</td><td class="val">${escHtml(r.value)}</td></tr>`,
+      )
+      .join("");
+
+    const html = `<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <title>${escHtml(fileBase)}-${ts}</title>
+    <style>
+      @page { size: A4; margin: 12mm; }
+      body { font-family: Arial, sans-serif; color: #0f172a; }
+      .wrap { border: 1px solid #cbd5e1; border-radius: 10px; padding: 16px; }
+      h1 { margin: 0 0 12px; font-size: 20px; }
+      .grid { display: grid; grid-template-columns: 1fr 180px; gap: 12px; align-items: start; }
+      .qr { width: 180px; height: 180px; border: 1px solid #cbd5e1; object-fit: contain; background: white; }
+      table { width: 100%; border-collapse: collapse; }
+      .lbl, .val { border: 1px solid #e2e8f0; padding: 8px; font-size: 13px; vertical-align: top; }
+      .lbl { width: 180px; background: #f8fafc; font-weight: 600; }
+      .meta { margin-top: 10px; font-size: 12px; color: #475569; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>${escHtml(title)}</h1>
+      <div class="grid">
+        <table>${rowHtml}</table>
+        ${
+          qrImageUrl
+            ? `<img class="qr" src="${escHtml(qrImageUrl)}" alt="QR" />`
+            : `<div class="qr" style="display:flex;align-items:center;justify-content:center;font-size:12px;color:#64748b">Chưa có ảnh QR</div>`
+        }
+      </div>
+      <div class="meta">Tên PDF gợi ý: ${escHtml(fileBase)}-${ts}.pdf</div>
+    </div>
+    <script>window.onload = () => window.print();</script>
+  </body>
+</html>`;
+
+    const w = window.open("", "_blank", "noopener,noreferrer,width=900,height=700");
+    if (!w) {
+      toast.error("Trình duyệt đã chặn popup. Vui lòng cho phép mở tab mới.");
+      return;
+    }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  };
+
   return (
     <div className="px-4 pb-4 pt-3 bg-[#222d32]">
       <div className="flex gap-2">
@@ -371,7 +485,7 @@ export default function AdminQrScanPanel() {
           }`}
         >
           <span className="inline-flex items-center gap-1 justify-center">
-            <Layers size={12} /> Lot
+            <Layers size={12} /> Lô
           </span>
         </button>
         <button
@@ -384,7 +498,7 @@ export default function AdminQrScanPanel() {
           }`}
         >
           <span className="inline-flex items-center gap-1 justify-center">
-            <Box size={12} /> Box
+            <Box size={12} /> Thùng
           </span>
         </button>
         <button
@@ -397,7 +511,7 @@ export default function AdminQrScanPanel() {
           }`}
         >
           <span className="inline-flex items-center gap-1 justify-center">
-            <QrCode size={12} /> Slot
+            <QrCode size={12} /> Vị trí
           </span>
         </button>
       </div>
@@ -444,6 +558,16 @@ export default function AdminQrScanPanel() {
           >
             <Camera size={14} />
             Chụp ảnh
+          </button>
+          <button
+            type="button"
+            onClick={handleExportQrPdf}
+            disabled={!currentResult}
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-slate-700 bg-[#1f2d3a] px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-[#1b2225] disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Xuất PDF QR"
+          >
+            <QrCode size={14} />
+            Xuất PDF QR
           </button>
 
           <input

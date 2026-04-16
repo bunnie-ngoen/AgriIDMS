@@ -55,10 +55,10 @@ const ChangePasswordCard = () => {
   const onSubmit = async (data: ChangePasswordDto) => {
     try {
       const res = await changePassword(data).unwrap();
-      toast.success(res.message || "Password changed successfully!");
+      toast.success(res.message || "Đổi mật khẩu thành công!");
       form.reset();
     } catch (err: any) {
-      toast.error(err?.data?.message || "Failed to change password");
+      toast.error(err?.data?.message || "Đổi mật khẩu thất bại.");
     }
   };
 
@@ -133,7 +133,7 @@ const ChangePasswordCard = () => {
           </svg>
         </div>
         <h2 style={{ fontSize: "14px", fontWeight: 700, color: "#1e293b", margin: 0 }}>
-          Change Password
+          Đổi mật khẩu
         </h2>
       </div>
 
@@ -144,7 +144,7 @@ const ChangePasswordCard = () => {
           style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
         >
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-            <Field label="Current Password">
+            <Field label="Mật khẩu hiện tại">
               {makePasswordField(
                 "currentPassword",
                 showCurrent,
@@ -152,7 +152,7 @@ const ChangePasswordCard = () => {
                 form.formState.errors.currentPassword?.message
               )}
             </Field>
-            <Field label="New Password">
+            <Field label="Mật khẩu mới">
               {makePasswordField(
                 "newPassword",
                 showNew,
@@ -193,9 +193,9 @@ const ChangePasswordCard = () => {
                     style={{ animation: "spin 0.8s linear infinite" }}>
                     <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                   </svg>
-                  Updating...
+                  Đang cập nhật...
                 </>
-              ) : "Update Password"}
+              ) : "Cập nhật mật khẩu"}
             </button>
           </div>
         </form>

@@ -21,6 +21,7 @@ import type {
   TransferBoxToSlotRequest,
   NearExpiryDashboard,
   DisposeHistoryItem,
+  GoodsReceiptPrintData,
 } from "../types/goods-receipt.type";
 
 type RawObject = Record<string, unknown>;
@@ -138,6 +139,10 @@ const mapLotBoxItem = (row: RawObject): LotBoxItem => ({
   boxId: (row.boxId as number) ?? (row.BoxId as number) ?? 0,
   boxCode: (row.boxCode as string) ?? (row.BoxCode as string) ?? "",
   weight: (row.weight as number) ?? (row.Weight as number) ?? 0,
+  volumeM3:
+    (row.volumeM3 as number | undefined) ??
+    (row.VolumeM3 as number | undefined) ??
+    0,
   status: (row.status as string) ?? (row.Status as string) ?? "",
   slotId:
     (row.slotId as number | null | undefined) ??
@@ -267,6 +272,168 @@ export const goodsReceiptApi = api.injectEndpoints({
       ],
     }),
 
+    getGoodsReceiptPrintData: builder.query<
+      GoodsReceiptPrintData,
+      { id: number; phase?: string; preview?: boolean }
+    >({
+      query: ({ id, phase, preview }) => {
+        const q: string[] = [];
+        if (phase) q.push(`phase=${encodeURIComponent(phase)}`);
+        if (typeof preview === "boolean") q.push(`preview=${preview ? "true" : "false"}`);
+        return {
+          url: q.length
+            ? `GoodsReceipts/${id}/print-data?${q.join("&")}`
+            : `GoodsReceipts/${id}/print-data`,
+        };
+      },
+      transformResponse: (raw: unknown): GoodsReceiptPrintData => {
+        const row = (raw ?? {}) as RawObject;
+        const linesRaw = Array.isArray(row.lines)
+          ? (row.lines as RawObject[])
+          : Array.isArray(row.Lines)
+            ? (row.Lines as RawObject[])
+            : [];
+
+        return {
+          schemaVersion:
+            (row.schemaVersion as string) ?? (row.SchemaVersion as string) ?? "1",
+          documentTitle:
+            (row.documentTitle as string) ??
+            (row.DocumentTitle as string) ??
+            "Phiếu nhập kho",
+          snapshotAtUtc:
+            (row.snapshotAtUtc as string) ?? (row.SnapshotAtUtc as string) ?? "",
+          snapshotPhase:
+            (row.snapshotPhase as string) ?? (row.SnapshotPhase as string) ?? "",
+          isPreview:
+            (row.isPreview as boolean) ?? (row.IsPreview as boolean) ?? false,
+          requiresManagerAttention:
+            (row.requiresManagerAttention as boolean) ??
+            (row.RequiresManagerAttention as boolean) ??
+            false,
+          printWarningMessage:
+            (row.printWarningMessage as string | null | undefined) ??
+            (row.PrintWarningMessage as string | null | undefined) ??
+            null,
+          receiptType:
+            (row.receiptType as string) ?? (row.ReceiptType as string) ?? "",
+          nonPoReason:
+            (row.nonPoReason as string | null | undefined) ??
+            (row.NonPoReason as string | null | undefined) ??
+            null,
+          receiptId: (row.receiptId as number) ?? (row.ReceiptId as number) ?? 0,
+          receiptCode:
+            (row.receiptCode as string) ?? (row.ReceiptCode as string) ?? "",
+          receiptStatus:
+            (row.receiptStatus as string) ?? (row.ReceiptStatus as string) ?? "",
+          purchaseOrderId:
+            (row.purchaseOrderId as number | null | undefined) ??
+            (row.PurchaseOrderId as number | null | undefined) ??
+            null,
+          purchaseOrderCode:
+            (row.purchaseOrderCode as string | null | undefined) ??
+            (row.PurchaseOrderCode as string | null | undefined) ??
+            null,
+          supplierName:
+            (row.supplierName as string) ?? (row.SupplierName as string) ?? "",
+          warehouseName:
+            (row.warehouseName as string) ?? (row.WarehouseName as string) ?? "",
+          vehicleNumber:
+            (row.vehicleNumber as string) ?? (row.VehicleNumber as string) ?? "",
+          driverName:
+            (row.driverName as string | null | undefined) ??
+            (row.DriverName as string | null | undefined) ??
+            null,
+          transportCompany:
+            (row.transportCompany as string | null | undefined) ??
+            (row.TransportCompany as string | null | undefined) ??
+            null,
+          sourceWarehouseName:
+            (row.sourceWarehouseName as string | null | undefined) ??
+            (row.SourceWarehouseName as string | null | undefined) ??
+            null,
+          sourceWarehouseAddress:
+            (row.sourceWarehouseAddress as string | null | undefined) ??
+            (row.SourceWarehouseAddress as string | null | undefined) ??
+            null,
+          receivedDate:
+            (row.receivedDate as string) ?? (row.ReceivedDate as string) ?? "",
+          totalReceivedWeight:
+            (row.totalReceivedWeight as number) ??
+            (row.TotalReceivedWeight as number) ??
+            0,
+          totalUsableWeight:
+            (row.totalUsableWeight as number) ??
+            (row.TotalUsableWeight as number) ??
+            0,
+          totalAmount:
+            (row.totalAmount as number | null | undefined) ??
+            (row.TotalAmount as number | null | undefined) ??
+            null,
+          amountInWords:
+            (row.amountInWords as string | null | undefined) ??
+            (row.AmountInWords as string | null | undefined) ??
+            null,
+          approvedByUserName:
+            (row.approvedByUserName as string | null | undefined) ??
+            (row.ApprovedByUserName as string | null | undefined) ??
+            null,
+          approvedAtUtc:
+            (row.approvedAtUtc as string | null | undefined) ??
+            (row.ApprovedAtUtc as string | null | undefined) ??
+            null,
+          lines: linesRaw.map((x) => ({
+            lineNo: (x.lineNo as number) ?? (x.LineNo as number) ?? 0,
+            detailId: (x.detailId as number) ?? (x.DetailId as number) ?? 0,
+            productName:
+              (x.productName as string) ?? (x.ProductName as string) ?? "",
+            grade: (x.grade as string) ?? (x.Grade as string) ?? "",
+            itemCode:
+              (x.itemCode as string | null | undefined) ??
+              (x.ItemCode as string | null | undefined) ??
+              null,
+            unit:
+              (x.unit as string | null | undefined) ??
+              (x.Unit as string | null | undefined) ??
+              null,
+            orderedWeightKg:
+              (x.orderedWeightKg as number | null | undefined) ??
+              (x.OrderedWeightKg as number | null | undefined) ??
+              null,
+            receivedWeightKg:
+              (x.receivedWeightKg as number) ??
+              (x.ReceivedWeightKg as number) ??
+              0,
+            usableWeightKg:
+              (x.usableWeightKg as number | null | undefined) ??
+              (x.UsableWeightKg as number | null | undefined) ??
+              null,
+            unitPrice:
+              (x.unitPrice as number | null | undefined) ??
+              (x.UnitPrice as number | null | undefined) ??
+              null,
+            lineTotal:
+              (x.lineTotal as number | null | undefined) ??
+              (x.LineTotal as number | null | undefined) ??
+              null,
+            qcResult: (x.qcResult as string) ?? (x.QcResult as string) ?? "",
+            qcNote:
+              (x.qcNote as string | null | undefined) ??
+              (x.QcNote as string | null | undefined) ??
+              null,
+            inspectedBy:
+              (x.inspectedBy as string | null | undefined) ??
+              (x.InspectedBy as string | null | undefined) ??
+              null,
+            inspectedAtUtc:
+              (x.inspectedAtUtc as string | null | undefined) ??
+              (x.InspectedAtUtc as string | null | undefined) ??
+              null,
+          })),
+        };
+      },
+    }),
+
     getLotsByGoodsReceiptId: builder.query<LotSummary[], number>({
       query: (receiptId) => ({ url: `Lots/by-goods-receipt/${receiptId}` }),
       transformResponse: (raw: unknown): LotSummary[] => {
@@ -277,12 +444,29 @@ export const goodsReceiptApi = api.injectEndpoints({
           const expiry = row.expiryDate ?? row.ExpiryDate;
 
           return {
-            id: (row.id as number) ?? (row.Id as number) ?? 0,
+            id:
+              (row.id as number) ??
+              (row.Id as number) ??
+              (row.lotId as number) ??
+              (row.LotId as number) ??
+              0,
             lotCode:
               (row.lotCode as string) ?? (row.LotCode as string) ?? "",
             qrImageUrl:
               (row.qrImageUrl as string | null | undefined) ??
               (row.QrImageUrl as string | null | undefined) ??
+              null,
+            productVariantId:
+              (row.productVariantId as number | null | undefined) ??
+              (row.ProductVariantId as number | null | undefined) ??
+              null,
+            productVariantName:
+              (row.productVariantName as string | null | undefined) ??
+              (row.ProductVariantName as string | null | undefined) ??
+              null,
+            productName:
+              (row.productName as string | null | undefined) ??
+              (row.ProductName as string | null | undefined) ??
               null,
             totalQuantity:
               (row.totalQuantity as number) ??
@@ -388,6 +572,10 @@ export const goodsReceiptApi = api.injectEndpoints({
             (row.QrImageUrl as string | null | undefined) ??
             null,
           weight: (row.weight as number) ?? (row.Weight as number) ?? 0,
+          volumeM3:
+            (row.volumeM3 as number | undefined) ??
+            (row.VolumeM3 as number | undefined) ??
+            0,
           status: (row.status as string) ?? (row.Status as string) ?? "",
           slotId:
             (row.slotId as number | null | undefined) ??
@@ -491,6 +679,10 @@ export const goodsReceiptApi = api.injectEndpoints({
               (row.QrImageUrl as string | null | undefined) ??
               null,
             weight: (row.weight as number) ?? (row.Weight as number) ?? 0,
+            volumeM3:
+              (row.volumeM3 as number | undefined) ??
+              (row.VolumeM3 as number | undefined) ??
+              0,
             status:
               (row.status as string) ??
               (row.Status as string) ??
@@ -573,6 +765,10 @@ export const goodsReceiptApi = api.injectEndpoints({
               (row.QrImageUrl as string | null | undefined) ??
               null,
             weight: (row.weight as number) ?? (row.Weight as number) ?? 0,
+            volumeM3:
+              (row.volumeM3 as number | undefined) ??
+              (row.VolumeM3 as number | undefined) ??
+              0,
             status:
               (row.status as string) ??
               (row.Status as string) ??
@@ -658,6 +854,10 @@ export const goodsReceiptApi = api.injectEndpoints({
               (row.QrImageUrl as string | null | undefined) ??
               null,
             weight: (row.weight as number) ?? (row.Weight as number) ?? 0,
+            volumeM3:
+              (row.volumeM3 as number | undefined) ??
+              (row.VolumeM3 as number | undefined) ??
+              0,
             status:
               (row.status as string) ??
               (row.Status as string) ??
@@ -740,6 +940,10 @@ export const goodsReceiptApi = api.injectEndpoints({
               (row.QrImageUrl as string | null | undefined) ??
               null,
             weight: (row.weight as number) ?? (row.Weight as number) ?? 0,
+            volumeM3:
+              (row.volumeM3 as number | undefined) ??
+              (row.VolumeM3 as number | undefined) ??
+              0,
             status:
               (row.status as string) ??
               (row.Status as string) ??
@@ -840,7 +1044,7 @@ export const goodsReceiptApi = api.injectEndpoints({
 
     createDisposalRequest: builder.mutation<
       { id: number; message: string },
-      { warehouseId: number; boxIds: number[]; reason: string }
+      { warehouseId: number; boxIds: number[]; reason?: string }
     >({
       query: (body) => ({
         url: "DisposalRequests",
@@ -862,7 +1066,7 @@ export const goodsReceiptApi = api.injectEndpoints({
 
     directDisposeBoxes: builder.mutation<
       { message: string },
-      { warehouseId: number; boxIds: number[]; reason: string }
+      { warehouseId: number; boxIds: number[]; reason?: string }
     >({
       query: (body) => ({
         url: "DisposalRequests/direct-dispose",
@@ -1566,6 +1770,7 @@ export const {
   useGetGoodsReceiptsQuery,
   useGetGoodsReceiptByIdQuery,
   useGetGoodsReceiptForApprovalByIdQuery,
+  useGetGoodsReceiptPrintDataQuery,
   useCreateGoodsReceiptMutation,
   useAddGoodsReceiptDetailMutation,
   useUpdateTruckWeightMutation,

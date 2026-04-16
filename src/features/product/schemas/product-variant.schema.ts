@@ -33,6 +33,9 @@ export const ProductVariantSchema = z.object({
   minReceiptWeight: z
     .number({ message: "Vui lòng nhập định mức tối thiểu (kg)" })
     .min(0, "Định mức tối thiểu (kg) phải >= 0"),
+  densityKgPerM3: z
+    .number({ message: "Vui lòng nhập khối lượng riêng (kg/m3)" })
+    .min(0.0001, "Khối lượng riêng phải > 0"),
 });
 
 export type ProductVariantDto = z.infer<typeof ProductVariantSchema>;

@@ -102,6 +102,9 @@ const GoodsReceiptDetailPage = lazy(
 const GoodsReceiptQCPage = lazy(
   () => import("../goods-receipt/pages/GoodsReceiptQC")
 );
+const GoodsReceiptPrintSlipPage = lazy(
+  () => import("../goods-receipt/pages/GoodsReceiptPrintSlipPage")
+);
 const LotListPage = lazy(
   () => import("../goods-receipt/pages/LotListPage")
 );
@@ -171,6 +174,7 @@ export const adminRoutes = [
       // Nhập kho (Goods Receipt)
       { path: "goods-receipts", element: <GoodsReceiptListPage /> },
       { path: "goods-receipts/create", element: <CreateGoodsReceiptPage /> },
+      { path: "goods-receipts/print", element: <GoodsReceiptPrintSlipPage /> },
       { path: "goods-receipts/:id", element: <GoodsReceiptDetailPage /> },
       { path: "goods-receipts/:id/qc", element: <GoodsReceiptQCPage /> },
       { path: "lots", element: <LotListPage /> },
