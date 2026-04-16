@@ -72,9 +72,9 @@ const PersonalInfoCard = ({ user }: Props) => {
         dob: user.dob,
         address: data.address || null,
       }).unwrap();
-      toast.success("Profile updated!");
+      toast.success("Đã cập nhật thông tin!");
     } catch {
-      toast.error("Failed to update profile.");
+      toast.error("Cập nhật thông tin thất bại.");
     }
   };
 
@@ -98,7 +98,7 @@ const PersonalInfoCard = ({ user }: Props) => {
           </svg>
         </div>
         <h2 style={{ fontSize: "14px", fontWeight: 700, color: "#1e293b", margin: 0 }}>
-          Personal Information
+          Thông tin cá nhân
         </h2>
       </div>
 
@@ -108,24 +108,24 @@ const PersonalInfoCard = ({ user }: Props) => {
           style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
         >
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-            <Field label="Full Name">
+            <Field label="Họ và tên">
               <input {...form.register("fullName")} style={inputStyle} {...focusHandlers} />
             </Field>
-            <Field label="Phone Number">
+            <Field label="Số điện thoại">
               <input {...form.register("phoneNumber")} style={inputStyle} {...focusHandlers} />
             </Field>
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-            <Field label="Email Address">
+            <Field label="Email">
               <input value={user.email} disabled style={disabledInputStyle} />
             </Field>
-            <Field label="Status">
+            <Field label="Trạng thái">
               <input value={user.status} disabled style={disabledInputStyle} />
             </Field>
           </div>
 
-          <Field label="Address">
+          <Field label="Địa chỉ">
             <input {...form.register("address")} style={inputStyle} {...focusHandlers} />
           </Field>
 
@@ -153,7 +153,7 @@ const PersonalInfoCard = ({ user }: Props) => {
                 (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 3px 10px rgba(127,187,53,0.3)";
               }}
             >
-              {isLoading ? "Saving..." : "Save Changes"}
+              {isLoading ? "Đang lưu..." : "Lưu thay đổi"}
             </button>
           </div>
         </form>
