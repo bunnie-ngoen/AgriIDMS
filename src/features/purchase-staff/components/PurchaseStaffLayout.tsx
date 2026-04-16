@@ -1,6 +1,6 @@
 import { Outlet } from "react-router-dom";
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, FilePlus, List, LogOut } from "lucide-react";
+import { LayoutDashboard, FilePlus, List, LogOut, User } from "lucide-react";
 import { useAppDispatch } from "../../../app/hook";
 import { logout } from "../../auth/slices/auth.slice";
 import { persistor } from "../../../app/store";
@@ -109,6 +109,31 @@ export default function PurchaseStaffLayout() {
                       <FilePlus size={15} />
                     </span>
                     <span className="truncate">Tạo đơn mua</span>
+                  </>
+                )}
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/purchase-staff/profile"
+                className={({ isActive }) =>
+                  `w-full flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    isActive
+                      ? "bg-[#1e282c] text-white border-l-4 border-sky-400"
+                      : "text-slate-200 hover:bg-[#1b2225]"
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <span
+                      className={`inline-flex h-7 w-7 items-center justify-center rounded mr-3 shrink-0 ${
+                        isActive ? "bg-sky-500 text-white" : "bg-[#1f2d3a] text-slate-200"
+                      }`}
+                    >
+                      <User size={15} />
+                    </span>
+                    <span className="truncate">Hồ sơ cá nhân</span>
                   </>
                 )}
               </NavLink>
