@@ -27,7 +27,7 @@ const WarehouseMapPage = lazy(
   () => import("../admin/pages/WarehouseMap")
 );
 const ProfilePage = lazy(
-  () => import("../admin/pages/Profile")
+  () => import("../home/pages/ProfilePage")
 );
 
 const SupplierListPage = lazy(

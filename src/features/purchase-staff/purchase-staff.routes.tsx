@@ -6,6 +6,7 @@ const PurchaseOrderList = lazy(() => import("./pages/PurchaseOrderList"));
 const CreatePurchaseOrder = lazy(() => import("./pages/CreatePurchaseOrder"));
 const PurchaseOrderDetail = lazy(() => import("./pages/PurchaseOrderDetail"));
 const EditPurchaseOrder = lazy(() => import("./pages/EditPurchaseOrder"));
+const ProfilePage = lazy(() => import("../home/pages/ProfilePage"));
 
 export const purchaseStaffRoutes = [
   {
@@ -18,6 +19,7 @@ export const purchaseStaffRoutes = [
       { path: "orders/create", element: <CreatePurchaseOrder /> },
       { path: "orders/:id", element: <PurchaseOrderDetail /> },
       { path: "orders/:id/edit", element: <EditPurchaseOrder /> },
+      { path: "profile", element: <ProfilePage /> },
     ],
   },
 ];

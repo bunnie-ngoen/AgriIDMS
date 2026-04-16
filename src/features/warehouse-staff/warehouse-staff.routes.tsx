@@ -52,6 +52,7 @@ const PutBoxIntoSlotPage = lazy(
 const InventoryIssueManagementPage = lazy(
   () => import("../manager/pages/InventoryIssueManagementPage"),
 );
+const ProfilePage = lazy(() => import("../home/pages/ProfilePage"));
 
 export const warehouseStaffRoutes = [
   {
@@ -80,6 +81,7 @@ export const warehouseStaffRoutes = [
       { path: "warehouses/:id/map", element: <WarehouseMapPage /> },
       { path: "putaway", element: <PutBoxIntoSlotPage /> },
       { path: "inventory-issues", element: <InventoryIssueManagementPage /> },
+      { path: "profile", element: <ProfilePage /> },
     ],
   },
 ];

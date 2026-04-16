@@ -9,6 +9,7 @@ const SalesPosUnpaidOrdersPage = lazy(() => import("./pages/SalesPosUnpaidOrders
 const SalesOrderDetailPage = lazy(() => import("./pages/SalesOrderDetailPage"));
 const SalesComplaintsPendingPage = lazy(() => import("./pages/SalesComplaintsPendingPage"));
 const SalesComplaintsProcessedPage = lazy(() => import("./pages/SalesComplaintsProcessedPage"));
+const ProfilePage = lazy(() => import("../home/pages/ProfilePage"));
 
 export const salesStaffRoutes = [
   {
@@ -27,6 +28,7 @@ export const salesStaffRoutes = [
       { path: "complaints", element: <SalesComplaintsPendingPage /> },
       { path: "complaints/pending", element: <SalesComplaintsPendingPage /> },
       { path: "complaints/processed", element: <SalesComplaintsProcessedPage /> },
+      { path: "profile", element: <ProfilePage /> },
     ],
   },
 ];

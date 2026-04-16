@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   User,
   Lock,
@@ -23,6 +23,7 @@ import {
 } from "../../admin/api/profile.api";
 
 export default function ProfilePage() {
+  const location = useLocation();
   const { data: user, isLoading } = useGetMyProfileQuery();
   const [updateProfile] = useUpdateProfileMutation();
   const [changePassword] = useChangePasswordMutation();
@@ -111,6 +112,12 @@ export default function ProfilePage() {
       .toUpperCase()
       .slice(0, 2);
 
+  const isEmbeddedInDashboard =
+    location.pathname.startsWith("/admin/") ||
+    location.pathname.startsWith("/warehouse/") ||
+    location.pathname.startsWith("/sales/") ||
+    location.pathname.startsWith("/purchase-staff/");
+
   if (isLoading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
@@ -123,8 +130,14 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="bg-gradient-to-b from-slate-50 to-white">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+    <div className={isEmbeddedInDashboard ? "" : "bg-gradient-to-b from-slate-50 to-white"}>
+      <div
+        className={
+          isEmbeddedInDashboard
+            ? "w-full"
+            : "max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12"
+        }
+      >
 
         {/* Breadcrumb */}
         <nav className="flex items-center gap-2 text-sm text-slate-500 mb-8">
