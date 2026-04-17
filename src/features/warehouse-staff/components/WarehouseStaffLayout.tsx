@@ -10,6 +10,7 @@ import {
   QrCode,
   ShieldCheck,
   Truck,
+  User,
   Warehouse,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -210,6 +211,23 @@ export default function WarehouseStaffLayout() {
                   <QrCode size={15} />
                 </span>
                 Danh sách lô hàng
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/warehouse/profile"
+                className={({ isActive }) =>
+                  `w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-slate-800 text-white border border-slate-700"
+                      : "text-slate-300 hover:bg-slate-800/70"
+                  }`
+                }
+              >
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-800 text-slate-200">
+                  <User size={15} />
+                </span>
+                Hồ sơ cá nhân
               </NavLink>
             </li>
 

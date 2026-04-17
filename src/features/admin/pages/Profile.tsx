@@ -7,8 +7,8 @@ const Profile = () => {
   const { data: user, isLoading, isError } = profileApi.useGetMyProfileQuery();
   console.log(user)
 
-  if (isLoading) return <div>Loading...</div>;
-  if (isError || !user) return <div>Failed to load profile.</div>;
+  if (isLoading) return <div>Đang tải...</div>;
+  if (isError || !user) return <div>Không tải được thông tin hồ sơ.</div>;
 
   return (
     <div style={{
@@ -22,10 +22,10 @@ const Profile = () => {
     }}>
       <div>
         <h1 style={{ fontSize: "1.4rem", fontWeight: 800, color: "#1e293b", margin: 0, letterSpacing: "-0.02em" }}>
-          My Profile
+          Thông tin cá nhân
         </h1>
         <p style={{ fontSize: "13px", color: "#9ca3af", margin: "3px 0 0" }}>
-          Manage your account information and security
+          Quản lý thông tin tài khoản và bảo mật
         </p>
       </div>
 

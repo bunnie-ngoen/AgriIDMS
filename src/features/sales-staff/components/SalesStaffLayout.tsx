@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ClipboardList, LogOut, ShieldCheck, MessageCircleWarning, ChevronDown, Bell, PlusCircle, Wallet } from "lucide-react";
+import { LayoutDashboard, ClipboardList, LogOut, ShieldCheck, MessageCircleWarning, ChevronDown, Bell, PlusCircle, Wallet, User } from "lucide-react";
 import { useAppDispatch } from "../../../app/hook";
 import { logout } from "../../auth/slices/auth.slice";
 import { persistor } from "../../../app/store";
@@ -226,6 +226,23 @@ export default function SalesStaffLayout() {
                   </li>
                 </ul>
               </div>
+            </li>
+            <li>
+              <NavLink
+                to="/sales/profile"
+                className={({ isActive }) =>
+                  `w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-slate-800 text-white border border-slate-700"
+                      : "text-slate-300 hover:bg-slate-800/70"
+                  }`
+                }
+              >
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-800 text-slate-200">
+                  <User size={15} />
+                </span>
+                <span className="flex-1 text-left">Hồ sơ cá nhân</span>
+              </NavLink>
             </li>
             <li>
               <button

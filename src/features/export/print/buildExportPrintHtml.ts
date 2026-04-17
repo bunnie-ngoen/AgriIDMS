@@ -1,8 +1,4 @@
 import type { ExportPrintData } from "../schemas/export.schema";
-import { boxTypeLabel } from "../../../shared/lib/boxTypeUi";
-import { fulfillmentTypeLabel } from "../../../shared/lib/fulfillmentTypeUi";
-import { orderSourceLabel } from "../../../shared/lib/orderSource";
-import { orderStatusLabel } from "../../../shared/lib/orderStatusUi";
 
 function escHtml(s: string) {
   return s
@@ -12,45 +8,72 @@ function escHtml(s: string) {
     .replace(/"/g, "&quot;");
 }
 
-function exportReceiptStatusVi(status: string): string {
-  if (status === "PendingPick") return "Chờ lấy hàng";
-  if (status === "ReadyToExport") return "Sẵn sàng xuất";
-  if (status === "Approved") return "Đã duyệt xuất";
-  if (status === "Cancelled") return "Đã hủy";
-  return status;
+function formatVnDate(input: string): string {
+  const dt = new Date(input);
+  const day = String(dt.getDate()).padStart(2, "0");
+  const month = String(dt.getMonth() + 1).padStart(2, "0");
+  const year = dt.getFullYear();
+  return `Ngày ${day} tháng ${month} năm ${year}`;
 }
 
-/** HTML độc lập (iframe srcdoc): Tailwind CDN; thanh nút in do trang React bọc ngoài. */
+function formatNumber(value: number): string {
+  return Number(value).toLocaleString("vi-VN");
+}
+
+function formatCurrency(value?: number): string {
+  if (value === undefined || Number.isNaN(value)) return "";
+  return formatNumber(value);
+}
+
+function getBoxCodeSuffix(boxCode: string): string {
+  const match = boxCode.match(/-(\d+)$/);
+  return match ? match[1] : boxCode;
+}
+
+function padRows(rowsHtml: string[], minRows = 5): string {
+  if (rowsHtml.length >= minRows) return rowsHtml.join("");
+  const padded = [...rowsHtml];
+  while (padded.length < minRows) {
+    padded.push(`
+      <tr>
+        <td class="border border-black p-1 text-center">&nbsp;</td>
+        <td class="border border-black p-1">&nbsp;</td>
+        <td class="border border-black p-1 text-center">&nbsp;</td>
+        <td class="border border-black p-1 text-center">&nbsp;</td>
+        <td class="border border-black p-1 text-center">&nbsp;</td>
+        <td class="border border-black p-1 text-right">&nbsp;</td>
+        <td class="border border-black p-1 text-right">&nbsp;</td>
+        <td class="border border-black p-1 text-right">&nbsp;</td>
+      </tr>`);
+  }
+  return padded.join("");
+}
+
+/** In theo mẫu 02-VT: field backend chưa có thì để trống. */
 export function buildExportPrintHtml(d: ExportPrintData): string {
-  const created = new Date(d.snapshotAtUtc).toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh" });
-  const totalStr = Number(d.totalAmount).toLocaleString("vi-VN");
-  const stExport = escHtml(exportReceiptStatusVi(d.exportStatus));
-  const stOrder = escHtml(orderStatusLabel(d.orderStatus));
-  const src = escHtml(orderSourceLabel(d.orderSource));
-  const fulfill = escHtml(fulfillmentTypeLabel(d.fulfillmentType));
-
-  const previewBanner = d.isPreview
-    ? `<div class="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 print:border-amber-300">
-        <span class="font-semibold">Xem trước:</span> Phiếu đang chờ lấy hàng — dữ liệu có thể thay đổi trước khi chốt in.
-      </div>`
-    : "";
-
-  const rows = d.lines
-    .map(
-      (x) => `
-        <tr class="border-b border-slate-200 bg-white print:border-slate-300">
-          <td class="whitespace-nowrap px-3 py-2.5 text-center text-sm text-slate-600">${x.lineNo}</td>
-          <td class="px-3 py-2.5 text-sm font-medium text-slate-900">${escHtml(x.boxCode)}</td>
-          <td class="max-w-[140px] break-words px-3 py-2.5 text-sm text-slate-700">${escHtml(x.lotCode)}</td>
-          <td class="max-w-[220px] break-words px-3 py-2.5 text-sm text-slate-800">${escHtml(x.productName)}</td>
-          <td class="whitespace-nowrap px-3 py-2.5 text-center text-sm text-slate-700">${escHtml(x.grade)}</td>
-          <td class="whitespace-nowrap px-3 py-2.5 text-right text-sm tabular-nums text-slate-800">${Number(x.boxWeightKg).toLocaleString("vi-VN")}</td>
-          <td class="whitespace-nowrap px-3 py-2.5 text-right text-sm font-semibold tabular-nums text-slate-900">${Number(x.actualQuantity).toLocaleString("vi-VN")}</td>
-          <td class="whitespace-nowrap px-3 py-2.5 text-sm text-slate-700">${escHtml(boxTypeLabel(x.boxType))}</td>
-          <td class="px-3 py-2.5 text-center text-sm text-slate-600">${x.isPartial ? "Có" : "—"}</td>
-        </tr>`,
-    )
-    .join("");
+  const dotted = ".......................................";
+  const printDate = formatVnDate(d.snapshotAtUtc);
+  const totalStr = formatNumber(d.totalAmount);
+  const rows = d.lines.map((x) => {
+    const itemName = escHtml(x.productName);
+    const itemCode = escHtml(getBoxCodeSuffix(x.boxCode));
+    const unit = "kg";
+    const requestedQty = formatNumber(x.requestedQuantity ?? x.actualQuantity);
+    const actualQty = formatNumber(x.actualQuantity);
+    const unitPrice = formatCurrency(x.unitPrice);
+    const lineAmount = formatCurrency(x.lineAmount);
+    return `
+      <tr>
+        <td class="border border-black p-1 text-center">${x.lineNo}</td>
+        <td class="border border-black p-1 item-cell">${itemName}</td>
+        <td class="border border-black p-1 text-center code-cell">${itemCode}</td>
+        <td class="border border-black p-1 text-center">${unit}</td>
+        <td class="border border-black p-1 text-center">${requestedQty}</td>
+        <td class="border border-black p-1 text-right">${actualQty}</td>
+        <td class="border border-black p-1 text-right">${unitPrice}</td>
+        <td class="border border-black p-1 text-right">${lineAmount}</td>
+      </tr>`;
+  });
 
   return `<!doctype html>
 <html lang="vi">
@@ -58,85 +81,156 @@ export function buildExportPrintHtml(d: ExportPrintData): string {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Phiếu xuất kho — ${escHtml(d.exportCode)}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] }
-          }
-        }
-      };
-    </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>
+      body { font-family: "Times New Roman", serif; font-size: 16px; color: #111; margin: 0; }
+      .page { width: 190mm; margin: 0 auto; background: #fff; padding: 8mm 10mm; box-sizing: border-box; }
+      .center { text-align: center; }
+      .right { text-align: right; }
+      .small { font-size: 14px; }
+      .xs { font-size: 13px; }
+      .mt8 { margin-top: 6px; }
+      .mt12 { margin-top: 10px; }
+      .mt20 { margin-top: 14px; }
+      .mt28 { margin-top: 20px; }
+      .w100 { width: 100%; border-collapse: collapse; table-layout: fixed; box-sizing: border-box; }
+      .border { border: 1px solid #111; }
+      .border-black { border-color: #111; }
+      .p-1 { padding: 3px 4px; }
+      .text-center { text-align: center; }
+      .text-right { text-align: right; }
+      th, td { vertical-align: middle; line-height: 1.2; }
+      .voucher-table th { vertical-align: middle; padding-top: 2px; padding-bottom: 2px; }
+      .voucher-table td { vertical-align: middle; padding-top: 2px; padding-bottom: 2px; }
+      .voucher-table { width: calc(100% - 1px); margin-right: 1px; border: 1px solid #111; border-right: 1px solid #111; }
+      .voucher-table th:last-child, .voucher-table td:last-child { border-right: 1px solid #111 !important; }
+      .item-col { width: 37%; }
+      .code-col { width: 12%; }
+      .unit-col { width: 7%; }
+      .qty-col { width: 8%; }
+      .price-col { width: 9.5%; }
+      .amount-col { width: 10.5%; }
+      .item-cell { white-space: normal; word-break: break-word; }
+      .code-cell { white-space: normal; word-break: break-word; overflow-wrap: anywhere; }
+      .voucher-table .item-cell,
+      .voucher-table .code-cell { vertical-align: top; }
+      .voucher-table .total-row td {
+        vertical-align: middle;
+        padding: 0;
+        height: 28px;
+      }
+      .total-cell {
+        height: 28px;
+        line-height: 28px;
+        text-align: center;
+        display: block;
+        font-weight: 700;
+      }
+      .total-cell-right {
+        text-align: right;
+        padding-right: 6px;
+      }
+      /* Khi xuất PDF qua html2canvas: nới line-height/padding để tránh lệch baseline chữ trong ô. */
+      .pdf-export-mode .voucher-table th,
+      .pdf-export-mode .voucher-table td {
+        line-height: 1.35;
+        padding-top: 3px;
+        padding-bottom: 3px;
+      }
+      .pdf-export-mode .voucher-table .xs td {
+        line-height: 1.2;
+      }
+      /* Ép cứng canh giữa dòng Cộng khi render PDF bằng html2canvas */
+      .pdf-export-mode .voucher-table .total-row td {
+        height: 28px;
+        padding: 0 !important;
+        vertical-align: middle !important;
+      }
+      .pdf-export-mode .total-cell {
+        height: 28px;
+        line-height: 28px;
+      }
+      .sign td { vertical-align: top; text-align: center; width: 25%; padding-top: 8px; }
+      .sign-space { height: 80px; }
+      .sign td { border: none !important; }
       @media print {
-        @page { size: A4 landscape; margin: 10mm; }
-        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        @page { size: A4 portrait; margin: 10mm; }
+        body { margin: 0; }
+        .page { width: auto; padding: 0; }
       }
     </style>
   </head>
-  <body class="min-h-screen bg-slate-100 font-sans text-slate-900 antialiased print:bg-white print:p-0">
-    <main class="mx-auto max-w-6xl px-4 py-8 print:max-w-none print:px-4 print:py-4">
-      <div class="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm print:rounded-none print:border-0 print:shadow-none">
-        <div class="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-6 py-6 print:border-slate-200">
-          <h1 class="text-2xl font-bold tracking-tight text-slate-900 print:text-xl">Phiếu xuất kho</h1>
-          <p class="mt-1 text-sm text-slate-500">Thời điểm snapshot · <span class="font-medium text-slate-700">${escHtml(created)}</span></p>
-        </div>
-
-        <div class="space-y-4 p-6 print:p-4">
-          ${previewBanner}
-
-          <div class="grid gap-4 sm:grid-cols-2">
-            <div class="rounded-xl border border-slate-200 bg-slate-50/50 p-5 print:border-slate-300">
-              <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Mã phiếu</p>
-              <p class="mt-1 text-lg font-bold text-slate-900">${escHtml(d.exportCode)}</p>
-              <p class="mt-4 text-xs font-medium uppercase tracking-wide text-slate-500">Trạng thái phiếu</p>
-              <p class="mt-1 inline-flex rounded-lg bg-indigo-100 px-2.5 py-1 text-sm font-semibold text-indigo-800 print:border print:border-indigo-300 print:bg-white">${stExport}</p>
-            </div>
-            <div class="rounded-xl border border-slate-200 bg-slate-50/50 p-5 print:border-slate-300">
-              <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Đơn hàng</p>
-              <p class="mt-1 text-lg font-bold text-slate-900">#${d.orderId}</p>
-              <p class="mt-4 text-xs font-medium uppercase tracking-wide text-slate-500">Đơn · Nguồn · Giao hàng</p>
-              <p class="mt-1 text-sm leading-relaxed text-slate-800">${stOrder} <span class="text-slate-400">·</span> ${src} <span class="text-slate-400">·</span> ${fulfill}</p>
-            </div>
-          </div>
-
-          <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm print:border-slate-300 print:shadow-none">
-            <p class="text-xs font-medium uppercase tracking-wide text-slate-500">Người nhận</p>
-            <p class="mt-1 text-base font-semibold text-slate-900">${escHtml(d.recipientFullName)} <span class="font-normal text-slate-500">—</span> ${escHtml(d.recipientPhone)}</p>
-            <p class="mt-4 text-xs font-medium uppercase tracking-wide text-slate-500">Địa chỉ giao</p>
-            <p class="mt-1 text-sm text-slate-800">${escHtml(d.recipientAddress)}</p>
-            <div class="mt-5 flex flex-wrap items-baseline justify-between gap-2 border-t border-slate-100 pt-4 print:border-slate-200">
-              <span class="text-xs font-medium uppercase tracking-wide text-slate-500">Tổng tiền đơn (VND)</span>
-              <span class="text-xl font-bold tabular-nums text-emerald-700 print:text-slate-900">${totalStr}</span>
-            </div>
-          </div>
-
-          <div class="overflow-x-auto rounded-xl border border-slate-200 print:border-slate-300">
-            <table class="w-full min-w-[880px] border-collapse text-left">
-              <thead>
-                <tr class="border-b border-slate-200 bg-slate-100 print:bg-slate-50">
-                  <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-600">STT</th>
-                  <th class="px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">Mã thùng</th>
-                  <th class="px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">Lô</th>
-                  <th class="px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">Sản phẩm</th>
-                  <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-600">Phân hạng</th>
-                  <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600">KL thùng (kg)</th>
-                  <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-600">SL xuất</th>
-                  <th class="px-3 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600">Loại thùng</th>
-                  <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-600">Một phần</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-100">
-                ${rows}
-              </tbody>
-            </table>
-          </div>
-        </div>
+  <body>
+    <main class="page">
+      <div class="right">
+        <div><strong>Mẫu số: 02 - VT</strong></div>
+        <div class="small"><em>(Kèm theo Thông tư số 99/2025/TT-BTC)</em></div>
       </div>
+
+      <h1 class="center mt20" style="font-size: 26px; margin-bottom: 0;">PHIẾU XUẤT KHO</h1>
+      <div class="center mt8"><em>${escHtml(printDate)}</em></div>
+
+      <div class="mt20">- Họ và tên người nhận hàng: ${escHtml(d.recipientFullName)} (${escHtml(d.recipientPhone)})</div>
+      <div class="mt8">- Lý do xuất kho: ${dotted}</div>
+      <div class="mt8">- Xuất tại kho: ${dotted}</div>
+      <div class="mt8">- Địa điểm: ${dotted}</div>
+
+      <table class="w100 mt12 voucher-table">
+        <colgroup>
+          <col style="width: 8%;" />
+          <col class="item-col" />
+          <col class="code-col" />
+          <col class="unit-col" />
+          <col class="qty-col" />
+          <col class="qty-col" />
+          <col class="price-col" />
+          <col class="amount-col" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th class="border border-black p-1" rowspan="2">STT</th>
+            <th class="border border-black p-1" rowspan="2">Tên, nhãn hiệu, quy cách, phẩm chất vật tư, dụng cụ, sản phẩm, hàng hóa</th>
+            <th class="border border-black p-1" rowspan="2">Mã số</th>
+            <th class="border border-black p-1" rowspan="2">Đơn vị tính</th>
+            <th class="border border-black p-1 center" colspan="2">Số lượng</th>
+            <th class="border border-black p-1" rowspan="2">Đơn giá</th>
+            <th class="border border-black p-1" rowspan="2">Thành tiền</th>
+          </tr>
+          <tr>
+            <th class="border border-black p-1">Yêu cầu</th>
+            <th class="border border-black p-1">Thực xuất</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${padRows(rows)}
+          <tr class="total-row">
+            <td class="border border-black" colspan="2"><div class="total-cell">Cộng</div></td>
+            <td class="border border-black"><div class="total-cell">x</div></td>
+            <td class="border border-black"><div class="total-cell">x</div></td>
+            <td class="border border-black"><div class="total-cell">x</div></td>
+            <td class="border border-black"><div class="total-cell">x</div></td>
+            <td class="border border-black"><div class="total-cell">x</div></td>
+            <td class="border border-black"><div class="total-cell total-cell-right">${totalStr}</div></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="mt8">- Tổng số tiền (viết bằng chữ): ${dotted}</div>
+
+      <div class="right mt28"><em>${escHtml(printDate)}</em></div>
+      <table class="w100 sign mt8" style="border: none;">
+        <tr>
+          <td><strong>Người lập phiếu</strong><br/><em>(Ký, họ tên)</em></td>
+          <td><strong>Người nhận hàng</strong><br/><em>(Ký, họ tên)</em></td>
+          <td><strong>Quản lí</strong><br/><em>(Ký, họ tên)</em></td>
+          <td><strong>Giám đốc</strong><br/><em>(Ký, họ tên)</em></td>
+        </tr>
+        <tr>
+          <td class="sign-space">&nbsp;</td>
+          <td class="sign-space">&nbsp;</td>
+          <td class="sign-space">&nbsp;</td>
+          <td class="sign-space">&nbsp;</td>
+        </tr>
+      </table>
     </main>
   </body>
 </html>`;

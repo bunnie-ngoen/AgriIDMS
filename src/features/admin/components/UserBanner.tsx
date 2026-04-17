@@ -41,13 +41,24 @@ const UserBanner = ({ user }: Props) => (
 
     <div style={{ flex: 1, position: "relative" }}>
       <div style={{ fontSize: "1rem", fontWeight: 700, color: "#fff", letterSpacing: "-0.01em" }}>
-        {user.fullName ?? "Unknown User"}
+        {user.fullName ?? "Người dùng không xác định"}
       </div>
       <div style={{ fontSize: "12.5px", color: "rgba(255,255,255,0.55)", marginTop: "2px" }}>
         {user.email}
       </div>
       <div style={{ display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
-        {[user.userType == "0" ? "Admin" : "User", user.status].map((tag) => (
+        {[
+          user.userType == "0" ? "Admin" : "User",
+          user.status === "Online"
+            ? "Đang hoạt động"
+            : user.status === "Offline"
+              ? "Ngoại tuyến"
+              : user.status === "Active"
+                ? "Đang hoạt động"
+                : user.status === "Inactive"
+                  ? "Tạm ngưng"
+                  : user.status,
+        ].map((tag) => (
           <span key={tag} style={{
             padding: "3px 9px", borderRadius: "20px", fontSize: "11px",
             fontWeight: 600, background: "rgba(127,187,53,0.2)", color: "#a8d96a",
@@ -60,7 +71,7 @@ const UserBanner = ({ user }: Props) => (
           padding: "3px 9px", borderRadius: "20px", fontSize: "11px",
           fontWeight: 600, background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)",
         }}>
-          Since {new Date(user.createdAt).getFullYear()}
+          Từ {new Date(user.createdAt).getFullYear()}
         </span>
       </div>
     </div>

@@ -51,13 +51,13 @@ function isNestedMenuItem(item: SubMenuItem | NestedMenuItem): item is NestedMen
 }
 
 const mainMenu: MenuItem[] = [
-  { name: "Dashboard", path: "dashboard", icon: Archive },
+  { name: "Trang tổng quan", path: "dashboard", icon: Archive },
   {
-    name: "User Management",
+    name: "Quản lý nhân viên",
     icon: Users,
     children: [
-      { name: "Create Employee", path: "create-user", icon: CirclePlus },
-      { name: "User list", path: "users", icon: List },
+      { name: "Tạo nhân viên", path: "create-user", icon: CirclePlus },
+      { name: "Danh sách nhân viên", path: "users", icon: List },
       { name: "Tài khoản đã xóa", path: "users/deleted", icon: UserX },
     ],
   },
@@ -98,7 +98,7 @@ const mainMenu: MenuItem[] = [
   {
     name: "Kiểm kê",
     icon: ShieldCheck,
-    children: [{ name: "Dashboard", path: "stock-checks", icon: ShieldCheck }],
+    children: [{ name: "Trang tổng quan", path: "stock-checks", icon: ShieldCheck }],
   },
   {
     name: "Danh mục sản phẩm",
@@ -116,7 +116,7 @@ const mainMenu: MenuItem[] = [
       { name: "Tạo sản phẩm", path: "products/create", icon: CirclePlus },
       // ← Nested dropdown cho Product Variant
       {
-        name: "Product Variant",
+        name: "Biến thể sản phẩm",
         icon: Layers,
         children: [
           { name: "Danh sách biến thể", path: "product-variants", icon: List },
@@ -128,7 +128,7 @@ const mainMenu: MenuItem[] = [
 ];
 
 const accountMenu: MenuItem[] = [
-  { name: "Profile", path: "profile", icon: Users },
+  { name: "Thông tin cá nhân", path: "profile", icon: Users },
 ];
 
 export default function AdminSidebar() {
@@ -351,8 +351,8 @@ export default function AdminSidebar() {
           <LayoutDashboard size={18} />
         </div>
         <div>
-          <p className="text-sm font-semibold tracking-wide">AgriIDMS Admin</p>
-          <p className="text-[11px] text-slate-300">Dashboard</p>
+          <p className="text-sm font-semibold tracking-wide">AgriIDMS Quản trị</p>
+          <p className="text-[11px] text-slate-300">Trang tổng quan</p>
         </div>
       </div>
 
@@ -362,8 +362,8 @@ export default function AdminSidebar() {
           AD
         </div>
         <div className="flex-1">
-          <p className="text-sm font-semibold">Admin User</p>
-          <p className="text-[11px] text-emerald-400">Online</p>
+          <p className="text-sm font-semibold">Tài khoản Admin</p>
+          <p className="text-[11px] text-emerald-400">Đang hoạt động</p>
         </div>
       </div>
 
@@ -371,7 +371,7 @@ export default function AdminSidebar() {
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
         <div>
           <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            Main navigation
+            Điều hướng chính
           </p>
           <ul className="space-y-1">
             {mainMenu.map((item) =>
@@ -382,7 +382,7 @@ export default function AdminSidebar() {
 
         <div>
           <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            Account
+            Tài khoản
           </p>
           <ul className="space-y-1">
             {accountMenu.map((item) => renderLeafItem(item))}
@@ -404,7 +404,7 @@ export default function AdminSidebar() {
               </span>
               <span className="min-w-0">
                 <p className="text-sm font-semibold text-slate-100 truncate">
-                  Scan QR
+                  Quét QR
                 </p>
               </span>
             </span>
