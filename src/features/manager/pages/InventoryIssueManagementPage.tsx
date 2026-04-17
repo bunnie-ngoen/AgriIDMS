@@ -5,6 +5,7 @@ import {
   useGetDamagedBoxesQuery,
   useGetNearExpiryDashboardQuery,
 } from "../../goods-receipt/api/goods-receipt.api";
+import { formatNearExpiryProductLines } from "../utils/nearExpiryProductDisplay";
 
 function formatDate(input?: string | null) {
   if (!input) return "—";
@@ -201,10 +202,19 @@ export default function InventoryIssueManagementPage() {
                   </td>
                 </tr>
               ) : (
-                (nearExpiry?.lots ?? []).map((l) => (
+                (nearExpiry?.lots ?? []).map((l) => {
+                  const { title, subtitle } = formatNearExpiryProductLines(l);
+                  return (
                   <tr key={l.lotId} className="border-t border-slate-100">
                     <td className="px-3 py-2 font-semibold text-slate-900">{l.lotCode}</td>
-                    <td className="px-3 py-2 text-slate-700">{l.productName}</td>
+                    <td className="px-3 py-2 text-slate-700">
+                      <div>
+                        <div className="font-medium text-slate-900">{title}</div>
+                        {subtitle ? (
+                          <div className="mt-0.5 text-xs text-slate-500">{subtitle}</div>
+                        ) : null}
+                      </div>
+                    </td>
                     <td className="px-3 py-2 text-right text-slate-700">
                       {formatKg(l.remainingQuantity)} kg
                     </td>
@@ -224,7 +234,8 @@ export default function InventoryIssueManagementPage() {
                       </span>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
