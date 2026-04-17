@@ -1,4 +1,4 @@
-import { Navigate, useParams, useNavigate } from "react-router-dom";
+import { Navigate, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import {
   useGetGoodsReceiptByIdQuery,
@@ -119,6 +119,7 @@ function toVietnameseQcResult(qcResult?: string | null): string {
 
 export default function GoodsReceiptQC() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const receiptId = id ? Number(id) : 0;
   const { isAdmin, isManager, isWarehouseStaff } = useRoleGuard();
@@ -154,8 +155,7 @@ export default function GoodsReceiptQC() {
   });
 
   const [qcInspection, { isLoading: isQcLoading }] = useQcInspectionMutation();
-  const [approveReceipt, { isLoading: isApproving }] =
-    useApproveGoodsReceiptMutation();
+  const [approveReceipt] = useApproveGoodsReceiptMutation();
   const [managerAllowQc, { isLoading: isManagerAllowingQc }] =
     useManagerAllowQcMutation();
   const [managerReviewMin, { isLoading: isManagerReviewingMin }] =
@@ -203,6 +203,7 @@ export default function GoodsReceiptQC() {
   const [selectedDetailIdForQc, setSelectedDetailIdForQc] = useState<
     number | null
   >(null);
+  const autoApprovedOnPageRef = useRef(false);
 
   const [isAiQcModalOpen, setIsAiQcModalOpen] = useState(false);
   const [aiQcImageFile, setAiQcImageFile] = useState<File | null>(null);
@@ -267,8 +268,7 @@ export default function GoodsReceiptQC() {
     return [...lots].sort((a, b) => b.id - a.id);
   }, [lots]);
   const lotInputLabel = (lot: (typeof lotsSorted)[number]) =>
-    `#${lot.id} - ${lot.lotCode} - còn ${lot.remainingQuantity} kg`;
-  const [lotInputValue, setLotInputValue] = useState("");
+    `${lot.lotCode} · ${lot.productName || "SP"}${lot.productVariantName ? ` (${lot.productVariantName})` : ""} · còn ${lot.remainingQuantity} kg`;
   const selectedBoxType = createBoxesForm.watch("boxType");
   const selectedLotId = createBoxesForm.watch("lotId");
   const selectedSpecId = createBoxesForm.watch("boxTypeSpecId");
@@ -360,25 +360,28 @@ export default function GoodsReceiptQC() {
   };
 
   useEffect(() => {
-    if (!lotsSorted || lotsSorted.length === 0) return;
+    if (!lotsSorted.length) return;
     const currentLotId = createBoxesForm.getValues("lotId");
     const stillExists = lotsSorted.some((l) => l.id === currentLotId);
-    if (!currentLotId || currentLotId <= 0 || !stillExists) {
-      // auto chọn Lot mới nhất (id lớn nhất)
-      createBoxesForm.setValue("lotId", lotsSorted[0].id);
+    if (!stillExists) {
+      createBoxesForm.setValue("lotId", 0);
     }
   }, [lotsSorted, createBoxesForm]);
 
   useEffect(() => {
-    if (!lotsSorted.length) {
-      setLotInputValue("");
-      return;
+    const lotIdParam = Number(searchParams.get("lotId"));
+    if (!lotIdParam || Number.isNaN(lotIdParam) || !lotsSorted.length) return;
+    const targetLot = lotsSorted.find((l) => l.id === lotIdParam);
+    if (!targetLot) return;
+    createBoxesForm.setValue("lotId", targetLot.id, { shouldValidate: true });
+    if (searchParams.get("focus") === "create-boxes") {
+      requestAnimationFrame(() => {
+        document
+          .getElementById("create-boxes-section")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
     }
-    const current = lotsSorted.find((l) => l.id === selectedLotId) ?? null;
-    if (current) {
-      setLotInputValue(lotInputLabel(current));
-    }
-  }, [selectedLotId, lotsSorted]);
+  }, [searchParams, lotsSorted, createBoxesForm]);
 
   useEffect(() => {
     if (filteredSpecs.length === 0) {
@@ -410,10 +413,6 @@ export default function GoodsReceiptQC() {
 
   const canReviewApprovalStage = isAdmin() || isManager();
   const canQC = receipt?.status === "Received";
-  const canInitialApprove = canReviewApprovalStage && receipt?.status === "Draft";
-  const canApprove =
-    canReviewApprovalStage &&
-    (receipt?.status === "QCCompleted" || receipt?.status === "PendingManagerApproval");
   const canManagerToleranceAction =
     canReviewApprovalStage && receipt?.status === "PendingManagerApproval";
   const canManagerMinWeightAction =
@@ -608,7 +607,17 @@ export default function GoodsReceiptQC() {
         id: toastId,
       });
       setSelectedDetailIdForQc(null);
-      await refetch();
+      const refreshed = await refetch();
+      const latestReceipt = refreshed.data;
+
+      // Fallback cho luồng Admin/Manager: nếu backend chưa tự duyệt ngay sau QC
+      // thì FE chủ động gọi duyệt để đảm bảo đúng nghiệp vụ "tự động duyệt".
+      if (canReviewApprovalStage && latestReceipt?.status === "QCCompleted") {
+        await approveReceipt(latestReceipt.id).unwrap();
+        toast.success("Đã tự động duyệt phiếu sau khi kiểm tra chất lượng.");
+        await refetch();
+        await refetchLots();
+      }
       if (canViewPrice) await refetchForApproval();
     } catch (err: any) {
       const msg =
@@ -619,37 +628,39 @@ export default function GoodsReceiptQC() {
     }
   };
 
-  const handleApprove = async () => {
-    if (!window.confirm("Bạn chắc chắn muốn duyệt phiếu nhập này?")) return;
-    const toastId = toast.loading("Đang duyệt phiếu nhập...");
-    try {
-      await approveReceipt(receipt.id).unwrap();
-      toast.success("Duyệt phiếu nhập thành công.", { id: toastId });
-      await refetch();
-      await refetchLots();
-      if (canViewPrice) await refetchForApproval();
-      await syncMissingLotQrImages();
-    } catch (err: any) {
-      const msg =
-        err?.data?.message ||
-        err?.data?.error ||
-        "Duyệt phiếu nhập thất bại.";
-      toast.error(msg, { id: toastId });
+  useEffect(() => {
+    if (!receipt) return;
+    if (!canReviewApprovalStage) return;
+    if (receipt.status !== "QCCompleted") return;
+    if (autoApprovedOnPageRef.current) return;
 
-      // Nếu lỗi do kho không đủ dung lượng, mở popup cho chọn lại kho
-      if (
-        typeof msg === "string" &&
-        (msg.includes("Không đủ dung lượng") ||
-          msg.includes("kg trống") ||
-          msg.includes("m³ trống") ||
-          msg.includes("m3 trống"))
-      ) {
-        const firstOther = otherWarehouses[0]?.id ?? 0;
-        setSelectedWarehouseId(firstOther);
-        setIsWarehouseModalOpen(true);
+    autoApprovedOnPageRef.current = true;
+    (async () => {
+      const toastId = toast.loading("Đang tự động duyệt phiếu...");
+      try {
+        await approveReceipt(receipt.id).unwrap();
+        toast.success("Đã tự động duyệt phiếu.", { id: toastId });
+        await refetch();
+        await refetchLots();
+        if (canViewPrice) await refetchForApproval();
+      } catch (err: any) {
+        autoApprovedOnPageRef.current = false;
+        const msg =
+          err?.data?.message ||
+          err?.data?.error ||
+          "Tự động duyệt phiếu thất bại.";
+        toast.error(msg, { id: toastId });
       }
-    }
-  };
+    })();
+  }, [
+    receipt,
+    canReviewApprovalStage,
+    approveReceipt,
+    refetch,
+    refetchLots,
+    canViewPrice,
+    refetchForApproval,
+  ]);
 
   const handleConfirmChangeWarehouse = async () => {
     if (!selectedWarehouseId || selectedWarehouseId <= 0) {
@@ -803,9 +814,10 @@ export default function GoodsReceiptQC() {
       }).unwrap();
       toast.success("Tạo thùng thành công.", { id: toastId });
       createBoxesForm.reset({
-        lotId: 0,
+        lotId: Number(values.lotId),
         boxSize: 0,
         boxType: BoxTypeEnum.StyrofoamBox,
+        boxTypeSpecId: 0,
       });
 
       if (created.boxes?.length) {
@@ -873,7 +885,7 @@ export default function GoodsReceiptQC() {
           </button>
           <div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-              Bước 2 · Kiểm tra chất lượng & duyệt phiếu nhập ·{" "}
+              Bước 2 · Kiểm tra chất lượng phiếu nhập ·{" "}
               {receipt.receiptCode}
             </h1>
             <p className="text-xs text-slate-400 mt-0.5">
@@ -1242,8 +1254,8 @@ export default function GoodsReceiptQC() {
           {/* Create boxes section */}
           {canReviewApprovalStage && (
             <div className="px-6 py-4 border-t border-slate-100 space-y-1.5 bg-slate-50/40">
-              <p className="text-xs font-semibold text-slate-700">
-                Bước 3 · Duyệt phiếu / Quản lí duyệt
+                <p className="text-xs font-semibold text-slate-700">
+                Bước 3 · Xử lý sau kiểm tra chất lượng
               </p>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs text-slate-500">
@@ -1253,21 +1265,6 @@ export default function GoodsReceiptQC() {
                   </span>
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {(canInitialApprove || canApprove) && (
-                    <button
-                      type="button"
-                      onClick={handleApprove}
-                      disabled={isApproving}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold text-white px-3 py-1.5 disabled:opacity-60"
-                    >
-                      {isApproving && (
-                        <Loader2 size={12} className="animate-spin" />
-                      )}
-                      {canInitialApprove
-                        ? "Duyệt bước 1 (mở kiểm tra chất lượng)"
-                        : "Duyệt phiếu"}
-                    </button>
-                  )}
                   {canManagerToleranceAction && (
                     <>
                       <button
@@ -1341,7 +1338,10 @@ export default function GoodsReceiptQC() {
 
           {/* Create boxes section */}
           {receipt.status === "Approved" && (
-            <div className="px-6 py-4 border-t border-slate-100 bg-emerald-50/40">
+            <div
+              id="create-boxes-section"
+              className="px-6 py-4 border-t border-slate-100 bg-emerald-50/40"
+            >
               <h3 className="text-xs font-semibold text-slate-800 mb-2">
                 Tạo thùng từ lô
               </h3>
@@ -1365,53 +1365,24 @@ export default function GoodsReceiptQC() {
                   <label className="flex h-5 items-center text-xs font-medium text-slate-600 mb-1">
                     Chọn lô
                   </label>
-                  <input
-                    list="lot-options"
-                    value={lotInputValue}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setLotInputValue(val);
-                      const normalized = val.trim().toLowerCase();
-                      const matched = lotsSorted.find(
-                        (lot) =>
-                          lotInputLabel(lot).toLowerCase() === normalized ||
-                          lot.lotCode.toLowerCase() === normalized ||
-                          `#${lot.id}`.toLowerCase() === normalized,
-                      );
-                      if (matched) {
-                        createBoxesForm.setValue("lotId", matched.id, {
-                          shouldValidate: true,
-                        });
-                      }
-                    }}
-                    onBlur={() => {
-                      const normalized = lotInputValue.trim().toLowerCase();
-                      const matched = lotsSorted.find(
-                        (lot) =>
-                          lotInputLabel(lot).toLowerCase() === normalized ||
-                          lot.lotCode.toLowerCase() === normalized ||
-                          `#${lot.id}`.toLowerCase() === normalized,
-                      );
-                      if (matched) {
-                        createBoxesForm.setValue("lotId", matched.id, {
-                          shouldValidate: true,
-                        });
-                        setLotInputValue(lotInputLabel(matched));
-                      }
-                    }}
+                  <select
+                    {...createBoxesForm.register("lotId", {
+                      valueAsNumber: true,
+                    })}
                     className="w-full h-11 rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
                     disabled={isLoadingLots || lots.length === 0}
-                    placeholder={
-                      isLoadingLots
+                  >
+                    <option value={0}>
+                      {isLoadingLots
                         ? "Đang tải danh sách lô..."
-                        : "Gõ mã lô hoặc chọn từ gợi ý"
-                    }
-                  />
-                  <datalist id="lot-options">
+                        : "Chọn lô để tạo thùng"}
+                    </option>
                     {lotsSorted.map((lot) => (
-                      <option key={lot.id} value={lotInputLabel(lot)} />
+                      <option key={lot.id} value={lot.id}>
+                        {lotInputLabel(lot)}
+                      </option>
                     ))}
-                  </datalist>
+                  </select>
                 </div>
                 <div className="md:col-span-3">
                   <label className="flex h-5 items-center text-xs font-medium text-slate-600 mb-1">

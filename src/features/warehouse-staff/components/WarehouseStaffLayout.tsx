@@ -1,6 +1,7 @@
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Bell,
+  CircleAlert,
   Boxes,
   ChevronRight,
   ClipboardList,
@@ -103,7 +104,8 @@ export default function WarehouseStaffLayout() {
   const [isWarehouseMenuOpen, setIsWarehouseMenuOpen] = useState(
     location.pathname.includes("/warehouse/warehouses") ||
       location.pathname.includes("/warehouse/putaway") ||
-      location.pathname.includes("/warehouse/inventory-issues"),
+      location.pathname.includes("/warehouse/inventory-issues") ||
+      location.pathname.includes("/warehouse/damage-reports"),
   );
 
   const handleLogout = () => {
@@ -230,6 +232,23 @@ export default function WarehouseStaffLayout() {
                 Hồ sơ cá nhân
               </NavLink>
             </li>
+            <li>
+              <NavLink
+                to="/warehouse/damage-reports"
+                className={({ isActive }) =>
+                  `w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-slate-800 text-white border border-slate-700"
+                      : "text-slate-300 hover:bg-slate-800/70"
+                  }`
+                }
+              >
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-800 text-slate-200">
+                  <CircleAlert size={15} />
+                </span>
+                Phiếu hỏng & giảm giá
+              </NavLink>
+            </li>
 
             <li className="mt-3 pt-2 border-t border-slate-800/60">
               <button
@@ -295,6 +314,20 @@ export default function WarehouseStaffLayout() {
                       }
                     >
                       Hàng hư hỏng / quá hạn
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink
+                      to="/warehouse/damage-reports"
+                      className={({ isActive }) =>
+                        `w-full flex items-center px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                          isActive
+                            ? "bg-slate-700 text-white border border-slate-600"
+                            : "text-slate-300 hover:bg-slate-800/70"
+                        }`
+                      }
+                    >
+                      Gửi phiếu hỏng & đề xuất giảm
                     </NavLink>
                   </li>
                 </ul>

@@ -127,6 +127,9 @@ const StockCheckDetailsPage = lazy(
 const DisposalRequestsPage = lazy(
   () => import("../admin/pages/DisposalRequestsPage")
 );
+const DamageDiscountApprovalPage = lazy(
+  () => import("../manager/pages/DamageDiscountApprovalPage")
+);
 
 export const adminRoutes = [
   {
@@ -187,6 +190,7 @@ export const adminRoutes = [
       { path: "stock-checks", element: <ManagerStockChecksDashboardPage /> },
       { path: "stock-checks/:id", element: <StockCheckDetailsPage /> },
       { path: "disposal-requests", element: <DisposalRequestsPage /> },
+      { path: "damage-discount-approvals", element: <DamageDiscountApprovalPage /> },
     ],
   },
 ];

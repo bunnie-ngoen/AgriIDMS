@@ -76,6 +76,11 @@ const mainMenu: MenuItem[] = [
             path: "variant-discount-config",
             icon: BadgePercent,
           },
+          {
+            name: "Duyệt phiếu hỏng áp giảm",
+            path: "damage-discount-approvals",
+            icon: BadgePercent,
+          },
         ],
       },
       {

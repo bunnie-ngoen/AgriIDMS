@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useForm, useFieldArray } from "react-hook-form";
 import { useGetSuppliersQuery } from "../../supplier/api/supplier.api";
@@ -13,12 +13,18 @@ type FormValues = {
   details: (CreatePurchaseOrderDetailRequest & { harvestDate: string })[];
 };
 
+const getTodayLocalYmd = () => {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+};
+
 const defaultDetail: FormValues["details"][0] = {
   productVariantId: 0,
   orderedWeight: 0,
   unitPrice: 0,
   tolerancePercent: 2,
-  harvestDate: new Date().toISOString().slice(0, 10),
+  harvestDate: getTodayLocalYmd(),
 };
 
 export default function CreatePurchaseOrder() {
@@ -46,6 +52,35 @@ export default function CreatePurchaseOrder() {
   });
 
   const [serverError, setServerError] = useState<string | null>(null);
+  const today = useMemo(() => getTodayLocalYmd(), []);
+  const watchedSupplierId = form.watch("supplierId");
+  const watchedDetails = form.watch("details");
+
+  const isCreateDisabled = useMemo(() => {
+    if (isLoading) return true;
+    if (!watchedSupplierId || watchedSupplierId <= 0) return true;
+    if (!watchedDetails || watchedDetails.length === 0) return true;
+    return watchedDetails.some((d) => {
+      if (!d) return true;
+      const variantId = Number(d.productVariantId);
+      const orderedWeight = Number(d.orderedWeight);
+      const unitPrice = Number(d.unitPrice);
+      const tolerancePercent = Number(d.tolerancePercent);
+      const harvestDate = d.harvestDate;
+      if (!variantId || variantId <= 0) return true;
+      if (!harvestDate) return true;
+      if (harvestDate > today) return true;
+      if (!Number.isFinite(orderedWeight) || orderedWeight <= 0) return true;
+      if (!Number.isFinite(unitPrice) || unitPrice <= 0) return true;
+      if (
+        !Number.isFinite(tolerancePercent) ||
+        tolerancePercent < 0 ||
+        tolerancePercent > 100
+      )
+        return true;
+      return false;
+    });
+  }, [isLoading, watchedSupplierId, watchedDetails, today]);
 
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
@@ -67,6 +102,9 @@ export default function CreatePurchaseOrder() {
       if (!d.harvestDate) {
         localErrors.push(`Dòng ${row}: vui lòng chọn ngày thu hoạch.`);
       }
+      if (d.harvestDate && d.harvestDate > today) {
+        localErrors.push(`Dòng ${row}: ngày thu hoạch phải nhỏ hơn hoặc bằng ngày hiện tại.`);
+      }
       if (!d.orderedWeight || Number(d.orderedWeight) <= 0) {
         localErrors.push(`Dòng ${row}: khối lượng đặt phải lớn hơn 0.`);
       }
@@ -80,8 +118,8 @@ export default function CreatePurchaseOrder() {
           `Khối lượng đặt (kg) phải >= định mức tối thiểu (${minLine} kg) của sản phẩm.`,
         );
       }
-      if (d.unitPrice != null && Number(d.unitPrice) < 0) {
-        localErrors.push(`Dòng ${row}: đơn giá không được âm.`);
+      if (d.unitPrice == null || Number(d.unitPrice) <= 0) {
+        localErrors.push(`Dòng ${row}: đơn giá phải lớn hơn 0.`);
       }
       if (
         d.tolerancePercent != null &&
@@ -209,7 +247,12 @@ export default function CreatePurchaseOrder() {
                     </label>
                     <input
                       type="date"
-                      {...form.register(`details.${index}.harvestDate`, { required: true })}
+                      max={today}
+                      {...form.register(`details.${index}.harvestDate`, {
+                        required: true,
+                        validate: (value) =>
+                          !value || value <= today || "Ngày thu hoạch phải nhỏ hơn hoặc bằng ngày hiện tại.",
+                      })}
                       className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                     />
                   </div>
@@ -238,9 +281,11 @@ export default function CreatePurchaseOrder() {
                     <input
                       type="number"
                       step="0.01"
-                      min={0}
+                      min={0.01}
                       {...form.register(`details.${index}.unitPrice`, {
                         valueAsNumber: true,
+                        required: true,
+                        min: 0.01,
                       })}
                       className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                     />
@@ -292,7 +337,7 @@ export default function CreatePurchaseOrder() {
           </button>
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isCreateDisabled}
             className="flex-[2] rounded-xl py-3 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {isLoading ? (
