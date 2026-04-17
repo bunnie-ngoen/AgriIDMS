@@ -8,8 +8,6 @@ export type NearExpiryDiscountRule = {
   discountPercent: number;
   priority: number;
   isActive: boolean;
-  startAtUtc?: string | null;
-  endAtUtc?: string | null;
   createdAt: string;
   updatedAt?: string | null;
 };
@@ -21,8 +19,6 @@ export type UpsertNearExpiryDiscountRule = {
   discountPercent: number;
   priority: number;
   isActive: boolean;
-  startAtUtc?: string | null;
-  endAtUtc?: string | null;
 };
 
 export const nearExpiryDiscountApi = api.injectEndpoints({

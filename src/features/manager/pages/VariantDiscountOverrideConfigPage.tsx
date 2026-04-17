@@ -18,12 +18,37 @@ type OverrideFormItem = UpsertProductVariantDiscountOverride;
 const emptyItem = (): OverrideFormItem => ({
   productVariantId: 0,
   lotId: null,
+  priority: 0,
   overrideNearExpiryDiscountPercent: 0,
   reason: "",
   isActive: true,
   startAtUtc: null,
   endAtUtc: null,
 });
+
+/** Gán số ưu tiên dương chưa dùng trong danh sách hiện tại (số nhỏ = ưu tiên cao hơn). */
+function nextFreePriority(rows: OverrideFormItem[]): number {
+  const used = new Set(
+    rows
+      .map((x) => Math.floor(Number(x.priority) || 0))
+      .filter((n) => n > 0),
+  );
+  let n = 1;
+  while (used.has(n)) n += 1;
+  return n;
+}
+
+/** Chuẩn hóa khi tải từ API: mỗi dòng có priority > 0 và không trùng trong form. */
+function ensureUniquePositivePriorities(rows: OverrideFormItem[]): OverrideFormItem[] {
+  const used = new Set<number>();
+  return rows.map((row) => {
+    let p = Math.floor(Number(row.priority) || 0);
+    if (p <= 0) p = 1;
+    while (used.has(p)) p += 1;
+    used.add(p);
+    return { ...row, priority: p };
+  });
+}
 
 /** Lot đã quá ngày HSD (theo lịch UTC) hoặc trạng thái Expired → không hiện trong dropdown ghi đè. */
 function isLotExpiredForOverride(lot: LotListItem): boolean {
@@ -40,6 +65,123 @@ function isLotExpiredForOverride(lot: LotListItem): boolean {
 
 function filterLotsForOverrideSelect(lots: LotListItem[]): LotListItem[] {
   return lots.filter((l) => !isLotExpiredForOverride(l));
+}
+
+/** yyyy-MM-dd cho <input type="date" /> */
+function toYmd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Ngày lịch (local) từ chuỗi API (ISO hoặc tương đương). */
+function parseCalendarDateFromApiDate(iso: string | null | undefined): Date | null {
+  if (!iso || !String(iso).trim()) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function formatDdMmYyyyFromYmd(ymd: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return "";
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  if (Number.isNaN(dt.getTime())) return "";
+  return dt.toLocaleDateString("vi-VN");
+}
+
+/** ISO UTC: đầu ngày theo lịch local (không nhập giờ). */
+function localYmdToUtcStartIso(ymd: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Date(y, m - 1, d, 0, 0, 0, 0).toISOString();
+}
+
+/** ISO UTC: cuối ngày local — để EndAtUtc >= cả ngày kết thúc đã chọn khi BE so sánh DateTime. */
+function localYmdToUtcEndOfDayIso(ymd: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Date(y, m - 1, d, 23, 59, 59, 999).toISOString();
+}
+
+/** Lấy yyyy-MM-dd từ ISO đã lưu (hiển thị lại trên date input). */
+function isoToLocalYmd(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return toYmd(d);
+}
+
+function ymdCompare(a: string, b: string): number {
+  return a.localeCompare(b);
+}
+
+/**
+ * Ngày nhập hàng tham chiếu (calendar local) để validate "bắt đầu hiệu lực" > ngày nhập.
+ * - Lot cụ thể: receivedDate của lot (API by-product-variant).
+ * - Tất cả lot: ngày nhập sớm nhất trong các lot đã lọc của biến thể.
+ * Trả về null nếu chưa có dữ liệu — khi đó chỉ dựa vào BE (nếu có lot) hoặc không kiểm tra receipt ở FE.
+ */
+function getReferenceReceiptCalendarDate(
+  item: OverrideFormItem,
+  variantLotsFiltered: LotListItem[],
+): Date | null {
+  if (item.lotId != null && Number(item.lotId) > 0) {
+    const lot = variantLotsFiltered.find((l) => Number(l.lotId) === Number(item.lotId));
+    return parseCalendarDateFromApiDate(lot?.receivedDate);
+  }
+  const dates = variantLotsFiltered
+    .map((l) => parseCalendarDateFromApiDate(l.receivedDate))
+    .filter((d): d is Date => d != null);
+  if (dates.length === 0) return null;
+  return new Date(Math.min(...dates.map((d) => d.getTime())));
+}
+
+/** Ngày bắt đầu hiệu lực (calendar) phải > ngày nhập hàng (calendar). */
+function isEffectiveStartYmdAfterReceiptYmd(
+  startYmd: string,
+  receiptCal: Date | null,
+): boolean {
+  if (!receiptCal || !/^\d{4}-\d{2}-\d{2}$/.test(startYmd)) return true;
+  const [y, m, d] = startYmd.split("-").map(Number);
+  const startCal = new Date(y, m - 1, d);
+  const rec = new Date(
+    receiptCal.getFullYear(),
+    receiptCal.getMonth(),
+    receiptCal.getDate(),
+  );
+  return startCal.getTime() > rec.getTime();
+}
+
+/** min trên input date = ngày sau ngày nhập (user không được chọn đúng ngày nhập hoặc trước). */
+function minStartYmdAfterReceipt(receiptCal: Date | null): string | undefined {
+  if (!receiptCal) return undefined;
+  const next = new Date(
+    receiptCal.getFullYear(),
+    receiptCal.getMonth(),
+    receiptCal.getDate() + 1,
+  );
+  return toYmd(next);
+}
+
+/**
+ * Dòng subtitle ngắn dưới title card: nhãn lot (mã hoặc #id) · % giảm · ưu tiên · trạng thái.
+ */
+function buildVariantDiscountConfigSummaryLine(
+  config: OverrideFormItem,
+  opts?: { lotCode?: string | null },
+): string {
+  const hasLot = config.lotId != null && Number(config.lotId) > 0;
+  const lotLabel = hasLot
+    ? opts?.lotCode?.trim()
+      ? opts.lotCode.trim()
+      : `Lot #${config.lotId}`
+    : "Toàn lot biến thể";
+  const pct = Number(config.overrideNearExpiryDiscountPercent ?? 0);
+  const prio = Math.floor(Number(config.priority) || 0);
+  const active = config.isActive ? "Kích hoạt" : "Tắt";
+  return `${lotLabel} · ${pct}% · Ưu tiên ${prio} · ${active}`;
 }
 
 export default function VariantDiscountOverrideConfigPage() {
@@ -77,29 +219,33 @@ export default function VariantDiscountOverrideConfigPage() {
 
   useEffect(() => {
     if (!data) return;
-    setItems(
-      data.map((x) => ({
-        productVariantId: Number(x.productVariantId || 0),
-        lotId:
-          x.lotId != null && Number.isFinite(Number(x.lotId))
-            ? Number(x.lotId)
-            : null,
-        overrideNearExpiryDiscountPercent: Number(
-          x.overrideNearExpiryDiscountPercent || 0,
-        ),
-        reason: x.reason ?? "",
-        isActive: Boolean(x.isActive),
-        startAtUtc: x.startAtUtc ?? null,
-        endAtUtc: x.endAtUtc ?? null,
-      })),
-    );
+    const mapped = data.map((x) => ({
+      productVariantId: Number(x.productVariantId || 0),
+      lotId:
+        x.lotId != null && Number.isFinite(Number(x.lotId))
+          ? Number(x.lotId)
+          : null,
+      priority: Math.floor(Number(x.priority) || 0),
+      overrideNearExpiryDiscountPercent: Number(
+        x.overrideNearExpiryDiscountPercent || 0,
+      ),
+      reason: x.reason ?? "",
+      isActive: Boolean(x.isActive),
+      startAtUtc: x.startAtUtc ?? null,
+      endAtUtc: x.endAtUtc ?? null,
+    }));
+    setItems(ensureUniquePositivePriorities(mapped));
   }, [data]);
 
   const updateItem = (idx: number, patch: Partial<OverrideFormItem>) => {
     setItems((prev) => prev.map((x, i) => (i === idx ? { ...x, ...patch } : x)));
   };
 
-  const addItem = () => setItems((prev) => [...prev, emptyItem()]);
+  const addItem = () =>
+    setItems((prev) => [
+      ...prev,
+      { ...emptyItem(), priority: nextFreePriority(prev) },
+    ]);
   const removeItem = (idx: number) =>
     setItems((prev) => prev.filter((_, i) => i !== idx));
 
@@ -157,25 +303,86 @@ export default function VariantDiscountOverrideConfigPage() {
   }, [lotsByVariant]);
 
   const saveAll = async () => {
-    const cleaned = items.map((x) => ({
-      productVariantId: Math.max(0, Math.floor(Number(x.productVariantId || 0))),
-      lotId:
-        x.lotId != null && Number(x.lotId) > 0
-          ? Math.floor(Number(x.lotId))
-          : null,
-      overrideNearExpiryDiscountPercent: Math.max(
-        0,
-        Math.min(100, Number(x.overrideNearExpiryDiscountPercent || 0)),
-      ),
-      reason: (x.reason || "").trim() || null,
-      isActive: Boolean(x.isActive),
-      startAtUtc: x.startAtUtc || null,
-      endAtUtc: x.endAtUtc || null,
-    }));
+    const cleaned = items.map((x) => {
+      const startYmd = isoToLocalYmd(x.startAtUtc ?? null);
+      const endYmd = isoToLocalYmd(x.endAtUtc ?? null);
+      return {
+        productVariantId: Math.max(0, Math.floor(Number(x.productVariantId || 0))),
+        lotId:
+          x.lotId != null && Number(x.lotId) > 0
+            ? Math.floor(Number(x.lotId))
+            : null,
+        priority: Math.max(0, Math.floor(Number(x.priority) || 0)),
+        overrideNearExpiryDiscountPercent: Math.max(
+          0,
+          Math.min(100, Number(x.overrideNearExpiryDiscountPercent || 0)),
+        ),
+        reason: (x.reason || "").trim() || null,
+        isActive: Boolean(x.isActive),
+        startYmd,
+        endYmd,
+        startAtUtc: startYmd ? localYmdToUtcStartIso(startYmd) : null,
+        endAtUtc: endYmd ? localYmdToUtcEndOfDayIso(endYmd) : null,
+      };
+    });
 
     if (cleaned.some((x) => x.productVariantId <= 0)) {
       toast.error("Mã biến thể sản phẩm phải lớn hơn 0.");
       return;
+    }
+    if (cleaned.some((x) => x.priority <= 0)) {
+      toast.error("Độ ưu tiên phải là số nguyên dương trên mỗi dòng.");
+      return;
+    }
+    const prioCounts = new Map<number, number>();
+    for (const x of cleaned) {
+      prioCounts.set(x.priority, (prioCounts.get(x.priority) ?? 0) + 1);
+    }
+    if ([...prioCounts.values()].some((c) => c > 1)) {
+      toast.error("Độ ưu tiên không được trùng nhau giữa các dòng.");
+      return;
+    }
+    for (const x of cleaned) {
+      const raw = lotsByVariant[x.productVariantId] || [];
+      const variantLots = filterLotsForOverrideSelect(raw);
+      if (!x.startYmd || !x.endYmd) {
+        toast.error("Ngày bắt đầu và ngày kết thúc hiệu lực là bắt buộc.");
+        return;
+      }
+      if (!x.startAtUtc || !x.endAtUtc) {
+        toast.error("Ngày hiệu lực không hợp lệ.");
+        return;
+      }
+      if (ymdCompare(x.endYmd, x.startYmd) < 0) {
+        toast.error("Ngày kết thúc hiệu lực phải từ ngày bắt đầu trở đi.");
+        return;
+      }
+      const t0 = new Date(x.startAtUtc).getTime();
+      const t1 = new Date(x.endAtUtc).getTime();
+      if (!Number.isFinite(t0) || !Number.isFinite(t1) || t0 >= t1) {
+        toast.error("Khoảng hiệu lực không hợp lệ.");
+        return;
+      }
+      const refReceipt = getReferenceReceiptCalendarDate(
+        {
+          productVariantId: x.productVariantId,
+          lotId: x.lotId,
+          priority: x.priority,
+          overrideNearExpiryDiscountPercent: x.overrideNearExpiryDiscountPercent,
+          reason: x.reason,
+          isActive: x.isActive,
+          startAtUtc: x.startAtUtc,
+          endAtUtc: x.endAtUtc,
+        },
+        variantLots,
+      );
+      if (
+        refReceipt &&
+        !isEffectiveStartYmdAfterReceiptYmd(x.startYmd, refReceipt)
+      ) {
+        toast.error("Ngày bắt đầu hiệu lực phải sau ngày nhập hàng.");
+        return;
+      }
     }
     if (
       cleaned.some((x) => {
@@ -192,7 +399,9 @@ export default function VariantDiscountOverrideConfigPage() {
     }
 
     try {
-      await save(cleaned).unwrap();
+      await save(
+        cleaned.map(({ startYmd: _s, endYmd: _e, ...rest }) => rest),
+      ).unwrap();
       toast.success("Đã lưu cấu hình ghi đè giảm giá theo sản phẩm.");
     } catch (err) {
       toast.error(extractErrorMessage(err, "Lưu thất bại. Vui lòng thử lại."));
@@ -247,19 +456,45 @@ export default function VariantDiscountOverrideConfigPage() {
           <div className="mb-3 text-xs text-slate-500">Đang tải danh sách lot...</div>
         ) : null}
 
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           {items.map((x, idx) => {
             const variantLots =
               x.productVariantId > 0
                 ? filterLotsForOverrideSelect(lotsByVariant[x.productVariantId] || [])
                 : [];
+            const pv = productVariants.find((p) => p.id === x.productVariantId);
+            const variantLabel =
+              pv != null
+                ? `#${pv.id} — ${pv.productName}`
+                : x.productVariantId > 0
+                  ? `#${x.productVariantId}`
+                  : "Chưa chọn biến thể";
+            const selectedLotCode =
+              x.lotId != null && Number(x.lotId) > 0
+                ? variantLots.find((l) => Number(l.lotId) === Number(x.lotId))
+                    ?.lotCode ?? null
+                : null;
+            const summaryLine = buildVariantDiscountConfigSummaryLine(x, {
+              lotCode: selectedLotCode,
+            });
 
             return (
             <div
               key={`${idx}-${x.productVariantId}`}
-              className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-7"
+              className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50"
             >
-              <div className="space-y-1">
+              <div className="border-b border-slate-200/90 bg-white/90 px-3 py-2">
+                <p className="truncate text-sm font-semibold leading-snug text-slate-900">
+                  {variantLabel}
+                </p>
+                <p className="mt-0.5 truncate text-[11px] font-normal leading-snug text-slate-500">
+                  {summaryLine}
+                </p>
+              </div>
+
+              <div className="p-2.5 sm:p-3">
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-12">
+              <div className="space-y-1 md:col-span-2">
                 <label className="text-[11px] font-medium text-slate-600">
                   Biến thể sản phẩm
                 </label>
@@ -288,11 +523,9 @@ export default function VariantDiscountOverrideConfigPage() {
                       </option>
                     ))}
                 </select>
-                <p className="text-[11px] text-slate-500">
-                  Chọn biến thể cần ghi đè mức giảm giá gần hết hạn.
-                </p>
+                
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1 md:col-span-2">
                 <label className="text-[11px] font-medium text-slate-600">
                   Lot áp dụng (tùy chọn)
                 </label>
@@ -315,11 +548,29 @@ export default function VariantDiscountOverrideConfigPage() {
                     </option>
                   ))}
                 </select>
-                <p className="text-[11px] text-slate-500">
-                  Để trống = áp dụng cho toàn bộ lot của biến thể đã chọn. Lot đã quá HSD không hiển thị.
-                </p>
+                
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1 md:col-span-1">
+                <label className="text-[11px] font-medium text-slate-600">
+                  Độ ưu tiên
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={x.priority > 0 ? x.priority : ""}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    updateItem(idx, {
+                      priority: raw === "" ? 0 : Math.floor(Number(raw) || 0),
+                    });
+                  }}
+                  placeholder="1, 2, 3…"
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
+                />
+                
+              </div>
+              <div className="space-y-1 md:col-span-1">
                 <label className="text-[11px] font-medium text-slate-600">
                   Mức giảm ghi đè (%)
                 </label>
@@ -339,7 +590,7 @@ export default function VariantDiscountOverrideConfigPage() {
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
                 />
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1 md:col-span-2">
                 <label className="text-[11px] font-medium text-slate-600">
                   Ghi chú / lý do
                 </label>
@@ -350,41 +601,92 @@ export default function VariantDiscountOverrideConfigPage() {
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
                 />
               </div>
-              <div className="space-y-1">
+              {(() => {
+                const refReceiptCal = getReferenceReceiptCalendarDate(
+                  x,
+                  variantLots,
+                );
+                const minStart = minStartYmdAfterReceipt(refReceiptCal);
+                const startYmd = isoToLocalYmd(x.startAtUtc);
+                const endYmd = isoToLocalYmd(x.endAtUtc);
+                const minEnd = startYmd || undefined;
+                const lotsFetchDone =
+                  x.productVariantId <= 0 ||
+                  x.productVariantId in lotsByVariant;
+                const pendingLots =
+                  x.productVariantId > 0 && !lotsFetchDone;
+                return (
+              <>
+              <div className="space-y-1 md:col-span-1">
                 <label className="text-[11px] font-medium text-slate-600">
-                  Bắt đầu hiệu lực
+                  Ngày bắt đầu hiệu lực
                 </label>
                 <input
-                  type="datetime-local"
-                  value={x.startAtUtc ? x.startAtUtc.slice(0, 16) : ""}
-                  onChange={(e) =>
+                  type="date"
+                  required
+                  min={minStart}
+                  value={startYmd}
+                  onChange={(e) => {
+                    const v = e.target.value;
                     updateItem(idx, {
-                      startAtUtc: e.target.value
-                        ? new Date(e.target.value).toISOString()
-                        : null,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
+                      startAtUtc: v ? localYmdToUtcStartIso(v) : null,
+                    });
+                  }}
+                  className="w-full max-w-[11rem] rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm outline-none focus:border-sky-500"
                 />
+                {startYmd ? (
+                  <p className="text-[10px] text-slate-500">
+                    {formatDdMmYyyyFromYmd(startYmd)}
+                  </p>
+                ) : null}
+                {pendingLots ? (
+                  <p className="text-[10px] text-slate-500">
+                    Đang tải lot để lấy ngày nhập hàng cho giới hạn chọn.
+                  </p>
+                ) : lotsFetchDone &&
+                  x.productVariantId > 0 &&
+                  variantLots.length === 0 ? (
+                  <p className="text-[10px] text-amber-700">
+                    Không có lot cho biến thể — không giới hạn min trên form; BE
+                    vẫn kiểm tra khi lưu nếu có dữ liệu.
+                  </p>
+                ) : lotsFetchDone &&
+                  x.productVariantId > 0 &&
+                  variantLots.length > 0 &&
+                  !refReceiptCal ? (
+                  <p className="text-[10px] text-amber-700">
+                    Lot không có receivedDate — không thể áp min ngày bắt đầu ở
+                    FE (cần API trả receivedDate).
+                  </p>
+                ) : null}
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1 md:col-span-1">
                 <label className="text-[11px] font-medium text-slate-600">
-                  Kết thúc hiệu lực
+                  Ngày kết thúc hiệu lực
                 </label>
                 <input
-                  type="datetime-local"
-                  value={x.endAtUtc ? x.endAtUtc.slice(0, 16) : ""}
-                  onChange={(e) =>
+                  type="date"
+                  required
+                  min={minEnd}
+                  value={endYmd}
+                  onChange={(e) => {
+                    const v = e.target.value;
                     updateItem(idx, {
-                      endAtUtc: e.target.value
-                        ? new Date(e.target.value).toISOString()
-                        : null,
-                    })
-                  }
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
+                      endAtUtc: v ? localYmdToUtcEndOfDayIso(v) : null,
+                    });
+                  }}
+                  className="w-full max-w-[11rem] rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm outline-none focus:border-sky-500"
                 />
+                {endYmd ? (
+                  <p className="text-[10px] text-slate-500">
+                    {formatDdMmYyyyFromYmd(endYmd)}
+                  </p>
+                ) : null}
               </div>
-              <div className="flex items-center gap-2">
+              </>
+                );
+              })()}
+              <div className="flex items-center gap-2 md:col-span-2">
                 <label className="inline-flex items-center gap-1 text-xs text-slate-700">
                   <input
                     type="checkbox"
@@ -401,6 +703,8 @@ export default function VariantDiscountOverrideConfigPage() {
                   <Trash2 size={12} />
                   Xóa
                 </button>
+              </div>
+              </div>
               </div>
             </div>
             );
