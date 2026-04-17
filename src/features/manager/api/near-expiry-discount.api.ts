@@ -2,7 +2,7 @@ import { api } from "../../../shared/api";
 
 export type NearExpiryDiscountRule = {
   id: number;
-  name: string;
+  name?: string | null;
   minDaysLeft?: number | null;
   maxDaysLeft: number;
   discountPercent: number;
@@ -15,7 +15,7 @@ export type NearExpiryDiscountRule = {
 };
 
 export type UpsertNearExpiryDiscountRule = {
-  name: string;
+  name?: string | null;
   minDaysLeft?: number | null;
   maxDaysLeft: number;
   discountPercent: number;

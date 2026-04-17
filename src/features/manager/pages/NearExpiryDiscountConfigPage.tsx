@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Tags, Plus, Trash2, Save } from "lucide-react";
 import toast from "react-hot-toast";
+import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { useGetNearExpiryDashboardQuery } from "../../goods-receipt/api/goods-receipt.api";
 import {
   useGetNearExpiryDiscountRulesQuery,
@@ -19,9 +20,36 @@ type DiscountRule = {
 };
 
 const defaultRules: DiscountRule[] = [
-  { name: "0-2 ngày", minDays: 0, maxDays: 2, discountPercent: 30, priority: 1, isActive: true, startAtUtc: null, endAtUtc: null },
-  { name: "3-5 ngày", minDays: 3, maxDays: 5, discountPercent: 20, priority: 2, isActive: true, startAtUtc: null, endAtUtc: null },
-  { name: "6-10 ngày", minDays: 6, maxDays: 10, discountPercent: 10, priority: 3, isActive: true, startAtUtc: null, endAtUtc: null },
+  {
+    name: "0-2 ngày",
+    minDays: 0,
+    maxDays: 2,
+    discountPercent: 30,
+    priority: 1,
+    isActive: true,
+    startAtUtc: null,
+    endAtUtc: null,
+  },
+  {
+    name: "3-5 ngày",
+    minDays: 3,
+    maxDays: 5,
+    discountPercent: 20,
+    priority: 2,
+    isActive: true,
+    startAtUtc: null,
+    endAtUtc: null,
+  },
+  {
+    name: "6-10 ngày",
+    minDays: 6,
+    maxDays: 10,
+    discountPercent: 10,
+    priority: 3,
+    isActive: true,
+    startAtUtc: null,
+    endAtUtc: null,
+  },
 ];
 
 export default function NearExpiryDiscountConfigPage() {
@@ -47,10 +75,44 @@ export default function NearExpiryDiscountConfigPage() {
     [data?.lots],
   );
 
+  const extractErrorMessage = (err: unknown, fallback: string): string => {
+    const e = err as FetchBaseQueryError & { data?: unknown; error?: string };
+    const dataObj = (e?.data ?? null) as
+      | { message?: unknown; title?: unknown; errors?: unknown }
+      | null;
+    if (typeof dataObj?.message === "string" && dataObj.message.trim()) {
+      return dataObj.message;
+    }
+    if (typeof dataObj?.title === "string" && dataObj.title.trim()) {
+      return dataObj.title;
+    }
+    if (dataObj?.errors && typeof dataObj.errors === "object") {
+      const values = Object.values(dataObj.errors as Record<string, unknown>).flatMap(
+        (v) => (Array.isArray(v) ? v : [v]),
+      );
+      const first = values.find((v) => typeof v === "string" && v.trim());
+      if (typeof first === "string") return first;
+    }
+    if (typeof e?.error === "string" && e.error.trim()) return e.error;
+    return fallback;
+  };
+
+  const isRuleEffectiveAt = (rule: DiscountRule, now: Date): boolean => {
+    if (!rule.isActive) return false;
+    if (rule.startAtUtc && now < new Date(rule.startAtUtc)) return false;
+    if (rule.endAtUtc && now > new Date(rule.endAtUtc)) return false;
+    return true;
+  };
+
   const getDiscountPercent = (daysLeft: number): number => {
-    const matched = sortedRules.find(
-      (r) => (r.minDays == null || daysLeft >= r.minDays) && daysLeft <= r.maxDays,
-    );
+    const now = new Date();
+    const matched = sortedRules.find((r) => r.isActive && daysLeft <= r.maxDays);
+    const effective = sortedRules.find((r) => {
+      if (!isRuleEffectiveAt(r, now)) return false;
+      if (r.minDays != null && daysLeft < r.minDays) return false;
+      return daysLeft <= r.maxDays;
+    });
+    if (effective) return effective.discountPercent;
     return matched?.discountPercent ?? 0;
   };
 
@@ -93,14 +155,45 @@ export default function NearExpiryDiscountConfigPage() {
 
   const saveRules = async () => {
     const cleaned = sortedRules.map((r) => ({
-      ...r,
       name: (r.name || "").trim(),
       minDays:
         r.minDays == null ? null : Math.max(0, Math.floor(Number(r.minDays))),
       maxDays: Math.max(0, Math.floor(r.maxDays)),
       discountPercent: Math.max(0, Math.min(100, Number(r.discountPercent))),
       priority: Math.max(1, Math.floor(Number(r.priority || 1))),
+      isActive: Boolean(r.isActive),
+      startAtUtc: r.startAtUtc,
+      endAtUtc: r.endAtUtc,
     }));
+
+    const invalidTimeRule = cleaned.find((r) => {
+      const hasStart = Boolean(r.startAtUtc);
+      const hasEnd = Boolean(r.endAtUtc);
+      if (hasStart !== hasEnd) return true;
+      if (hasStart && hasEnd) {
+        const start = new Date(r.startAtUtc as string).getTime();
+        const end = new Date(r.endAtUtc as string).getTime();
+        return Number.isNaN(start) || Number.isNaN(end) || start > end;
+      }
+      return false;
+    });
+    if (invalidTimeRule) {
+      toast.error(
+        `Thời gian hiệu lực không hợp lệ ở "${invalidTimeRule.name || "(không tên)"}".`,
+      );
+      return;
+    }
+
+    const invalidMinMaxRule = cleaned.find(
+      (r) => r.minDays != null && Number(r.minDays) > Number(r.maxDays),
+    );
+    if (invalidMinMaxRule) {
+      toast.error(
+        `Số ngày tối thiểu phải nhỏ hơn hoặc bằng số ngày tối đa ở "${invalidMinMaxRule.name || "(không tên)"}".`,
+      );
+      return;
+    }
+
     setRules(cleaned);
     try {
       await updateRules(
@@ -116,8 +209,8 @@ export default function NearExpiryDiscountConfigPage() {
         })),
       ).unwrap();
       toast.success("Đã lưu cấu hình giảm giá gần hết hạn.");
-    } catch {
-      toast.error("Lưu cấu hình thất bại. Vui lòng thử lại.");
+    } catch (err) {
+      toast.error(extractErrorMessage(err, "Lưu cấu hình thất bại. Vui lòng thử lại."));
     }
   };
 
@@ -131,10 +224,12 @@ export default function NearExpiryDiscountConfigPage() {
     setRules(
       rulesData
         .map((r) => ({
-          maxDays: Math.max(0, Math.floor(Number(r.maxDaysLeft ?? 0))),
           name: r.name ?? "",
           minDays:
-            r.minDaysLeft == null ? null : Math.max(0, Math.floor(Number(r.minDaysLeft))),
+            r.minDaysLeft == null
+              ? null
+              : Math.max(0, Math.floor(Number(r.minDaysLeft))),
+          maxDays: Math.max(0, Math.floor(Number(r.maxDaysLeft ?? 0))),
           discountPercent: Math.max(
             0,
             Math.min(100, Number(r.discountPercent ?? 0)),
@@ -168,7 +263,7 @@ export default function NearExpiryDiscountConfigPage() {
         <div className="flex flex-wrap items-end gap-3">
           <div>
             <label className="text-xs font-medium text-slate-600">
-              Lấy danh sách lô hàng trong
+              Lấy danh sách các lô hàng sẽ hết hạn trong vòng
             </label>
             <div className="mt-1 flex items-center gap-2">
               <input
@@ -230,7 +325,7 @@ export default function NearExpiryDiscountConfigPage() {
               className="grid grid-cols-1 md:grid-cols-7 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3"
             >
               <div>
-                <label className="text-[11px] text-slate-500">Tên rule</label>
+                <label className="text-[11px] text-slate-500">Tên mức giảm giá</label>
                 <input
                   value={r.name}
                   onChange={(e) =>
@@ -242,7 +337,7 @@ export default function NearExpiryDiscountConfigPage() {
                 />
               </div>
               <div>
-                <label className="text-[11px] text-slate-500">MinDaysLeft</label>
+                <label className="text-[11px] text-slate-500">Số ngày còn lại từ</label>
                 <input
                   type="number"
                   min={0}
@@ -261,7 +356,7 @@ export default function NearExpiryDiscountConfigPage() {
               </div>
               <div>
                 <label className="text-[11px] text-slate-500">
-                  Áp dụng khi số ngày còn lại {"<="}
+                  Áp dụng đến khi số ngày còn lại {"<="}
                 </label>
                 <input
                   type="number"
@@ -274,7 +369,7 @@ export default function NearExpiryDiscountConfigPage() {
                 />
               </div>
               <div>
-                <label className="text-[11px] text-slate-500">Priority</label>
+                <label className="text-[11px] text-slate-500">Độ ưu tiên</label>
                 <input
                   type="number"
                   min={1}

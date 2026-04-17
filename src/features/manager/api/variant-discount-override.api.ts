@@ -3,6 +3,7 @@ import { api } from "../../../shared/api";
 export type ProductVariantDiscountOverride = {
   id: number;
   productVariantId: number;
+  lotId?: number | null;
   overrideNearExpiryDiscountPercent: number;
   reason?: string | null;
   isActive: boolean;
@@ -14,6 +15,7 @@ export type ProductVariantDiscountOverride = {
 
 export type UpsertProductVariantDiscountOverride = {
   productVariantId: number;
+  lotId?: number | null;
   overrideNearExpiryDiscountPercent: number;
   reason?: string | null;
   isActive: boolean;

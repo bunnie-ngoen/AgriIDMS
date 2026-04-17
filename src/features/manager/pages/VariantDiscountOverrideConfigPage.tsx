@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { Plus, Save, Trash2, Tags } from "lucide-react";
 import toast from "react-hot-toast";
+import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { useGetProductVariantsQuery } from "../../product/api/product-variant.api";
+import {
+  useLazyGetLotsByProductVariantIdQuery,
+} from "../../goods-receipt/api/goods-receipt.api";
+import type { LotListItem } from "../../goods-receipt/types/goods-receipt.type";
 import {
   type UpsertProductVariantDiscountOverride,
   useGetProductVariantDiscountOverridesQuery,
@@ -12,6 +17,7 @@ type OverrideFormItem = UpsertProductVariantDiscountOverride;
 
 const emptyItem = (): OverrideFormItem => ({
   productVariantId: 0,
+  lotId: null,
   overrideNearExpiryDiscountPercent: 0,
   reason: "",
   isActive: true,
@@ -24,14 +30,38 @@ export default function VariantDiscountOverrideConfigPage() {
   const { data, isFetching } = useGetProductVariantDiscountOverridesQuery();
   const { data: productVariants = [], isFetching: isFetchingVariants } =
     useGetProductVariantsQuery();
+  const [triggerLotsByVariant, { isFetching: isFetchingLots }] =
+    useLazyGetLotsByProductVariantIdQuery();
+  const [lotsByVariant, setLotsByVariant] = useState<Record<number, LotListItem[]>>(
+    {},
+  );
   const [save, { isLoading: isSaving }] =
     useUpdateProductVariantDiscountOverridesMutation();
+
+  const extractErrorMessage = (err: unknown, fallback: string) => {
+    const e = err as
+      | FetchBaseQueryError
+      | { data?: { message?: string } }
+      | { message?: string };
+    const dataMessage =
+      typeof (e as { data?: { message?: string } })?.data?.message === "string"
+        ? (e as { data?: { message?: string } }).data!.message
+        : null;
+    if (dataMessage) return dataMessage;
+    if (typeof (e as { message?: string })?.message === "string")
+      return (e as { message?: string }).message!;
+    return fallback;
+  };
 
   useEffect(() => {
     if (!data) return;
     setItems(
       data.map((x) => ({
         productVariantId: Number(x.productVariantId || 0),
+        lotId:
+          x.lotId != null && Number.isFinite(Number(x.lotId))
+            ? Number(x.lotId)
+            : null,
         overrideNearExpiryDiscountPercent: Number(
           x.overrideNearExpiryDiscountPercent || 0,
         ),
@@ -51,9 +81,42 @@ export default function VariantDiscountOverrideConfigPage() {
   const removeItem = (idx: number) =>
     setItems((prev) => prev.filter((_, i) => i !== idx));
 
+  const ensureLotsLoaded = async (productVariantId: number) => {
+    if (productVariantId <= 0) return;
+    if (lotsByVariant[productVariantId]) return;
+    try {
+      const result = await triggerLotsByVariant(productVariantId).unwrap();
+      setLotsByVariant((prev) => ({ ...prev, [productVariantId]: result }));
+    } catch (err) {
+      setLotsByVariant((prev) => ({ ...prev, [productVariantId]: [] }));
+      toast.error(
+        extractErrorMessage(err, "Không thể tải danh sách lot theo biến thể."),
+      );
+    }
+  };
+
+  useEffect(() => {
+    const variantIds = Array.from(
+      new Set(
+        items
+          .map((x) => Number(x.productVariantId || 0))
+          .filter((id) => Number.isInteger(id) && id > 0),
+      ),
+    );
+    variantIds.forEach((variantId) => {
+      if (!lotsByVariant[variantId]) {
+        void ensureLotsLoaded(variantId);
+      }
+    });
+  }, [items, lotsByVariant]);
+
   const saveAll = async () => {
     const cleaned = items.map((x) => ({
       productVariantId: Math.max(0, Math.floor(Number(x.productVariantId || 0))),
+      lotId:
+        x.lotId != null && Number(x.lotId) > 0
+          ? Math.floor(Number(x.lotId))
+          : null,
       overrideNearExpiryDiscountPercent: Math.max(
         0,
         Math.min(100, Number(x.overrideNearExpiryDiscountPercent || 0)),
@@ -68,12 +131,24 @@ export default function VariantDiscountOverrideConfigPage() {
       toast.error("Mã biến thể sản phẩm phải lớn hơn 0.");
       return;
     }
+    if (
+      cleaned.some((x) =>
+        x.lotId != null
+          ? !(lotsByVariant[x.productVariantId] || []).some(
+              (lot) => Number(lot.lotId) === x.lotId,
+            )
+          : false,
+      )
+    ) {
+      toast.error("Lot đã chọn không thuộc biến thể sản phẩm tương ứng.");
+      return;
+    }
 
     try {
       await save(cleaned).unwrap();
       toast.success("Đã lưu cấu hình ghi đè giảm giá theo sản phẩm.");
-    } catch {
-      toast.error("Lưu thất bại. Vui lòng thử lại.");
+    } catch (err) {
+      toast.error(extractErrorMessage(err, "Lưu thất bại. Vui lòng thử lại."));
     }
   };
 
@@ -121,12 +196,19 @@ export default function VariantDiscountOverrideConfigPage() {
         {isFetchingVariants ? (
           <div className="mb-3 text-xs text-slate-500">Đang tải danh sách biến thể sản phẩm...</div>
         ) : null}
+        {isFetchingLots ? (
+          <div className="mb-3 text-xs text-slate-500">Đang tải danh sách lot...</div>
+        ) : null}
 
         <div className="space-y-3">
-          {items.map((x, idx) => (
+          {items.map((x, idx) => {
+            const variantLots =
+              x.productVariantId > 0 ? lotsByVariant[x.productVariantId] || [] : [];
+
+            return (
             <div
               key={`${idx}-${x.productVariantId}`}
-              className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-6"
+              className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-7"
             >
               <div className="space-y-1">
                 <label className="text-[11px] font-medium text-slate-600">
@@ -135,7 +217,16 @@ export default function VariantDiscountOverrideConfigPage() {
                 <select
                   value={x.productVariantId}
                   onChange={(e) =>
-                    updateItem(idx, { productVariantId: Number(e.target.value || 0) })
+                    {
+                      const nextVariantId = Number(e.target.value || 0);
+                      updateItem(idx, {
+                        productVariantId: nextVariantId,
+                        lotId: null,
+                      });
+                      if (nextVariantId > 0) {
+                        void ensureLotsLoaded(nextVariantId);
+                      }
+                    }
                   }
                   className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
                 >
@@ -150,6 +241,33 @@ export default function VariantDiscountOverrideConfigPage() {
                 </select>
                 <p className="text-[11px] text-slate-500">
                   Chọn biến thể cần ghi đè mức giảm giá gần hết hạn.
+                </p>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-slate-600">
+                  Lot áp dụng (tùy chọn)
+                </label>
+                <select
+                  value={x.lotId ?? ""}
+                  onChange={(e) =>
+                    updateItem(idx, {
+                      lotId: e.target.value ? Number(e.target.value) : null,
+                    })
+                  }
+                  disabled={x.productVariantId <= 0}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 disabled:bg-slate-100 disabled:text-slate-500"
+                >
+                  <option value="">Tất cả lot của biến thể</option>
+                  {variantLots.map((lot) => (
+                    <option key={lot.lotId} value={lot.lotId}>
+                      {lot.lotCode} • HSD{" "}
+                      {lot.expiryDate ? lot.expiryDate.slice(0, 10) : "N/A"} • Còn{" "}
+                      {Number(lot.remainingQuantity || 0)}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-500">
+                  Để trống = áp dụng cho toàn bộ lot của biến thể đã chọn.
                 </p>
               </div>
               <div className="space-y-1">
@@ -236,7 +354,8 @@ export default function VariantDiscountOverrideConfigPage() {
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

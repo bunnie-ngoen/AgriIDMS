@@ -126,6 +126,10 @@ const mapLotListItem = (row: RawObject): LotListItem => ({
   status: (row.status as string) ?? (row.Status as string) ?? "",
   goodsReceiptId:
     (row.goodsReceiptId as number) ?? (row.GoodsReceiptId as number) ?? 0,
+  productVariantId:
+    (row.productVariantId as number | null | undefined) ??
+    (row.ProductVariantId as number | null | undefined) ??
+    null,
   productName: (row.productName as string) ?? (row.ProductName as string) ?? "",
   productVariantName:
     (row.productVariantName as string) ??
@@ -495,6 +499,16 @@ export const goodsReceiptApi = api.injectEndpoints({
 
     getAllLots: builder.query<LotListItem[], void>({
       query: () => ({ url: "Lots" }),
+      transformResponse: (raw: unknown): LotListItem[] => {
+        const arr = Array.isArray(raw) ? raw : [];
+        return arr.map((item) => mapLotListItem((item ?? {}) as RawObject));
+      },
+    }),
+
+    getLotsByProductVariantId: builder.query<LotListItem[], number>({
+      query: (productVariantId) => ({
+        url: `Lots/by-product-variant/${productVariantId}`,
+      }),
       transformResponse: (raw: unknown): LotListItem[] => {
         const arr = Array.isArray(raw) ? raw : [];
         return arr.map((item) => mapLotListItem((item ?? {}) as RawObject));
@@ -1785,6 +1799,7 @@ export const {
   useUpdateGoodsReceiptWarehouseMutation,
   useGetLotsByGoodsReceiptIdQuery,
   useGetAllLotsQuery,
+  useLazyGetLotsByProductVariantIdQuery,
   useGetLotDetailByIdQuery,
   useLazyGetLotByQrQuery,
   useGetUnassignedBoxesByWarehouseQuery,

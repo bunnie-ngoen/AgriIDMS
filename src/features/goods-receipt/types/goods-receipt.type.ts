@@ -54,6 +54,7 @@ export type LotListItem = {
   lotId: number;
   lotCode: string;
   qrImageUrl?: string | null;
+  productVariantId?: number | null;
   totalQuantity: number;
   remainingQuantity: number;
   receivedDate: string;
