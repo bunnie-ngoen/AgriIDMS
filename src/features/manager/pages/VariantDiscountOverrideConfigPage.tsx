@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus, Save, Trash2, Tags } from "lucide-react";
 import toast from "react-hot-toast";
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
@@ -25,6 +25,23 @@ const emptyItem = (): OverrideFormItem => ({
   endAtUtc: null,
 });
 
+/** Lot đã quá ngày HSD (theo lịch UTC) hoặc trạng thái Expired → không hiện trong dropdown ghi đè. */
+function isLotExpiredForOverride(lot: LotListItem): boolean {
+  const st = (lot.status || "").trim().toLowerCase();
+  if (st === "expired") return true;
+  if (!lot.expiryDate) return false;
+  const exp = new Date(lot.expiryDate);
+  if (Number.isNaN(exp.getTime())) return false;
+  const now = new Date();
+  const expDayUtc = Date.UTC(exp.getUTCFullYear(), exp.getUTCMonth(), exp.getUTCDate());
+  const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return expDayUtc < todayUtc;
+}
+
+function filterLotsForOverrideSelect(lots: LotListItem[]): LotListItem[] {
+  return lots.filter((l) => !isLotExpiredForOverride(l));
+}
+
 export default function VariantDiscountOverrideConfigPage() {
   const [items, setItems] = useState<OverrideFormItem[]>([]);
   const { data, isFetching } = useGetProductVariantDiscountOverridesQuery();
@@ -38,18 +55,23 @@ export default function VariantDiscountOverrideConfigPage() {
   const [save, { isLoading: isSaving }] =
     useUpdateProductVariantDiscountOverridesMutation();
 
+  /** Tránh gọi trùng song song (React Strict Mode / effect) → 2 toast giống nhau. */
+  const lotsLoadInFlight = useRef(new Set<number>());
+
   const extractErrorMessage = (err: unknown, fallback: string) => {
-    const e = err as
-      | FetchBaseQueryError
-      | { data?: { message?: string } }
-      | { message?: string };
-    const dataMessage =
-      typeof (e as { data?: { message?: string } })?.data?.message === "string"
-        ? (e as { data?: { message?: string } }).data!.message
-        : null;
-    if (dataMessage) return dataMessage;
-    if (typeof (e as { message?: string })?.message === "string")
-      return (e as { message?: string }).message!;
+    const e = err as FetchBaseQueryError & { data?: unknown; error?: string };
+    const dataObj = (e?.data ?? null) as
+      | { message?: unknown; title?: unknown }
+      | null;
+    if (typeof dataObj?.message === "string" && dataObj.message.trim()) {
+      return dataObj.message;
+    }
+    if (typeof dataObj?.title === "string" && dataObj.title.trim()) {
+      return dataObj.title;
+    }
+    if (typeof e?.error === "string" && e.error.trim()) return e.error;
+    if (e?.status === "FETCH_ERROR") return "Lỗi kết nối tới máy chủ.";
+    if (typeof e?.status === "number") return `Lỗi máy chủ (${e.status}).`;
     return fallback;
   };
 
@@ -83,7 +105,9 @@ export default function VariantDiscountOverrideConfigPage() {
 
   const ensureLotsLoaded = async (productVariantId: number) => {
     if (productVariantId <= 0) return;
-    if (lotsByVariant[productVariantId]) return;
+    if (productVariantId in lotsByVariant) return;
+    if (lotsLoadInFlight.current.has(productVariantId)) return;
+    lotsLoadInFlight.current.add(productVariantId);
     try {
       const result = await triggerLotsByVariant(productVariantId).unwrap();
       setLotsByVariant((prev) => ({ ...prev, [productVariantId]: result }));
@@ -91,7 +115,10 @@ export default function VariantDiscountOverrideConfigPage() {
       setLotsByVariant((prev) => ({ ...prev, [productVariantId]: [] }));
       toast.error(
         extractErrorMessage(err, "Không thể tải danh sách lot theo biến thể."),
+        { id: `lots-by-variant-${productVariantId}` },
       );
+    } finally {
+      lotsLoadInFlight.current.delete(productVariantId);
     }
   };
 
@@ -104,11 +131,30 @@ export default function VariantDiscountOverrideConfigPage() {
       ),
     );
     variantIds.forEach((variantId) => {
-      if (!lotsByVariant[variantId]) {
+      if (!(variantId in lotsByVariant)) {
         void ensureLotsLoaded(variantId);
       }
     });
   }, [items, lotsByVariant]);
+
+  /** Bỏ lot đã hết hạn khỏi lựa chọn đã lưu (nếu dữ liệu API cập nhật sau). */
+  useEffect(() => {
+    setItems((prev) => {
+      let changed = false;
+      const next = prev.map((item) => {
+        if (item.lotId == null || item.productVariantId <= 0) return item;
+        const raw = lotsByVariant[item.productVariantId];
+        if (!raw) return item;
+        const eligible = filterLotsForOverrideSelect(raw);
+        if (!eligible.some((l) => Number(l.lotId) === Number(item.lotId))) {
+          changed = true;
+          return { ...item, lotId: null };
+        }
+        return item;
+      });
+      return changed ? next : prev;
+    });
+  }, [lotsByVariant]);
 
   const saveAll = async () => {
     const cleaned = items.map((x) => ({
@@ -132,15 +178,16 @@ export default function VariantDiscountOverrideConfigPage() {
       return;
     }
     if (
-      cleaned.some((x) =>
-        x.lotId != null
-          ? !(lotsByVariant[x.productVariantId] || []).some(
-              (lot) => Number(lot.lotId) === x.lotId,
-            )
-          : false,
-      )
+      cleaned.some((x) => {
+        if (x.lotId == null) return false;
+        const raw = lotsByVariant[x.productVariantId] || [];
+        const lot = raw.find((l) => Number(l.lotId) === x.lotId);
+        return !lot || isLotExpiredForOverride(lot);
+      })
     ) {
-      toast.error("Lot đã chọn không thuộc biến thể sản phẩm tương ứng.");
+      toast.error(
+        "Lot đã chọn không thuộc biến thể hoặc đã hết hạn. Vui lòng chọn lot khác hoặc để trống (tất cả lot).",
+      );
       return;
     }
 
@@ -203,7 +250,9 @@ export default function VariantDiscountOverrideConfigPage() {
         <div className="space-y-3">
           {items.map((x, idx) => {
             const variantLots =
-              x.productVariantId > 0 ? lotsByVariant[x.productVariantId] || [] : [];
+              x.productVariantId > 0
+                ? filterLotsForOverrideSelect(lotsByVariant[x.productVariantId] || [])
+                : [];
 
             return (
             <div
@@ -261,13 +310,13 @@ export default function VariantDiscountOverrideConfigPage() {
                   {variantLots.map((lot) => (
                     <option key={lot.lotId} value={lot.lotId}>
                       {lot.lotCode} • HSD{" "}
-                      {lot.expiryDate ? lot.expiryDate.slice(0, 10) : "N/A"} • Còn{" "}
-                      {Number(lot.remainingQuantity || 0)}
+                      {lot.expiryDate ? lot.expiryDate.slice(0, 10) : "N/A"} • Còn{" "} 
+                      {Number(lot.remainingQuantity || 0)} kg
                     </option>
                   ))}
                 </select>
                 <p className="text-[11px] text-slate-500">
-                  Để trống = áp dụng cho toàn bộ lot của biến thể đã chọn.
+                  Để trống = áp dụng cho toàn bộ lot của biến thể đã chọn. Lot đã quá HSD không hiển thị.
                 </p>
               </div>
               <div className="space-y-1">

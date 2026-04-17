@@ -230,6 +230,8 @@ export type NearExpiryLotItem = {
   lotCode: string;
   productVariantId: number;
   productName: string;
+  /** Tên biến thể từ API (SKU / phân loại chi tiết). */
+  productVariantName: string;
   grade: string;
   remainingQuantity: number;
   expiryDate: string;

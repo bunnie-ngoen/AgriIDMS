@@ -1398,6 +1398,17 @@ export const goodsReceiptApi = api.injectEndpoints({
                 ? (row.Boxes as RawObject[])
                 : [];
 
+            const rawGrade = row.grade ?? row.Grade;
+            let gradeStr = "";
+            if (typeof rawGrade === "number" && Number.isFinite(rawGrade)) {
+              if (rawGrade === 1) gradeStr = "Grade1";
+              else if (rawGrade === 2) gradeStr = "Grade2";
+              else if (rawGrade === 3) gradeStr = "Grade3";
+              else gradeStr = String(rawGrade);
+            } else if (typeof rawGrade === "string") {
+              gradeStr = rawGrade;
+            }
+
             return {
               lotId: (row.lotId as number) ?? (row.LotId as number) ?? 0,
               lotCode:
@@ -1410,7 +1421,11 @@ export const goodsReceiptApi = api.injectEndpoints({
                 (row.productName as string) ??
                 (row.ProductName as string) ??
                 "",
-              grade: (row.grade as string) ?? (row.Grade as string) ?? "",
+              productVariantName:
+                (row.productVariantName as string) ??
+                (row.ProductVariantName as string) ??
+                "",
+              grade: gradeStr,
               remainingQuantity:
                 (row.remainingQuantity as number) ??
                 (row.RemainingQuantity as number) ??

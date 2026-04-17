@@ -52,13 +52,31 @@ const ChangePasswordCard = () => {
     defaultValues: { currentPassword: "", newPassword: "" },
   });
 
+  const extractApiErrorMessage = (err: unknown, fallback: string) => {
+    const e = err as {
+      data?: { message?: unknown; error?: unknown; errors?: unknown };
+      error?: string;
+    };
+    const data = e?.data;
+    if (typeof data?.message === "string" && data.message.trim()) return data.message;
+    if (typeof data?.error === "string" && data.error.trim()) return data.error;
+    if (data?.errors && typeof data.errors === "object") {
+      const first = Object.values(data.errors as Record<string, unknown>)
+        .flatMap((v) => (Array.isArray(v) ? v : [v]))
+        .find((v) => typeof v === "string" && v.trim());
+      if (typeof first === "string") return first;
+    }
+    if (typeof e?.error === "string" && e.error.trim()) return e.error;
+    return fallback;
+  };
+
   const onSubmit = async (data: ChangePasswordDto) => {
     try {
       const res = await changePassword(data).unwrap();
       toast.success(res.message || "Đổi mật khẩu thành công!");
       form.reset();
-    } catch (err: any) {
-      toast.error(err?.data?.message || "Đổi mật khẩu thất bại.");
+    } catch (err: unknown) {
+      toast.error(extractApiErrorMessage(err, "Đổi mật khẩu thất bại."));
     }
   };
 
