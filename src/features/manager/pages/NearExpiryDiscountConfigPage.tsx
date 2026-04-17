@@ -16,54 +16,34 @@ type DiscountRule = {
   discountPercent: number;
   priority: number;
   isActive: boolean;
-  startAtUtc: string | null;
-  endAtUtc: string | null;
 };
 
-/** Khung hiệu lực mặc định: 00:00 hôm nay → cùng giờ sau 1 năm (UTC ISO cho API). */
-function defaultEffectiveWindowIso(): { startAtUtc: string; endAtUtc: string } {
-  const start = new Date();
-  start.setUTCHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setUTCFullYear(end.getUTCFullYear() + 1);
-  return { startAtUtc: start.toISOString(), endAtUtc: end.toISOString() };
-}
-
-const defaultRules: DiscountRule[] = (() => {
-  const w = defaultEffectiveWindowIso();
-  return [
-    {
-      name: "0-2 ngày",
-      minDays: 0,
-      maxDays: 2,
-      discountPercent: 30,
-      priority: 1,
-      isActive: true,
-      startAtUtc: w.startAtUtc,
-      endAtUtc: w.endAtUtc,
-    },
-    {
-      name: "3-5 ngày",
-      minDays: 3,
-      maxDays: 5,
-      discountPercent: 20,
-      priority: 2,
-      isActive: true,
-      startAtUtc: w.startAtUtc,
-      endAtUtc: w.endAtUtc,
-    },
-    {
-      name: "6-10 ngày",
-      minDays: 6,
-      maxDays: 10,
-      discountPercent: 10,
-      priority: 3,
-      isActive: true,
-      startAtUtc: w.startAtUtc,
-      endAtUtc: w.endAtUtc,
-    },
-  ];
-})();
+const defaultRules: DiscountRule[] = [
+  {
+    name: "0-2 ngày",
+    minDays: 0,
+    maxDays: 2,
+    discountPercent: 30,
+    priority: 1,
+    isActive: true,
+  },
+  {
+    name: "3-5 ngày",
+    minDays: 3,
+    maxDays: 5,
+    discountPercent: 20,
+    priority: 2,
+    isActive: true,
+  },
+  {
+    name: "6-10 ngày",
+    minDays: 6,
+    maxDays: 10,
+    discountPercent: 10,
+    priority: 3,
+    isActive: true,
+  },
+];
 
 type PreviewTableFilter = "near" | "beyondThreshold";
 
@@ -142,28 +122,25 @@ export default function NearExpiryDiscountConfigPage() {
     return fallback;
   };
 
-  const isRuleEffectiveAt = (rule: DiscountRule, now: Date): boolean => {
-    if (!rule.isActive) return false;
-    if (!rule.startAtUtc || !rule.endAtUtc) return false;
-    if (now < new Date(rule.startAtUtc)) return false;
-    if (now > new Date(rule.endAtUtc)) return false;
-    return true;
-  };
-
+  /** Cùng thứ tự ưu tiên với NearExpiryDiscountService.FindMatchedRule (priority → % giảm → maxDays). */
   const getDiscountPercent = (daysLeft: number): number => {
-    const now = new Date();
-    const matched = sortedRules.find((r) => r.isActive && daysLeft <= r.maxDays);
-    const effective = sortedRules.find((r) => {
-      if (!isRuleEffectiveAt(r, now)) return false;
+    const candidates = sortedRules.filter((r) => {
+      if (!r.isActive) return false;
       if (r.minDays != null && daysLeft < r.minDays) return false;
       return daysLeft <= r.maxDays;
     });
-    if (effective) return effective.discountPercent;
-    return matched?.discountPercent ?? 0;
+    const pick = candidates
+      .slice()
+      .sort(
+        (a, b) =>
+          a.priority - b.priority ||
+          b.discountPercent - a.discountPercent ||
+          a.maxDays - b.maxDays,
+      )[0];
+    return pick?.discountPercent ?? 0;
   };
 
   const addRule = () => {
-    const w = defaultEffectiveWindowIso();
     setRules((prev) => [
       ...prev,
       {
@@ -173,8 +150,6 @@ export default function NearExpiryDiscountConfigPage() {
         discountPercent: 5,
         priority: prev.length + 1,
         isActive: true,
-        startAtUtc: w.startAtUtc,
-        endAtUtc: w.endAtUtc,
       },
     ]);
   };
@@ -214,29 +189,7 @@ export default function NearExpiryDiscountConfigPage() {
       discountPercent: Math.max(0, Math.min(100, Number(r.discountPercent))),
       priority: Math.max(1, Math.floor(Number(r.priority || 1))),
       isActive: Boolean(r.isActive),
-      startAtUtc: r.startAtUtc,
-      endAtUtc: r.endAtUtc,
     }));
-
-    const missingTimeRule = cleaned.find((r) => !r.startAtUtc?.trim() || !r.endAtUtc?.trim());
-    if (missingTimeRule) {
-      toast.error(
-        `Bắt buộc nhập đủ thời gian bắt đầu và kết thúc (kèm giờ) ở "${missingTimeRule.name || "(không tên)"}".`,
-      );
-      return;
-    }
-
-    const invalidTimeRule = cleaned.find((r) => {
-      const start = new Date(r.startAtUtc as string).getTime();
-      const end = new Date(r.endAtUtc as string).getTime();
-      return Number.isNaN(start) || Number.isNaN(end) || start > end;
-    });
-    if (invalidTimeRule) {
-      toast.error(
-        `Thời gian hiệu lực không hợp lệ (bắt đầu phải trước hoặc bằng kết thúc) ở "${invalidTimeRule.name || "(không tên)"}".`,
-      );
-      return;
-    }
 
     const invalidMinMaxRule = cleaned.find(
       (r) => r.minDays != null && Number(r.minDays) > Number(r.maxDays),
@@ -258,8 +211,6 @@ export default function NearExpiryDiscountConfigPage() {
           discountPercent: r.discountPercent,
           priority: r.priority,
           isActive: r.isActive,
-          startAtUtc: r.startAtUtc,
-          endAtUtc: r.endAtUtc,
         })),
       ).unwrap();
       toast.success("Đã lưu cấu hình giảm giá gần hết hạn.");
@@ -290,8 +241,6 @@ export default function NearExpiryDiscountConfigPage() {
           ),
           priority: Math.max(1, Math.floor(Number(r.priority ?? 1))),
           isActive: Boolean(r.isActive),
-          startAtUtc: r.startAtUtc ?? null,
-          endAtUtc: r.endAtUtc ?? null,
         }))
         .sort((a, b) => a.priority - b.priority || a.maxDays - b.maxDays),
     );
@@ -344,12 +293,15 @@ export default function NearExpiryDiscountConfigPage() {
         ) : null}
 
         <div className="space-y-2">
-          {sortedRules.map((r, idx) => (
+          {sortedRules.map((r) => {
+            const idx = rules.indexOf(r);
+            if (idx < 0) return null;
+            return (
             <div
-              key={`${r.maxDays}-${idx}`}
-              className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 md:grid-cols-7"
+              key={`${idx}-${r.priority}-${r.maxDays}`}
+              className="grid grid-cols-1 items-end gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 lg:grid-cols-12"
             >
-              <div>
+              <div className="lg:col-span-2">
                 <label className="text-[11px] text-slate-500">Tên mức giảm giá</label>
                 <input
                   value={r.name}
@@ -361,7 +313,7 @@ export default function NearExpiryDiscountConfigPage() {
                   className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
                 />
               </div>
-              <div>
+              <div className="lg:col-span-2">
                 <label className="text-[11px] text-slate-500">Số ngày còn lại từ</label>
                 <input
                   type="number"
@@ -379,7 +331,7 @@ export default function NearExpiryDiscountConfigPage() {
                   className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
                 />
               </div>
-              <div>
+              <div className="lg:col-span-2">
                 <label className="text-[11px] text-slate-500">
                   Áp dụng đến khi số ngày còn lại {"<="}
                 </label>
@@ -391,7 +343,7 @@ export default function NearExpiryDiscountConfigPage() {
                   className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
                 />
               </div>
-              <div>
+              <div className="lg:col-span-1">
                 <label className="text-[11px] text-slate-500">Độ ưu tiên</label>
                 <input
                   type="number"
@@ -401,7 +353,7 @@ export default function NearExpiryDiscountConfigPage() {
                   className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
                 />
               </div>
-              <div>
+              <div className="lg:col-span-1">
                 <label className="text-[11px] text-slate-500">Giảm giá (%)</label>
                 <input
                   type="number"
@@ -414,63 +366,20 @@ export default function NearExpiryDiscountConfigPage() {
                   className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
                 />
               </div>
-              <div>
-                <div className="mt-1 grid grid-cols-1 gap-1">
-                  <span className="text-[10px] text-slate-500">Thời gian bắt đầu</span>
-                  <input
-                    type="datetime-local"
-                    value={r.startAtUtc ? r.startAtUtc.slice(0, 16) : ""}
-                    onChange={(e) =>
-                      setRules((prev) =>
-                        prev.map((x, i) =>
-                          i === idx
-                            ? {
-                                ...x,
-                                startAtUtc: e.target.value
-                                  ? new Date(e.target.value).toISOString()
-                                  : null,
-                              }
-                            : x,
-                        ),
-                      )
-                    }
-                    className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs outline-none focus:border-sky-500"
-                  />
-                  <span className="text-[10px] text-slate-500">Thời gian kết thúc</span>
-                  <input
-                    type="datetime-local"
-                    value={r.endAtUtc ? r.endAtUtc.slice(0, 16) : ""}
-                    onChange={(e) =>
-                      setRules((prev) =>
-                        prev.map((x, i) =>
-                          i === idx
-                            ? {
-                                ...x,
-                                endAtUtc: e.target.value
-                                  ? new Date(e.target.value).toISOString()
-                                  : null,
-                              }
-                            : x,
-                        ),
-                      )
-                    }
-                    className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs outline-none focus:border-sky-500"
-                  />
-                </div>
-              </div>
-              <div className="flex items-end">
+              <div className="flex justify-end sm:col-span-2 lg:col-span-2">
                 <button
                   type="button"
                   onClick={() => removeRule(idx)}
                   disabled={rules.length <= 1}
-                  className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                  className="inline-flex w-full items-center justify-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 sm:w-auto lg:w-full"
                 >
                   <Trash2 size={12} />
                   Xóa
                 </button>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

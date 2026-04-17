@@ -1,9 +1,11 @@
 import { api } from "../../../shared/api";
 
+/** BE dùng DateTime; UI chỉ chọn ngày — FE gửi ISO: bắt đầu = 00:00:00 local, kết thúc = 23:59:59.999 local cùng ngày đã chọn. */
 export type ProductVariantDiscountOverride = {
   id: number;
   productVariantId: number;
   lotId?: number | null;
+  priority: number;
   overrideNearExpiryDiscountPercent: number;
   reason?: string | null;
   isActive: boolean;
@@ -16,6 +18,7 @@ export type ProductVariantDiscountOverride = {
 export type UpsertProductVariantDiscountOverride = {
   productVariantId: number;
   lotId?: number | null;
+  priority: number;
   overrideNearExpiryDiscountPercent: number;
   reason?: string | null;
   isActive: boolean;
