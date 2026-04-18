@@ -105,9 +105,9 @@ const ProductVariantDetail = () => {
           <div className="px-6 py-2">
             <DetailRow label="Tên sản phẩm" value={variant.productName} accent />
             <DetailRow label="Product ID" value={`#${variant.productId}`} />
-            <DetailRow label="Grade" value={
+            <DetailRow label="Hàng loại" value={
               <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold">
-                Grade {variant.grade}
+                Hàng loại {variant.grade}
               </span>
             } />
           </div>

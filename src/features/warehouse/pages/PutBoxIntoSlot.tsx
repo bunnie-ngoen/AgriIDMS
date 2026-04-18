@@ -94,6 +94,14 @@ export default function PutBoxIntoSlot() {
   // Nếu đi từ sơ đồ kho qua (bấm "Chuyển"), tự fill QR box
   useEffect(() => {
     const prefillQr = (searchParams.get("boxQr") || "").trim();
+    const prefillLotId = Number(searchParams.get("lotId") || 0);
+
+    if (prefillLotId > 0) {
+      setSourceMode("lot");
+      setSelectedLotId(prefillLotId);
+      setSelectedLotBoxIds([]);
+      return;
+    }
 
     if (prefillQr) {
       setBoxQrInput(prefillQr);
@@ -155,6 +163,20 @@ export default function PutBoxIntoSlot() {
     if (selectedSlotId > 0) return slots.find((s) => s.id === selectedSlotId);
     return undefined;
   }, [slots, selectedSlotId]);
+  const lotExpiryDateRaw = lotDetail?.expiryDate || lot?.expiryDate || "";
+  const isSelectedLotExpired = useMemo(() => {
+    if (!lotExpiryDateRaw) return false;
+    const expiry = new Date(lotExpiryDateRaw);
+    if (Number.isNaN(expiry.getTime())) return false;
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const expiryOnly = new Date(
+      expiry.getFullYear(),
+      expiry.getMonth(),
+      expiry.getDate(),
+    );
+    return expiryOnly < today;
+  }, [lotExpiryDateRaw]);
 
   const MAX_SLOT_UTILIZATION = 0.8;
   const slotRawCapacity = selectedSlot?.capacity ?? slot?.capacity ?? 0;
@@ -396,6 +418,10 @@ export default function PutBoxIntoSlot() {
   };
 
   const handleAssignMultiple = async () => {
+    if (isSelectedLotExpired) {
+      toast.error("Lô đã hết hạn, không thể xếp vào vị trí. Vui lòng xử lý hàng hết hạn.");
+      return;
+    }
     if (selectedSlotId <= 0) {
       toast.error("Vui lòng chọn vị trí trước khi xếp nhiều hàng.");
       return;
@@ -464,7 +490,9 @@ export default function PutBoxIntoSlot() {
     isTransferring ||
     isBulkAssigning ||
     isBulkAssigningByApi ||
-    (sourceMode === "box" ? !box?.id : !hasBulkSelection) ||
+    (sourceMode === "box"
+      ? !box?.id
+      : !hasBulkSelection || isSelectedLotExpired) ||
     selectedSlotId <= 0 ||
     isLoadingWarehouses;
 
@@ -517,7 +545,7 @@ export default function PutBoxIntoSlot() {
                       : "text-slate-600"
                   }`}
                 >
-                  Xếp 1 hàng
+                  Xếp hàng lẻ
                 </button>
                 <button
                   type="button"
@@ -734,6 +762,11 @@ export default function PutBoxIntoSlot() {
                       Đã chọn {selectedLotBoxIds.length} hàng · Tổng thể tích{" "}
                       {selectedLotTotalVolume.toFixed(4)} m³
                     </div>
+                    {isSelectedLotExpired && (
+                      <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                        Lô này đã hết hạn, không thể xếp vào vị trí. Vui lòng chuyển sang quy trình xử lý hàng hết hạn.
+                      </div>
+                    )}
                     {isFetchingLotDetail ? (
                       <div className="text-xs text-slate-500 mt-2 inline-flex items-center gap-2">
                         <Loader2 size={13} className="animate-spin" /> Đang tải danh sách hàng của lô...

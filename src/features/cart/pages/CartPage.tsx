@@ -1,70 +1,29 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Minus, Plus, ShoppingCart, Trash2, Check, AlertCircle } from "lucide-react";
+import { Minus, Plus, ShoppingCart, Trash2, AlertCircle } from "lucide-react";
 
-import toast from "react-hot-toast";
 import { ROUTES } from "../../../shared/constants/routes";
 import {
     useClearCartMutation,
-    useCreateOrderFromCartMutation,
-    useCreateOrderFromCartVariantsMutation,
     useGetMyCartQuery,
-    useGetOrderCheckoutDefaultsQuery,
     useRemoveCartItemMutation,
     useUpdateCartItemQuantityMutation,
 } from "../api/cart.api";
-import {
-    validateOrderRecipientCheckout,
-    type CartItem,
-    type CreateOrderFromCartResponse,
-    type OrderRecipientCheckout,
-} from "../schemas/cart.schema";
-
-function vnd(n: number) {
-    return n.toLocaleString("vi-VN");
-}
-
-function getLineAmount(item: CartItem) {
-    // BE: LineAmount = Quantity * UnitPrice * BoxWeight
-    return item.quantity * item.unitPrice * item.boxWeight;
-}
-
-function cartItemKey(item: CartItem) {
-    // BoxWeight là decimal; dùng string để ổn định theo dữ liệu BE trả về.
-    return `${item.productVariantId}|${item.isPartial ? "partial" : "full"}|${String(item.boxWeight)}`;
-}
+import type { CartItem } from "../schemas/cart.schema";
+import type { CheckoutNavigateState } from "../types/checkout.types";
+import { cartItemKey, getLineAmount, vnd } from "../utils/cartItem.utils";
 
 export default function CartPage() {
     const navigate = useNavigate();
     const { data: cart, isLoading, isError, refetch, isFetching } = useGetMyCartQuery(undefined);
-    const { data: checkoutDefaults } = useGetOrderCheckoutDefaultsQuery();
 
     const [updateCartItemQuantity, { isLoading: isUpdating }] = useUpdateCartItemQuantityMutation();
     const [removeCartItem, { isLoading: isRemoving }] = useRemoveCartItemMutation();
     const [clearCart, { isLoading: isClearing }] = useClearCartMutation();
-    const [createOrderFromCart, { isLoading: isPlacingOrder }] = useCreateOrderFromCartMutation();
-    const [createOrderFromCartVariants, { isLoading: isPlacingSelectedOrder }] =
-        useCreateOrderFromCartVariantsMutation();
 
-    const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-    const [lastOrder, setLastOrder] = useState<CreateOrderFromCartResponse | null>(null);
+    const [message, setMessage] = useState<{ type: "error"; text: string } | null>(null);
     const [localQty, setLocalQty] = useState<Record<string, number>>({});
     const [selectedKeys, setSelectedKeys] = useState<Record<string, boolean>>({});
-    const [recipient, setRecipient] = useState<OrderRecipientCheckout>({
-        fullName: "",
-        phone: "",
-        address: "",
-    });
-    const [recipientTouched, setRecipientTouched] = useState(false);
-
-    useEffect(() => {
-        if (!checkoutDefaults || recipientTouched) return;
-        setRecipient({
-            fullName: checkoutDefaults.fullName ?? "",
-            phone: checkoutDefaults.phone ?? "",
-            address: checkoutDefaults.address ?? "",
-        });
-    }, [checkoutDefaults, recipientTouched]);
 
     useEffect(() => {
         if (!cart?.items?.length) {
@@ -91,9 +50,9 @@ export default function CartPage() {
         return sum + getLineAmount({ ...item, quantity: qty });
     }, 0);
 
-    const canCheckoutAll = items.length > 0 && !isPlacingOrder && !isPlacingSelectedOrder;
-    const canCheckoutSelected =
-        selectedItems.length > 0 && !isPlacingOrder && !isPlacingSelectedOrder && !isUpdating && !isFetching;
+    const canGoCheckout =
+        selectedItems.length > 0 && !isUpdating && !isFetching;
+
     const allSelected = items.length > 0 && selectedItems.length === items.length;
 
     const toggleSelectOne = (key: string) => {
@@ -116,7 +75,6 @@ export default function CartPage() {
         const key = cartItemKey(item);
         const safeQty = Math.max(1, Math.floor(nextQty));
 
-        // Optimistic
         setLocalQty((prev) => ({ ...prev, [key]: safeQty }));
         setMessage(null);
 
@@ -130,7 +88,6 @@ export default function CartPage() {
             await refetch();
         } catch {
             setMessage({ type: "error", text: "Không cập nhật được số lượng. Vui lòng thử lại." });
-            // Re-sync từ BE (để tránh local bị lệch).
             await refetch();
         }
     };
@@ -149,88 +106,27 @@ export default function CartPage() {
         }
     };
 
-    const handleCheckout = async () => {
-        if (!canCheckoutAll) return;
-        setMessage(null);
-        const recipientCheck = validateOrderRecipientCheckout(recipient);
-        if (!recipientCheck.ok) {
-            setMessage({ type: "error", text: recipientCheck.message });
-            return;
-        }
-        try {
-            const res = await createOrderFromCart(recipientCheck.value).unwrap();
-            setLastOrder(res);
-            const successText = `Đặt hàng thành công! Mã đơn #${res.orderId}. Cảm ơn bạn — đơn sẽ được xử lý sớm.`;
-            setMessage({ type: "success", text: successText });
-            toast.success(successText);
-            await refetch();
-        } catch (e: unknown) {
-            const err = e as { data?: { message?: string } };
-            const text =
-                err?.data?.message ?? "Đặt hàng chưa thành công. Vui lòng thử lại hoặc kiểm tra giỏ hàng.";
-            setMessage({ type: "error", text });
-            toast.error(text);
-        }
-    };
-
-    const handleCheckoutSelected = async () => {
-        if (!canCheckoutSelected) return;
-        setMessage(null);
-        try {
-            // Đồng bộ với server trước khi tạo đơn để tránh gửi quantity lệch gây lỗi backend.
-            const latest = await refetch();
-            const latestItems = latest.data?.items ?? cart?.items ?? [];
-            const selectedFromServer = latestItems.filter((item) => selectedKeys[cartItemKey(item)]);
-            if (selectedFromServer.length === 0) {
-                setMessage({
-                type: "error",
-                text: "Chưa có mặt hàng nào được chọn hợp lệ. Vui lòng chọn lại trong giỏ.",
-            });
-                return;
-            }
-            const recipientCheck = validateOrderRecipientCheckout(recipient);
-            if (!recipientCheck.ok) {
-                setMessage({ type: "error", text: recipientCheck.message });
-                return;
-            }
-            const payload = {
-                recipient: recipientCheck.value,
-                items: selectedFromServer.map((item) => {
-                    const key = cartItemKey(item);
-                    const qty = localQty[key] ?? item.quantity;
-                    return {
-                        productVariantId: item.productVariantId,
-                        boxWeight: item.boxWeight,
-                        isPartial: item.isPartial,
-                        quantity: Math.max(1, Math.floor(qty)),
-                    };
-                }),
-            };
-            const res = await createOrderFromCartVariants(payload).unwrap();
-            setLastOrder(res);
-            const successText = `Đặt hàng thành công! Mã đơn #${res.orderId} — ${selectedFromServer.length} mặt hàng đã chọn.`;
-            setMessage({ type: "success", text: successText });
-            toast.success(successText);
-            await refetch();
-        } catch (e: unknown) {
-            const err = e as { data?: { message?: string } };
-            const text =
-                err?.data?.message ??
-                    "Đặt hàng chưa thành công. Vui lòng thử lại hoặc kiểm tra các mặt hàng đã chọn.";
-            setMessage({ type: "error", text });
-            toast.error(text);
-        }
-    };
-
     const handleClearCart = async () => {
         setMessage(null);
         try {
             await clearCart(undefined).unwrap();
-            setLastOrder(null);
             await refetch();
         } catch {
             setMessage({ type: "error", text: "Không thể xóa toàn bộ giỏ hàng. Vui lòng thử lại." });
         }
+    };
+
+    const goToCheckoutSelected = () => {
+        if (!canGoCheckout) return;
+        const lineKeys = selectedItems.map((i) => cartItemKey(i));
+        const state: CheckoutNavigateState = { lineKeys };
+        navigate(ROUTES.CHECKOUT, { state });
+    };
+
+    const goToCheckoutAll = () => {
+        if (items.length === 0 || isFetching) return;
+        const state: CheckoutNavigateState = {};
+        navigate(ROUTES.CHECKOUT, { state });
     };
 
     return (
@@ -242,7 +138,8 @@ export default function CartPage() {
                         Giỏ hàng
                     </h1>
                     <p className="text-slate-600 mt-1">
-                        Chọn sản phẩm rồi đặt hàng. Sau khi đặt, bạn có thể thanh toán trong mục Đơn của tôi.
+                        Chọn sản phẩm rồi bấm <span className="font-medium">Thanh toán</span> để sang màn xác nhận đơn
+                        (PO).
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -306,20 +203,15 @@ export default function CartPage() {
                                 Chọn tất cả sản phẩm trong giỏ
                             </label>
                             <span className="text-sm text-slate-600">
-                                Đã chọn: <span className="font-semibold text-slate-900">{selectedItems.length}</span> / {items.length}
+                                Đã chọn: <span className="font-semibold text-slate-900">{selectedItems.length}</span> /{" "}
+                                {items.length}
                             </span>
                         </div>
 
                         {message && (
-                            <div
-                                className={`rounded-xl p-4 border ${
-                                    message.type === "success"
-                                        ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-                                        : "bg-red-50 border-red-200 text-red-800"
-                                }`}
-                            >
+                            <div className="rounded-xl p-4 border bg-red-50 border-red-200 text-red-800">
                                 <div className="flex items-center gap-2">
-                                    {message.type === "success" ? <Check size={18} /> : <AlertCircle size={18} />}
+                                    <AlertCircle size={18} />
                                     <p className="font-medium">{message.text}</p>
                                 </div>
                             </div>
@@ -344,7 +236,6 @@ export default function CartPage() {
                                         </label>
                                         <div className="w-16 h-16 rounded-lg bg-slate-100 overflow-hidden flex items-center justify-center border border-slate-200">
                                             {item.imageUrl ? (
-                                                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
                                                 <img
                                                     src={item.imageUrl}
                                                     alt={item.productName}
@@ -358,9 +249,7 @@ export default function CartPage() {
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-start justify-between gap-4">
                                                 <div className="min-w-0">
-                                                    <p className="font-bold text-slate-900 truncate">
-                                                        {item.productName}
-                                                    </p>
+                                                    <p className="font-bold text-slate-900 truncate">{item.productName}</p>
                                                     <p className="text-sm text-slate-600 mt-1">
                                                         {boxLabel} - {item.boxWeight}kg · {item.grade}
                                                     </p>
@@ -416,94 +305,29 @@ export default function CartPage() {
 
                     <div className="lg:col-span-1">
                         <div className="rounded-xl border border-slate-200 bg-white p-5 sticky top-[90px]">
-                            <div className="mb-4 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                                <p className="text-sm font-semibold text-slate-900">Thông tin nhận hàng</p>
-                                <div>
-                                    <label className="text-xs font-medium text-slate-600">Họ và tên</label>
-                                    <input
-                                        value={recipient.fullName}
-                                        onChange={(e) => {
-                                            setRecipientTouched(true);
-                                            setRecipient((prev) => ({ ...prev, fullName: e.target.value }));
-                                        }}
-                                        placeholder="Nguyễn Văn A"
-                                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-medium text-slate-600">Số điện thoại</label>
-                                    <input
-                                        value={recipient.phone}
-                                        onChange={(e) => {
-                                            setRecipientTouched(true);
-                                            setRecipient((prev) => ({ ...prev, phone: e.target.value }));
-                                        }}
-                                        placeholder="09xxxxxxxx"
-                                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-medium text-slate-600">Địa chỉ nhận hàng</label>
-                                    <textarea
-                                        value={recipient.address}
-                                        onChange={(e) => {
-                                            setRecipientTouched(true);
-                                            setRecipient((prev) => ({ ...prev, address: e.target.value }));
-                                        }}
-                                        placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố"
-                                        rows={2}
-                                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                                    />
-                                </div>
-                            </div>
-
                             <h2 className="text-lg font-bold text-slate-900 mb-2">Tóm tắt</h2>
                             <div className="flex items-center justify-between gap-4 text-slate-700">
-                                <span className="font-medium">Thành tiền (VNĐ)</span>
+                                <span className="font-medium">Tạm tính (đã chọn)</span>
                                 <span className="text-slate-900 font-bold">{vnd(selectedTotal)} ₫</span>
                             </div>
 
-                            <div className="mt-4 text-sm text-slate-600">
-                                Khi đặt hàng, chúng tôi sẽ kiểm tra tồn kho và xác nhận đơn cho bạn.
-                            </div>
-
                             <button
                                 type="button"
-                                onClick={handleCheckoutSelected}
-                                disabled={!canCheckoutSelected}
-                                className="mt-5 w-full inline-flex items-center justify-center gap-2 bg-slate-800 text-white px-4 py-3 rounded-lg font-semibold hover:bg-slate-900 disabled:opacity-60 disabled:cursor-not-allowed"
+                                onClick={goToCheckoutSelected}
+                                disabled={!canGoCheckout}
+                                className="mt-5 w-full inline-flex items-center justify-center gap-2 bg-slate-900 text-white px-4 py-3 rounded-lg font-bold hover:bg-black disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                                {isPlacingSelectedOrder ? "Đang tạo đơn..." : "Tạo đơn từ sản phẩm đã tích"}
+                                Thanh toán ({selectedItems.length} sản phẩm)
                             </button>
 
                             <button
                                 type="button"
-                                onClick={handleCheckout}
-                                disabled={!canCheckoutAll}
-                                className="mt-5 w-full inline-flex items-center justify-center gap-2 bg-[#1a5f2a] text-white px-4 py-3 rounded-lg font-semibold hover:bg-[#145026] disabled:opacity-60 disabled:cursor-not-allowed"
+                                onClick={goToCheckoutAll}
+                                disabled={items.length === 0 || isFetching}
+                                className="mt-3 w-full inline-flex items-center justify-center gap-2 border border-slate-300 bg-white text-slate-800 px-4 py-2.5 rounded-lg font-semibold hover:bg-slate-50 disabled:opacity-60"
                             >
-                                {isPlacingOrder ? "Đang đặt hàng..." : "Đặt hàng toàn bộ giỏ"}
+                                Thanh toán toàn bộ giỏ
                             </button>
-
-                            {lastOrder && (
-                                <div className="mt-4 rounded-lg bg-slate-50 border border-slate-200 p-3">
-                                    <p className="text-sm text-slate-700">
-                                        Đơn của bạn: <span className="font-bold text-slate-900">#{lastOrder.orderId}</span>
-                                    </p>
-                                    <p className="text-xs text-slate-500 mt-1">
-                                        Tồn kho:{" "}
-                                        <span className="font-medium">
-                                            {lastOrder.allocationSucceeded ? "Đã phân bổ đủ" : "Đang chờ xử lý"}
-                                        </span>
-                                    </p>
-                                    <Link
-                                        to={ROUTES.CUSTOMER_ORDER_DETAIL.replace(":id", String(lastOrder.orderId))}
-                                        className="inline-flex mt-2 text-sm font-semibold text-[#1a5f2a] hover:underline"
-                                    >
-                                        Đi tới chi tiết đơn để thanh toán
-                                    </Link>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
@@ -511,4 +335,3 @@ export default function CartPage() {
         </div>
     );
 }
-

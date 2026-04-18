@@ -165,7 +165,7 @@ export default function EditPurchaseOrder() {
   if (order.status !== "Pending") {
     return (
       <div className="max-w-2xl mx-auto">
-        <p className="text-amber-600">Chỉ được sửa đơn ở trạng thái Pending.</p>
+        <p className="text-amber-600">Chỉ được sửa đơn ở trạng thái Chờ duyệt.</p>
         <button
           type="button"
           onClick={() => navigate(detailLink(poId))}
@@ -284,7 +284,7 @@ export default function EditPurchaseOrder() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Đơn giá</label>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Đơn giá (VNĐ)</label>
                     <input
                       type="number"
                       step="0.01"

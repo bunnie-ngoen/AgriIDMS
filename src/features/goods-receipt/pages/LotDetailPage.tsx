@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Boxes, FileDown, Loader2, Package, X } from "lucide-react";
+import { ArrowLeft, FileDown, Loader2, Package, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 import { useGetLotDetailByIdQuery } from "../api/goods-receipt.api";
@@ -51,9 +51,6 @@ export default function LotDetailPage() {
   const { data, isLoading, isError, refetch } = useGetLotDetailByIdQuery(lotId, {
     skip: !lotId || Number.isNaN(lotId),
   });
-  const receiptQcPath = data
-    ? `${lotBasePath.replace("/lots", "")}/goods-receipts/${data.goodsReceiptId}/qc?lotId=${data.lotId}&focus=create-boxes`
-    : "";
 
   const boxes = useMemo(() => data?.boxes ?? [], [data?.boxes]);
   const [selectedBox, setSelectedBox] = useState<LotBoxItem | null>(null);
@@ -393,16 +390,6 @@ export default function LotDetailPage() {
                 </h2>
                 <div className="ml-auto">
                   <div className="flex items-center gap-2">
-                    {boxes.length === 0 && (
-                      <button
-                        type="button"
-                        onClick={() => navigate(receiptQcPath)}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
-                      >
-                        <Boxes size={14} className="text-emerald-600" />
-                        Tạo thùng cho lô này
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={exportAllBoxQrsInLot}
@@ -420,16 +407,6 @@ export default function LotDetailPage() {
                   <p className="text-slate-500 text-sm">
                     Chưa có thùng nào được tạo từ lô này.
                   </p>
-                  {boxes.length === 0 && (
-                    <button
-                      type="button"
-                      onClick={() => navigate(receiptQcPath)}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
-                    >
-                      <Boxes size={14} className="text-emerald-600" />
-                      Mở màn tạo thùng cho lô này
-                    </button>
-                  )}
                 </div>
               ) : (
                 <div className="overflow-x-auto">
