@@ -91,7 +91,9 @@ export default function SalesStaffLayout() {
       return;
     }
 
-    navigate(referenceId ? `/sales/orders/sale-confirm?orderId=${referenceId}` : "/sales/orders/sale-confirm");
+    navigate(
+      referenceId ? `/sales/orders?orderId=${referenceId}` : "/sales/orders",
+    );
     setNotificationOpen(false);
   };
 
@@ -160,6 +162,22 @@ export default function SalesStaffLayout() {
 
               <div className={`grid transition-all duration-200 ${isOrdersOpen ? "grid-rows-[1fr] mt-1" : "grid-rows-[0fr]"}`}>
                 <ul className="overflow-hidden space-y-1 pl-4">
+                  <li>
+                    <NavLink
+                      to="/sales/orders"
+                      end
+                      className={({ isActive }) =>
+                        `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                          isActive
+                            ? "bg-slate-700/80 text-white border border-slate-600/80"
+                            : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                        }`
+                      }
+                    >
+                      <ClipboardList size={14} />
+                      Theo dõi đơn (tất cả hàng đợi)
+                    </NavLink>
+                  </li>
                   <li>
                     <NavLink
                       to="/sales/orders/pos-create"

@@ -182,14 +182,13 @@ export type QCInspectionRequest = {
 };
 
 // Khớp BE enum BoxType:
-// Unknown = 0, StyrofoamBox = 1, Carton = 2, MeshBag = 3, Crate = 4
+// Unknown = 0, StyrofoamBox = 1, Carton = 2, MeshBag = 3
 // Note: project bật `erasableSyntaxOnly`, nên tránh TypeScript `enum`.
 export const BoxTypeEnum = {
   Unknown: 0,
   StyrofoamBox: 1,
   Carton: 2,
   MeshBag: 3,
-  Crate: 4,
 } as const;
 
 export type BoxTypeEnum = (typeof BoxTypeEnum)[keyof typeof BoxTypeEnum];

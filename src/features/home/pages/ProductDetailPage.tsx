@@ -271,18 +271,18 @@ export default function ProductDetailPage() {
                                     </span>
                                 </div>
                                 {product.hasNearExpiryStock && product.nearExpiryPriceTiers.length > 0 ? (
-                                    <div className="mt-2 space-y-1.5 rounded-lg border border-amber-200/80 bg-amber-50/90 p-2.5">
-                                        <p className="flex items-center gap-1 text-[11px] font-bold text-amber-800">
-                                            <Sparkles size={13} className="shrink-0" />
-                                            Ưu đãi lô gần hết hạn
+                                    <div className="mt-3 space-y-2 rounded-xl border border-amber-200/80 bg-amber-50/90 p-3 sm:p-3.5">
+                                        <p className="flex items-center gap-1.5 text-xs font-bold text-amber-800">
+                                            <Sparkles size={14} className="shrink-0" />
+                                            Giảm giá ưu đãi sản phẩm
                                         </p>
                                         {product.nearExpiryPriceTiers.map((tier) => (
                                             <div
                                                 key={tier.maxDaysLeft}
-                                                className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-amber-900"
+                                                className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-amber-900 sm:text-xs"
                                             >
-                                                <span className="rounded bg-amber-100 px-1.5 py-0.5 font-bold">
-                                                    ≤ {tier.maxDaysLeft} ngày
+                                                <span className="rounded-md bg-amber-100 px-2 py-0.5 font-bold">
+                                                    Áp dụng trong {tier.maxDaysLeft} ngày
                                                 </span>
                                                 <span className="font-semibold">
                                                     −{tier.discountPercent.toLocaleString("vi-VN")}%
