@@ -261,7 +261,7 @@ export default function ProductDetailPage() {
                                     <div className="mt-4 space-y-2 rounded-xl border border-amber-200/80 bg-amber-50/90 p-3.5">
                                         <p className="flex items-center gap-1.5 text-xs font-bold text-amber-800">
                                             <Sparkles size={14} className="shrink-0" />
-                                            Ưu đãi lô gần hết hạn
+                                            Giảm giá ưu đãi sản phẩm
                                         </p>
                                         {product.nearExpiryPriceTiers.map((tier) => (
                                             <div
@@ -269,7 +269,7 @@ export default function ProductDetailPage() {
                                                 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-amber-900"
                                             >
                                                 <span className="rounded-md bg-amber-100 px-2 py-0.5 font-bold">
-                                                    ≤ {tier.maxDaysLeft} ngày
+                                                    Áp dụng trong {tier.maxDaysLeft} ngày
                                                 </span>
                                                 <span className="font-semibold">
                                                     −{tier.discountPercent.toLocaleString("vi-VN")}%
@@ -277,7 +277,7 @@ export default function ProductDetailPage() {
                                                 <span className="font-bold">
                                                     {tier.pricePerKg.toLocaleString("vi-VN")} ₫/kg
                                                 </span>
-                                                <span className="text-amber-700/90">({tier.boxCount} hộp)</span>
+                                                <span className="text-amber-700/90">({tier.boxCount})</span>
                                             </div>
                                         ))}
                                     </div>
