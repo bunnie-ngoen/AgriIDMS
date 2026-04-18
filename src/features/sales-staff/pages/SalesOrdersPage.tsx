@@ -1,6 +1,6 @@
 import toast from "react-hot-toast";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Boxes, Loader2, PackageSearch, ShieldAlert, Sparkles } from "lucide-react";
 import {
   useAllocateAsStaffMutation,
@@ -81,6 +81,8 @@ type SalesOrdersPageProps = {
 };
 
 export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQueue }: SalesOrdersPageProps) {
+  const [searchParams] = useSearchParams();
+
   type SaleConfirmPreviewCard = {
     orderId: number;
     totalAmount: number;
@@ -138,6 +140,15 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
       setActiveQueue(forcedQueue);
     }
   }, [forcedQueue, activeQueue]);
+
+  /** Deep link từ thông báo / bookmark: ?orderId=123 */
+  useEffect(() => {
+    const oid = searchParams.get("orderId")?.trim();
+    if (!oid || !/^\d+$/.test(oid)) return;
+    setOrderIdQuery(oid);
+    setSaleConfirmOrderIdQuery(oid);
+    setPendingCodOrderIdQuery(oid);
+  }, [searchParams]);
 
   /** Kho thuần không dùng hàng đợi xác nhận đã giao (chỉ sale). */
   useEffect(() => {
@@ -241,6 +252,20 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
           tone: "text-sky-700 bg-sky-50 border-sky-200",
         },
         {
+          key: "pending-allocation",
+          label: "Chờ giữ hàng",
+          value: filteredPendingAllocation.length,
+          icon: Boxes,
+          tone: "text-emerald-700 bg-emerald-50 border-emerald-200",
+        },
+        {
+          key: "pending-warehouse",
+          label: "Chờ kho xác nhận",
+          value: filteredPendingWarehouseConfirm.length,
+          icon: ShieldAlert,
+          tone: "text-indigo-700 bg-indigo-50 border-indigo-200",
+        },
+        {
           key: "pending-cod",
           label: "Thanh toán chờ xử lý",
           value: filteredPendingCodPayments.length,
@@ -294,6 +319,8 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
   const queueTabs = isSalesOnly
     ? ([
         { key: "saleConfirm", label: "Đơn hàng chờ xác nhận bán", count: filteredPendingSaleConfirm.length },
+        { key: "allocation", label: "Chờ giữ hàng", count: filteredPendingAllocation.length },
+        { key: "warehouseConfirm", label: "Chờ kho xác nhận", count: filteredPendingWarehouseConfirm.length },
         { key: "pendingCod", label: "Thanh toán chờ xử lý", count: filteredPendingCodPayments.length },
         {
           key: "approvedExport",
@@ -318,9 +345,10 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
             count: filteredApprovedExportOrders.length,
           },
         ] as const);
-  const visibleQueueTabs = forcedQueue
-    ? queueTabs.filter((tab) => tab.key === forcedQueue)
-    : queueTabs;
+  const visibleQueueTabs =
+    hideQueueTabs && forcedQueue
+      ? queueTabs.filter((tab) => tab.key === forcedQueue)
+      : queueTabs;
 
   const setQueuePage = (page: number) => {
     setPageByQueue((prev) => ({ ...prev, [activeQueue]: Math.max(1, page) }));
@@ -1127,6 +1155,13 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
                           >
                             Xác nhận giữ hàng
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/sales/orders/${o.orderId}`)}
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50"
+                          >
+                            Chi tiết đơn
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1141,8 +1176,13 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
             filteredPendingWarehouseConfirm,
             "Không có đơn chờ kho xác nhận.",
             isLoadingPendingWarehouseConfirm,
-            (row) => navigate(`/warehouse/orders/${row.orderId}/proposals`),
-            "Xem đề xuất",
+            (row) =>
+              navigate(
+                canWarehouseConfirm
+                  ? `/warehouse/orders/${row.orderId}/proposals`
+                  : `/sales/orders/${row.orderId}`,
+              ),
+            () => (canWarehouseConfirm ? "Xem đề xuất" : "Xem chi tiết đơn"),
             false,
             "px-3 py-2 rounded-lg border border-indigo-300 text-indigo-700 text-sm font-semibold hover:bg-indigo-50 disabled:opacity-60",
             true,
