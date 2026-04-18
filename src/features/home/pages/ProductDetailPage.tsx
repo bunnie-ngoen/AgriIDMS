@@ -18,6 +18,7 @@ import toast from "react-hot-toast";
 import { useGetApprovedReviewsByProductVariantQuery } from "../../review/api/review.api";
 import { stripGradeSuffixFromProductName } from "../utils/productDisplayName";
 import { getHomeProductDiscountViewModel } from "../utils/productDiscountDisplay";
+import { boxTypeKey } from "../components/ProductBoxTypeSection";
 
 // ─── Skeleton loading ────────────────────────────────────────
 
@@ -297,8 +298,8 @@ export default function ProductDetailPage() {
                                 {product.boxTypes.length > 0 ? (
                                     <div className="mt-4 flex flex-col gap-3">
                                         {product.boxTypes.map((box) => {
-                                            const key = boxKey(box);
-                                            const isSelected = selectedBox ? boxKey(selectedBox) === key : false;
+                                            const key = boxTypeKey(box);
+                                            const isSelected = selectedBox ? boxTypeKey(selectedBox) === key : false;
                                             const boxLabel = box.boxType === "Partial" ? "Hộp lẻ" : "Hộp đầy";
                                             const disabled = box.availableCount <= 0;
                                             return (
