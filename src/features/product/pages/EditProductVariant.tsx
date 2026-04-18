@@ -179,7 +179,7 @@ const EditProductVariant = () => {
             </div>
           </div>
 
-          {/* Section 2 — Product & Grade */}
+          {/* Section 2 — Sản phẩm & hàng loại */}
           <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-50 flex items-center gap-3">
               <div className="h-7 w-7 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
@@ -227,7 +227,7 @@ const EditProductVariant = () => {
                 )}
               </Field>
 
-              <Field label="Grade *" error={form.formState.errors.grade?.message}>
+              <Field label="Hàng loại *" error={form.formState.errors.grade?.message}>
                 <div className="relative">
                   <select
                     {...form.register("grade", { valueAsNumber: true })}
@@ -237,7 +237,7 @@ const EditProductVariant = () => {
                         : "border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                     }`}
                   >
-                    <option value="">Chọn grade...</option>
+                    <option value="">Chọn hàng loại...</option>
                     {PRODUCT_GRADE_OPTIONS.map((grade) => (
                       <option key={grade.value} value={grade.value}>
                         {grade.label}
