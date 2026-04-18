@@ -4,6 +4,5 @@ export function boxTypeLabel(type: string): string {
   if (type === "StyrofoamBox") return "Thùng xốp";
   if (type === "Carton") return "Thùng carton";
   if (type === "MeshBag") return "Bao lưới";
-  if (type === "Crate") return "Sọt";
   return type;
 }

@@ -1400,7 +1400,6 @@ export default function GoodsReceiptQC() {
                     <option value={BoxTypeEnum.StyrofoamBox}>Thùng xốp</option>
                     <option value={BoxTypeEnum.Carton}>Thùng carton</option>
                     <option value={BoxTypeEnum.MeshBag}>Bao lưới</option>
-                    <option value={BoxTypeEnum.Crate}>Sọt</option>
                   </select>
                   {Number(selectedBoxType) === BoxTypeEnum.Unknown && (
                     <p className="mt-1 text-[11px] text-rose-600">
