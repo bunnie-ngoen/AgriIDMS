@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import toast from "react-hot-toast";
+import QrCameraScannerModal from "../../../shared/components/QrCameraScannerModal";
+import { decodeQrFromImageFile } from "../../../shared/lib/decodeQrFromImage";
 import {
   useGetWarehouseQuery,
   useGetZonesQuery,
@@ -16,6 +18,8 @@ import {
   useDisposeExpiredBoxesMutation,
   useCreateDisposalRequestMutation,
   useGetDisposeHistoryByWarehouseQuery,
+  useLazyGetLotByQrQuery,
+  useLazyGetBoxByQrQuery,
 } from "../../goods-receipt/api/goods-receipt.api";
 import type { SlotBoxItem, SlotItem } from "../types/warehouse.type";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
@@ -832,6 +836,9 @@ type RackOverviewProps = {
   name: string;
   onSlotClick?: (slot: SlotItem) => void;
   variantFilterId?: number | null;
+  qrMatchedSlotIds?: number[];
+  expiryMatchedSlotIds?: number[];
+  hasExpiryFilter?: boolean;
 };
 
 const RackOverview = ({
@@ -839,6 +846,9 @@ const RackOverview = ({
   name,
   onSlotClick,
   variantFilterId,
+  qrMatchedSlotIds = [],
+  expiryMatchedSlotIds = [],
+  hasExpiryFilter = false,
 }: RackOverviewProps) => {
   const { data: slots, isLoading } = useGetSlotsQuery(rackId);
 
@@ -888,17 +898,24 @@ const RackOverview = ({
               hasVariantFilter &&
               Number(s.productVariantId ?? 0) === Number(variantFilterId);
             const isVariantDimmed = hasVariantFilter && !isVariantMatched;
+            const hasQrHighlight = qrMatchedSlotIds.length > 0;
+            const isQrMatched = hasQrHighlight && qrMatchedSlotIds.includes(s.id);
+            const isQrDimmed = hasQrHighlight && !isQrMatched;
+            const isExpiryMatched = hasExpiryFilter && expiryMatchedSlotIds.includes(s.id);
+            const isExpiryDimmed = hasExpiryFilter && !isExpiryMatched;
+            const isHighlighted = isVariantMatched || isQrMatched || isExpiryMatched;
+            const shouldDim = isVariantDimmed || isQrDimmed || isExpiryDimmed;
             return (
               <button
                 key={s.id}
                 type="button"
                 onClick={() => onSlotClick?.(s)}
                 className={`inline-flex flex-col items-center justify-center rounded-lg border min-w-[52px] py-1.5 px-1.5 text-[10px] font-medium cursor-pointer transition ring-2 ring-transparent hover:ring-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-400 ${cellStyle} ${
-                  isVariantMatched
+                  isHighlighted
                     ? "bg-sky-600 text-white border-sky-700 shadow-[0_0_0_2px_rgba(14,165,233,0.28)]"
                     : ""
                 } ${
-                  isVariantDimmed
+                  shouldDim
                     ? "opacity-40 saturate-50"
                     : ""
                 }`}
@@ -924,6 +941,9 @@ type ZoneOverviewProps = {
   name: string;
   onSlotClick?: (slot: SlotItem) => void;
   variantFilterId?: number | null;
+  qrMatchedSlotIds?: number[];
+  expiryMatchedSlotIds?: number[];
+  hasExpiryFilter?: boolean;
 };
 
 const ZoneOverview = ({
@@ -931,6 +951,9 @@ const ZoneOverview = ({
   name,
   onSlotClick,
   variantFilterId,
+  qrMatchedSlotIds = [],
+  expiryMatchedSlotIds = [],
+  hasExpiryFilter = false,
 }: ZoneOverviewProps) => {
   const { data: racks, isLoading } = useGetRacksQuery(zoneId);
 
@@ -953,6 +976,9 @@ const ZoneOverview = ({
               name={r.name}
               onSlotClick={onSlotClick}
               variantFilterId={variantFilterId}
+              qrMatchedSlotIds={qrMatchedSlotIds}
+              expiryMatchedSlotIds={expiryMatchedSlotIds}
+              hasExpiryFilter={hasExpiryFilter}
             />
           ))
         ) : !isLoading ? (
@@ -988,6 +1014,10 @@ const WarehouseMap = () => {
   const [detailSlot, setDetailSlot] = useState<SlotItem | null>(null);
   const [selectedUnassignedBoxQr, setSelectedUnassignedBoxQr] = useState<string>("");
   const [selectedVariantFilterId, setSelectedVariantFilterId] = useState<number | null>(null);
+  const [qrSearchType, setQrSearchType] = useState<"LOT" | "BOX">("LOT");
+  const [qrSearchValue, setQrSearchValue] = useState("");
+  const [qrMatchedSlotIds, setQrMatchedSlotIds] = useState<number[]>([]);
+  const [isQrCameraOpen, setIsQrCameraOpen] = useState(false);
   const [isAreaDetailModalOpen, setIsAreaDetailModalOpen] = useState(false);
   const [slotExpiryFilter, setSlotExpiryFilter] = useState<"ALL" | "EXPIRED" | "D1" | "D3" | "D7">("ALL");
   const [slotIdsByExpiryFilter, setSlotIdsByExpiryFilter] = useState<number[]>([]);
@@ -1002,6 +1032,9 @@ const WarehouseMap = () => {
   const [disposeFromDate, setDisposeFromDate] = useState("");
   const [disposeToDate, setDisposeToDate] = useState("");
   const [disposeCreatedBy, setDisposeCreatedBy] = useState("");
+  const qrImageInputRef = useRef<HTMLInputElement | null>(null);
+  const [triggerGetLotByQr, { isFetching: isFindingLotByQr }] = useLazyGetLotByQrQuery();
+  const [triggerGetBoxByQr, { isFetching: isFindingBoxByQr }] = useLazyGetBoxByQrQuery();
 
   const {
     data: unassignedBoxes = [],
@@ -1103,6 +1136,119 @@ const WarehouseMap = () => {
     }
   }, [variantOptionsInRack, selectedVariantFilterId]);
 
+  const clearSearchFilters = () => {
+    setSelectedVariantFilterId(null);
+    setQrSearchValue("");
+    setQrMatchedSlotIds([]);
+  };
+
+  const findSlotsInWarehouseByLotId = async (lotId: number) => {
+    if (!zones?.length) return [];
+    const matched = new Set<number>();
+    for (const zone of zones) {
+      let racksInZone: Array<{ id: number }> = [];
+      try {
+        racksInZone = await dispatch(
+          userApi.endpoints.getRacks.initiate(zone.id, {
+            forceRefetch: true,
+            subscribe: false,
+          }),
+        ).unwrap();
+      } catch {
+        continue;
+      }
+      for (const rack of racksInZone ?? []) {
+        let slotsInRack: SlotItem[] = [];
+        try {
+          slotsInRack = await dispatch(
+            userApi.endpoints.getSlots.initiate(rack.id, {
+              forceRefetch: true,
+              subscribe: false,
+            }),
+          ).unwrap();
+        } catch {
+          continue;
+        }
+        await Promise.all(
+          (slotsInRack ?? []).map(async (slot) => {
+            try {
+              const contents = await dispatch(
+                userApi.endpoints.getSlotContents.initiate(slot.id, {
+                  forceRefetch: true,
+                  subscribe: false,
+                }),
+              ).unwrap();
+              const hasLot = (contents.boxes ?? []).some(
+                (box) => Number(box.lotId) === Number(lotId),
+              );
+              if (hasLot) matched.add(slot.id);
+            } catch {
+              // skip slot errors
+            }
+          }),
+        );
+      }
+    }
+    return Array.from(matched);
+  };
+
+  const performSearchByQr = async (rawPayload: string) => {
+    const qrText = rawPayload.trim();
+    if (!qrText) {
+      toast.error("Vui lòng nhập hoặc quét mã QR.");
+      return;
+    }
+    try {
+      if (qrSearchType === "LOT") {
+        const lot = await triggerGetLotByQr(qrText).unwrap();
+        const matchedSlots = await findSlotsInWarehouseByLotId(lot.id);
+        setQrMatchedSlotIds(matchedSlots);
+        if (!matchedSlots.length) {
+          toast(`Không tìm thấy slot đang chứa lô ${lot.lotCode}.`, { icon: "ℹ️" });
+          return;
+        }
+        toast.success(`Đã tô màu ${matchedSlots.length} slot đang chứa lô ${lot.lotCode}.`);
+        return;
+      }
+
+      const box = await triggerGetBoxByQr(qrText).unwrap();
+      if (box.slotId && Number(box.slotId) > 0) {
+        setQrMatchedSlotIds([Number(box.slotId)]);
+        toast.success(`Đã tô màu slot chứa box ${box.boxCode}.`);
+      } else {
+        setQrMatchedSlotIds([]);
+        toast(`Box ${box.boxCode} hiện chưa được xếp slot.`, { icon: "ℹ️" });
+      }
+    } catch (error: unknown) {
+      const err = error as { data?: { message?: string; error?: string } };
+      const msg =
+        err?.data?.message ||
+        err?.data?.error ||
+        "Không tìm thấy dữ liệu theo mã QR đã quét.";
+      toast.error(msg);
+    }
+  };
+
+  const handleSearchByQr = async () => {
+    await performSearchByQr(qrSearchValue);
+  };
+
+  const handlePickQrImage = async (file: File) => {
+    const toastId = toast.loading("Đang đọc QR từ ảnh...");
+    try {
+      const decoded = await decodeQrFromImageFile(file);
+      if (!decoded) {
+        toast.error("Không đọc được mã QR từ ảnh.", { id: toastId });
+        return;
+      }
+      setQrSearchValue(decoded);
+      toast.success("Đã đọc QR từ ảnh.", { id: toastId });
+      await performSearchByQr(decoded);
+    } catch {
+      toast.error("Đọc QR từ ảnh thất bại.", { id: toastId });
+    }
+  };
+
   const filteredUnassignedBoxes = useMemo(() => {
     const cleanBoxes = unassignedBoxes.filter(
       (b) =>
@@ -1119,7 +1265,7 @@ const WarehouseMap = () => {
     let cancelled = false;
 
     const run = async () => {
-      if (!slots?.length || slotExpiryFilter === "ALL") {
+      if (!zones?.length || slotExpiryFilter === "ALL") {
         if (!cancelled) {
           setSlotIdsByExpiryFilter([]);
           setIsLoadingExpiryFilter(false);
@@ -1130,38 +1276,80 @@ const WarehouseMap = () => {
       if (!cancelled) {
         setIsLoadingExpiryFilter(true);
       }
-      const matched: number[] = [];
-
-      await Promise.all(
-        slots.map(async (slot) => {
+      const matchedSet = new Set<number>();
+      for (const zone of zones) {
+        let racksInZone: Array<{ id: number }> = [];
+        try {
+          racksInZone = await dispatch(
+            userApi.endpoints.getRacks.initiate(zone.id, {
+              forceRefetch: true,
+              subscribe: false,
+            }),
+          ).unwrap();
+        } catch {
+          continue;
+        }
+        for (const rack of racksInZone ?? []) {
+          let slotsInRack: SlotItem[] = [];
           try {
-            const contents = await dispatch(
-              userApi.endpoints.getSlotContents.initiate(slot.id, {
+            slotsInRack = await dispatch(
+              userApi.endpoints.getSlots.initiate(rack.id, {
                 forceRefetch: true,
                 subscribe: false,
               }),
             ).unwrap();
-            const hasMatch = (contents.boxes ?? []).some((b) => {
-              if (!b.expiryDate) return false;
-              const now = new Date();
-              const end = new Date(b.expiryDate);
-              if (Number.isNaN(end.getTime())) return false;
-              const diffDays = (end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
-              if (slotExpiryFilter === "EXPIRED") return diffDays <= 0;
-              if (slotExpiryFilter === "D1") return diffDays > 0 && diffDays <= 1;
-              if (slotExpiryFilter === "D3") return diffDays > 1 && diffDays <= 3;
-              if (slotExpiryFilter === "D7") return diffDays > 3 && diffDays <= 7;
-              return false;
-            });
-            if (hasMatch) matched.push(slot.id);
           } catch {
-            // skip slot errors, keep others
+            continue;
           }
-        }),
-      );
+          await Promise.all(
+            (slotsInRack ?? []).map(async (slot) => {
+              try {
+                const contents = await dispatch(
+                  userApi.endpoints.getSlotContents.initiate(slot.id, {
+                    forceRefetch: true,
+                    subscribe: false,
+                  }),
+                ).unwrap();
+                const hasMatch = (contents.boxes ?? []).some((b) => {
+                  if (!b.expiryDate) return false;
+                  const end = new Date(b.expiryDate);
+                  if (Number.isNaN(end.getTime())) return false;
+                  const now = new Date();
+                  const startOfToday = new Date(
+                    now.getFullYear(),
+                    now.getMonth(),
+                    now.getDate(),
+                  );
+                  const endOfExpiryDay = new Date(
+                    end.getFullYear(),
+                    end.getMonth(),
+                    end.getDate(),
+                    23,
+                    59,
+                    59,
+                    999,
+                  );
+                  const daysLeft = Math.ceil(
+                    (endOfExpiryDay.getTime() - startOfToday.getTime()) /
+                      (1000 * 60 * 60 * 24),
+                  );
+                  if (slotExpiryFilter === "EXPIRED") return daysLeft <= 0;
+                  if (slotExpiryFilter === "D1") return daysLeft === 1;
+                  if (slotExpiryFilter === "D3") return daysLeft > 0 && daysLeft <= 3;
+                  if (slotExpiryFilter === "D7") return daysLeft > 0 && daysLeft <= 7;
+                  return false;
+                });
+                if (hasMatch) matchedSet.add(slot.id);
+              } catch {
+                // skip slot errors, keep others
+              }
+            }),
+          );
+        }
+      }
 
       if (!cancelled) {
-        setSlotIdsByExpiryFilter(matched);
+        setSlotIdsByExpiryFilter(Array.from(matchedSet));
         setIsLoadingExpiryFilter(false);
       }
     };
@@ -1170,7 +1358,7 @@ const WarehouseMap = () => {
     return () => {
       cancelled = true;
     };
-  }, [dispatch, slots, slotExpiryFilter]);
+  }, [dispatch, zones, slotExpiryFilter]);
 
   const expiredBoxesInWarehouse = useMemo(() => {
     return [...expiredBoxes].sort((a, b) => {
@@ -1612,6 +1800,76 @@ const WarehouseMap = () => {
                 Mở chi tiết khu vực
               </button>
           </div>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+              <select
+                value={qrSearchType}
+                onChange={(e) =>
+                  setQrSearchType(e.target.value as "LOT" | "BOX")
+                }
+                className="w-full sm:w-auto min-w-[130px] max-w-[160px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400"
+              >
+                <option value="LOT">Quét QR lô</option>
+                <option value="BOX">Quét QR box</option>
+              </select>
+              <input
+                value={qrSearchValue}
+                onChange={(e) => setQrSearchValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleSearchByQr();
+                  }
+                }}
+                placeholder={
+                  qrSearchType === "LOT" ? "Nhập/Quét QR lô..." : "Nhập/Quét QR box..."
+                }
+                className="w-full sm:w-auto min-w-[230px] max-w-[320px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400"
+              />
+              <input
+                ref={qrImageInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) {
+                    void handlePickQrImage(file);
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => void handleSearchByQr()}
+                disabled={isFindingLotByQr || isFindingBoxByQr}
+                className="inline-flex items-center rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-100 disabled:opacity-60"
+              >
+                {isFindingLotByQr || isFindingBoxByQr ? "Đang tìm..." : "Tìm theo QR"}
+              </button>
+              <button
+                type="button"
+                onClick={() => qrImageInputRef.current?.click()}
+                className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+              >
+                Quét ảnh QR
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsQrCameraOpen(true)}
+                className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+              >
+                Quét camera
+              </button>
+              <button
+                type="button"
+                onClick={clearSearchFilters}
+                disabled={!qrMatchedSlotIds.length && !selectedVariantFilterId && !qrSearchValue.trim()}
+                className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+              >
+                Xóa tìm kiếm
+              </button>
+          </div>
 
         </div>
 
@@ -1639,6 +1897,9 @@ const WarehouseMap = () => {
                   name={z.name}
                   onSlotClick={(slot) => setDetailSlot(slot)}
                   variantFilterId={selectedVariantFilterId}
+                  qrMatchedSlotIds={qrMatchedSlotIds}
+                  expiryMatchedSlotIds={slotIdsByExpiryFilter}
+                  hasExpiryFilter={slotExpiryFilter !== "ALL"}
                 />
               ))}
             </div>
@@ -1646,6 +1907,16 @@ const WarehouseMap = () => {
         )}
 
       </div>
+
+      <QrCameraScannerModal
+        open={isQrCameraOpen}
+        title={qrSearchType === "LOT" ? "Quét QR lô" : "Quét QR box"}
+        onClose={() => setIsQrCameraOpen(false)}
+        onDetected={(value) => {
+          setQrSearchValue(value);
+          void performSearchByQr(value);
+        }}
+      />
 
       {isAreaDetailModalOpen && (
         <div
@@ -1801,6 +2072,11 @@ const WarehouseMap = () => {
                         Vị trí có viền xanh dương là vị trí đang chứa biến thể đã chọn, các vị trí còn lại được làm mờ.
                       </p>
                     ) : null}
+                    {qrMatchedSlotIds.length > 0 ? (
+                      <p className="text-[11px] text-sky-700 mt-0.5">
+                        Vị trí có viền xanh dương là slot khớp theo QR đã tìm.
+                      </p>
+                    ) : null}
                   </div>
                 </div>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
@@ -1820,8 +2096,11 @@ const WarehouseMap = () => {
                     const hasExpiryFilter = slotExpiryFilter !== "ALL";
                     const isExpiryMatched = hasExpiryFilter && slotIdsByExpiryFilter.includes(slot.id);
                     const isExpiryDimmed = hasExpiryFilter && !isExpiryMatched;
-                    const isHighlighted = isVariantMatched || isExpiryMatched;
-                    const shouldDim = isVariantDimmed || isExpiryDimmed;
+                    const hasQrHighlight = qrMatchedSlotIds.length > 0;
+                    const isQrMatched = hasQrHighlight && qrMatchedSlotIds.includes(slot.id);
+                    const isQrDimmed = hasQrHighlight && !isQrMatched;
+                    const isHighlighted = isVariantMatched || isExpiryMatched || isQrMatched;
+                    const shouldDim = isVariantDimmed || isExpiryDimmed || isQrDimmed;
 
                     return (
                       <button

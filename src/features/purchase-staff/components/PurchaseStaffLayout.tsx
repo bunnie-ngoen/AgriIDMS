@@ -58,7 +58,7 @@ export default function PurchaseStaffLayout() {
                     >
                       <LayoutDashboard size={15} />
                     </span>
-                    <span className="truncate">Dashboard</span>
+                    <span className="truncate">Bảng điều khiển</span>
                   </>
                 )}
               </NavLink>

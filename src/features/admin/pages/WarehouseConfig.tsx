@@ -233,6 +233,20 @@ const WarehouseConfig = () => {
       toast.error("Zone phải có chiều dài và chiều rộng lớn hơn 0.");
       return;
     }
+    const warehouseLengthM = Number(warehouse?.lengthM ?? 0);
+    const warehouseWidthM = Number(warehouse?.widthM ?? 0);
+    if (warehouseLengthM > 0 && lengthM > warehouseLengthM) {
+      toast.error(
+        `Chiều dài zone không được lớn hơn chiều dài kho (${warehouseLengthM.toFixed(2)} m).`,
+      );
+      return;
+    }
+    if (warehouseWidthM > 0 && widthM > warehouseWidthM) {
+      toast.error(
+        `Chiều rộng zone không được lớn hơn chiều rộng kho (${warehouseWidthM.toFixed(2)} m).`,
+      );
+      return;
+    }
     const warehouseArea = Number(warehouse?.floorAreaM2 ?? 0);
     if (warehouseArea > 0) {
       const maxZonesArea = warehouseArea * 0.7;
@@ -298,6 +312,20 @@ const WarehouseConfig = () => {
     }
     if (lengthM <= 0 || widthM <= 0) {
       toast.error("Rack phải có chiều dài và chiều rộng lớn hơn 0.");
+      return;
+    }
+    const zoneLengthM = Number(selectedZone?.lengthM ?? 0);
+    const zoneWidthM = Number(selectedZone?.widthM ?? 0);
+    if (zoneLengthM > 0 && lengthM > zoneLengthM) {
+      toast.error(
+        `Chiều dài rack không được lớn hơn chiều dài zone (${zoneLengthM.toFixed(2)} m).`,
+      );
+      return;
+    }
+    if (zoneWidthM > 0 && widthM > zoneWidthM) {
+      toast.error(
+        `Chiều rộng rack không được lớn hơn chiều rộng zone (${zoneWidthM.toFixed(2)} m).`,
+      );
       return;
     }
     const zoneArea = Number(selectedZone?.floorAreaM2 ?? 0);
@@ -367,6 +395,20 @@ const WarehouseConfig = () => {
     }
     if (lengthCm <= 0 || widthCm <= 0 || heightCm <= 0) {
       toast.error("Slot phải nhập đủ dài, rộng, cao lớn hơn 0.");
+      return;
+    }
+    const rackLengthCm = Number(selectedRack?.lengthM ?? 0) * 100;
+    const rackWidthCm = Number(selectedRack?.widthM ?? 0) * 100;
+    if (rackLengthCm > 0 && lengthCm > rackLengthCm) {
+      toast.error(
+        `Chiều dài slot không được lớn hơn chiều dài rack (${rackLengthCm.toFixed(0)} cm).`,
+      );
+      return;
+    }
+    if (rackWidthCm > 0 && widthCm > rackWidthCm) {
+      toast.error(
+        `Chiều rộng slot không được lớn hơn chiều rộng rack (${rackWidthCm.toFixed(0)} cm).`,
+      );
       return;
     }
     const rackArea = Number(selectedRack?.floorAreaM2 ?? 0);
