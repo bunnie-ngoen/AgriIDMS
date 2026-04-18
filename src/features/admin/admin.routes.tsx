@@ -127,8 +127,11 @@ const StockCheckDetailsPage = lazy(
 const DisposalRequestsPage = lazy(
   () => import("../admin/pages/DisposalRequestsPage")
 );
-const DamageDiscountApprovalPage = lazy(
-  () => import("../manager/pages/DamageDiscountApprovalPage")
+const ManagerDamageReportListPage = lazy(
+  () => import("../manager/pages/damage-reports/ManagerDamageReportListPage"),
+);
+const ManagerDamageReportDetailPage = lazy(
+  () => import("../manager/pages/damage-reports/ManagerDamageReportDetailPage"),
 );
 
 export const adminRoutes = [
@@ -190,7 +193,9 @@ export const adminRoutes = [
       { path: "stock-checks", element: <ManagerStockChecksDashboardPage /> },
       { path: "stock-checks/:id", element: <StockCheckDetailsPage /> },
       { path: "disposal-requests", element: <DisposalRequestsPage /> },
-      { path: "damage-discount-approvals", element: <DamageDiscountApprovalPage /> },
+      { path: "damage-discount-approvals", element: <ManagerDamageReportListPage /> },
+      { path: "damage-reports", element: <ManagerDamageReportListPage /> },
+      { path: "damage-reports/:id", element: <ManagerDamageReportDetailPage /> },
     ],
   },
 ];

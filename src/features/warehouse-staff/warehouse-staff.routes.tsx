@@ -55,8 +55,14 @@ const PutBoxIntoSlotPage = lazy(
 const InventoryIssueManagementPage = lazy(
   () => import("../manager/pages/InventoryIssueManagementPage"),
 );
-const WarehouseDamageReportsPage = lazy(
-  () => import("./pages/WarehouseDamageReportsPage"),
+const WarehouseDamageReportListPage = lazy(
+  () => import("./pages/damage-reports/WarehouseDamageReportListPage"),
+);
+const WarehouseDamageReportCreatePage = lazy(
+  () => import("./pages/damage-reports/WarehouseDamageReportCreatePage"),
+);
+const WarehouseDamageReportDetailPage = lazy(
+  () => import("./pages/damage-reports/WarehouseDamageReportDetailPage"),
 );
 const ProfilePage = lazy(() => import("../home/pages/ProfilePage"));
 
@@ -88,7 +94,9 @@ export const warehouseStaffRoutes = [
       { path: "warehouses/:id/map", element: <WarehouseMapPage /> },
       { path: "putaway", element: <PutBoxIntoSlotPage /> },
       { path: "inventory-issues", element: <InventoryIssueManagementPage /> },
-      { path: "damage-reports", element: <WarehouseDamageReportsPage /> },
+      { path: "damage-reports", element: <WarehouseDamageReportListPage /> },
+      { path: "damage-reports/new", element: <WarehouseDamageReportCreatePage /> },
+      { path: "damage-reports/:id", element: <WarehouseDamageReportDetailPage /> },
       { path: "profile", element: <ProfilePage /> },
     ],
   },

@@ -61,6 +61,7 @@ const mainMenu: MenuItem[] = [
       { name: "Tạo kho", path: "warehouses/create", icon: CirclePlus },
       { name: "Xếp hàng vào vị trí", path: "putaway", icon: Boxes },
       { name: "Hàng hư hỏng / quá hạn", path: "inventory-issues", icon: AlertTriangle },
+      { name: "Duyệt phiếu hỏng", path: "damage-reports", icon: AlertTriangle },
       { name: "Duyệt yêu cầu tiêu hủy", path: "disposal-requests", icon: Trash2 },
       {
         name: "Cấu hình giảm giá",
@@ -74,11 +75,6 @@ const mainMenu: MenuItem[] = [
           {
             name: "Giảm giá theo mặt hàng",
             path: "variant-discount-config",
-            icon: BadgePercent,
-          },
-          {
-            name: "Duyệt phiếu hỏng áp giảm",
-            path: "damage-discount-approvals",
             icon: BadgePercent,
           },
         ],
