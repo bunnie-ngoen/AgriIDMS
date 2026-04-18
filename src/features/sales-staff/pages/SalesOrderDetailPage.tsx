@@ -16,7 +16,11 @@ import {
   useGetLatestPaymentByOrderQuery,
 } from "../../payment/api/payment.api";
 import { paymentMethodEnum, shouldUseStaffOnlinePayBeforeEndpoint } from "../../payment/schemas/payment.schema";
-import { formatVietnamDateTime } from "../../../shared/lib/vietnamTime";
+import {
+  formatVietnamDate,
+  formatVietnamDateTime,
+  formatVietnamTime,
+} from "../../../shared/lib/vietnamTime";
 import {
   isPaymentActive,
   isPaymentSettled,
