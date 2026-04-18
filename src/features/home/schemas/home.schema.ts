@@ -3,6 +3,7 @@ import { z } from "zod";
 /**
  * Khớp BE: ProductVariantResponseCustomerHomeDto
  * Grade từ BE là enum ProductGrade (1, 2, 3) serialized thành number.
+ * Các field nearExpiry* do HomePageService tính — gộp rule gần HSD và ghi đè variant; FE dùng productHasActiveSaleDisplay() cho badge danh sách.
  */
 export const homeProductSchema = z.object({
     id: z.number(),
