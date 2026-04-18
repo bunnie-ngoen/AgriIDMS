@@ -1,9 +1,9 @@
 import { z } from "zod";
 
 export const PRODUCT_GRADE_OPTIONS = [
-  { value: 1, label: "Grade 1" },
-  { value: 2, label: "Grade 2" },
-  { value: 3, label: "Grade 3" },
+  { value: 1, label: "Hàng loại 1" },
+  { value: 2, label: "Hàng loại 2" },
+  { value: 3, label: "Hàng loại 3" },
 ] as const;
 
 const VALID_PRODUCT_GRADES = PRODUCT_GRADE_OPTIONS.map((item) => item.value);
@@ -14,10 +14,10 @@ export const ProductVariantSchema = z.object({
     .int()
     .positive("Vui lòng chọn sản phẩm"),
   grade: z
-    .number({ message: "Vui lòng chọn grade" })
+    .number({ message: "Vui lòng chọn hàng loại" })
     .int()
     .refine((value) => VALID_PRODUCT_GRADES.includes(value as 1 | 2 | 3), {
-      message: "Grade không hợp lệ. Vui lòng chọn Grade 1, 2 hoặc 3",
+      message: "Hàng loại không hợp lệ. Vui lòng chọn hàng loại 1, 2 hoặc 3",
     }),
   price: z
     .number({ message: "Vui lòng nhập giá" })

@@ -146,7 +146,7 @@ const ProductVariantList = () => {
               <tr className="bg-slate-50 border-b border-slate-100">
                 <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Ảnh</th>
                 <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Sản phẩm</th>
-                <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Grade</th>
+                <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Hàng loại</th>
                 <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Giá</th>
                 <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Hạn SD</th>
                 <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Định mức tối thiểu (kg)</th>
@@ -192,7 +192,7 @@ const ProductVariantList = () => {
                     </td>
                     <td className="px-5 py-3.5">
                       <span className="inline-flex items-center rounded-lg bg-violet-50 border border-violet-200 px-2.5 py-1 text-[11px] font-semibold text-violet-700">
-                        Grade {variant.grade}
+                        Hàng loại {variant.grade}
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
