@@ -234,7 +234,7 @@ export default function ProductDetailPage() {
 
                         {/* Card phải: giới hạn chiều cao = ảnh trái; dư nội dung cuộn trong card */}
                         <div className="flex min-h-0 w-full min-w-0 flex-col lg:max-h-[calc(50cqw-1rem)] lg:overflow-hidden">
-                            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5 lg:p-6 [scrollbar-gutter:stable] [scrollbar-width:thin]">
+                            <div className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto overflow-x-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5 lg:p-6 [scrollbar-gutter:stable] [scrollbar-width:thin]">
                                 <div className="shrink-0 border-b border-slate-100 pb-4">
                                 <h1 className="text-2xl font-bold leading-snug tracking-tight text-slate-900 sm:text-[1.65rem] lg:text-3xl">
                                     {displayName}
@@ -298,8 +298,8 @@ export default function ProductDetailPage() {
                                 </div>
 
                             <div
-                                className={`flex min-h-0 flex-1 flex-col pt-4 ${
-                                    needsBoxListScroll ? "justify-start" : "justify-center"
+                                className={`flex flex-col pt-6 ${
+                                    needsBoxListScroll ? "min-h-0 flex-1" : "shrink-0"
                                 }`}
                             >
                                 <h3 className="shrink-0 text-sm font-bold uppercase tracking-wide text-slate-800 lg:text-base">
@@ -355,7 +355,7 @@ export default function ProductDetailPage() {
                                 )}
                             </div>
 
-                                <div className="mt-auto shrink-0 border-t border-slate-100 pt-4">
+                                <div className="mt-5 shrink-0 border-t border-slate-100 pt-4">
                                 <h3 className="text-sm font-bold uppercase tracking-wide text-slate-800 lg:text-base">
                                     Đặt hàng
                                 </h3>
