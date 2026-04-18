@@ -5,6 +5,7 @@ import {
     ShoppingCart,
     ArrowLeft,
     AlertCircle,
+    CheckCircle2,
     Package,
     Clock,
     Sparkles,
@@ -28,7 +29,7 @@ function DetailSkeleton() {
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12 animate-pulse pb-14">
                 <div className="h-10 w-40 bg-slate-200 rounded-full mb-8" />
                 <div className="rounded-3xl bg-white p-6 sm:p-8 shadow-xl shadow-slate-200/50 ring-1 ring-slate-200/60">
-                    <div className="grid lg:grid-cols-[1fr_1.05fr] gap-8 lg:gap-12">
+                    <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12">
                         <div className="aspect-square rounded-2xl bg-slate-200" />
                         <div className="space-y-5">
                             <div className="h-4 w-24 bg-slate-100 rounded-full" />
@@ -181,9 +182,10 @@ export default function ProductDetailPage() {
     const displayName = stripGradeSuffixFromProductName(product.productName);
     const gradeLabel = product.grade === 1 ? "Loại 1" : product.grade === 2 ? "Loại 2" : product.grade === 3 ? "Loại 3" : `Hạng ${product.grade}`;
     const discountVm = getHomeProductDiscountViewModel(product);
+    const needsBoxListScroll = product.boxTypes.length > 4;
 
     return (
-        <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-emerald-50/30">
+        <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-emerald-50/30 [scrollbar-gutter:stable]">
             <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 pb-12 sm:pb-14">
                 <button
                     type="button"
@@ -199,11 +201,15 @@ export default function ProductDetailPage() {
                         Chi tiết sản phẩm
                     </p>
 
-                    <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-12 lg:items-start">
-                        {/* Ảnh */}
-                        <div className="relative mx-auto w-full max-w-lg lg:mx-0 lg:max-w-none">
-                            <div className="absolute -inset-1 rounded-[1.35rem] bg-gradient-to-br from-[#1a5f2a]/10 via-transparent to-emerald-100/50 blur-sm" aria-hidden />
-                            <div className="relative aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 ring-1 ring-slate-200/80 shadow-inner">
+                    {/* @container: max-h cột phải = cạnh ảnh vuông ≈ (100% − gap) / 2 → calc(50cqw − 1rem) với gap-8 */}
+                    <div className="@container mt-8 grid grid-cols-1 items-start gap-6 lg:grid-cols-2 lg:items-start lg:gap-8">
+                        {/* Ảnh — aspect-square full nửa cột */}
+                        <div className="w-full min-w-0">
+                            <div className="relative mx-auto aspect-square w-full max-w-lg overflow-hidden rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 shadow-md ring-1 ring-slate-200/80 sm:max-w-xl lg:mx-0 lg:max-w-none">
+                                <div
+                                    className="pointer-events-none absolute -inset-1 rounded-[1.35rem] bg-gradient-to-br from-[#1a5f2a]/10 via-transparent to-emerald-100/50 blur-sm"
+                                    aria-hidden
+                                />
                                 {discountVm.hasDiscount ? (
                                     <div
                                         className="absolute right-2 top-2 z-10 rounded-md bg-red-600 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white shadow-lg"
@@ -216,23 +222,24 @@ export default function ProductDetailPage() {
                                     <img
                                         src={imageUrl}
                                         alt={displayName}
-                                        className="h-full w-full object-cover transition duration-500 hover:scale-[1.02]"
+                                        className="relative z-[1] h-full w-full object-cover object-center"
                                     />
                                 ) : (
-                                    <div className="flex h-full w-full items-center justify-center bg-slate-100/80">
+                                    <div className="relative z-[1] flex h-full min-h-[12rem] w-full items-center justify-center bg-slate-100/80">
                                         <Leaf className="text-slate-300" size={88} strokeWidth={1.25} />
                                     </div>
                                 )}
                             </div>
                         </div>
 
-                        {/* Thông tin & mua */}
-                        <div className="min-w-0 space-y-6">
-                            <div>
-                                <h1 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+                        {/* Card phải: giới hạn chiều cao = ảnh trái; dư nội dung cuộn trong card */}
+                        <div className="flex min-h-0 w-full min-w-0 flex-col lg:max-h-[calc(50cqw-1rem)] lg:overflow-hidden">
+                            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5 lg:p-6 [scrollbar-gutter:stable] [scrollbar-width:thin]">
+                                <div className="shrink-0 border-b border-slate-100 pb-4">
+                                <h1 className="text-2xl font-bold leading-snug tracking-tight text-slate-900 sm:text-[1.65rem] lg:text-3xl">
                                     {displayName}
                                 </h1>
-                                <div className="mt-4 flex flex-wrap items-center gap-2">
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
                                     <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-[#145026] ring-1 ring-[#1a5f2a]/15">
                                         {gradeLabel}
                                     </span>
@@ -243,32 +250,38 @@ export default function ProductDetailPage() {
                                                 : "bg-red-50 text-red-700 ring-red-200/80"
                                         }`}
                                     >
-                                        <Package size={13} strokeWidth={2.5} />
+                                        <Package size={14} strokeWidth={2.5} />
                                         {product.availableBoxCount > 0 ? "Còn hàng" : "Hết hàng"}
                                     </span>
                                 </div>
-                            </div>
-
-                            <div className="rounded-2xl border border-slate-100 bg-gradient-to-br from-slate-50/90 to-white p-5 shadow-sm">
-                                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                                    Giá niêm yết
-                                </p>
-                                <p className="mt-1 text-3xl font-bold tabular-nums tracking-tight text-[#b03030] sm:text-4xl">
-                                    {product.price.toLocaleString("vi-VN")}
-                                    <span className="ml-1.5 text-xl font-semibold text-[#c0392b]/90 sm:text-2xl">₫/kg</span>
-                                </p>
+                                <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 lg:text-xs">
+                                            Giá niêm yết
+                                        </p>
+                                        <p className="mt-1 text-2xl font-bold tabular-nums tracking-tight text-[#b03030] sm:text-3xl lg:text-[2rem]">
+                                            {product.price.toLocaleString("vi-VN")}
+                                            <span className="ml-1.5 text-lg font-semibold text-[#c0392b]/90 sm:text-xl">₫/kg</span>
+                                        </p>
+                                    </div>
+                                    <span className="inline-flex shrink-0 items-center gap-1.5 self-start text-right text-xs leading-snug text-slate-600 sm:max-w-[12rem] sm:self-auto sm:text-[13px]">
+                                        <Clock size={16} className="shrink-0 text-slate-400" />
+                                        Hạn dùng:{" "}
+                                        <strong className="font-semibold text-slate-800">{product.shelfLifeDays} ngày</strong>
+                                    </span>
+                                </div>
                                 {product.hasNearExpiryStock && product.nearExpiryPriceTiers.length > 0 ? (
-                                    <div className="mt-4 space-y-2 rounded-xl border border-amber-200/80 bg-amber-50/90 p-3.5">
-                                        <p className="flex items-center gap-1.5 text-xs font-bold text-amber-800">
-                                            <Sparkles size={14} className="shrink-0" />
+                                    <div className="mt-2 space-y-1.5 rounded-lg border border-amber-200/80 bg-amber-50/90 p-2.5">
+                                        <p className="flex items-center gap-1 text-[11px] font-bold text-amber-800">
+                                            <Sparkles size={13} className="shrink-0" />
                                             Ưu đãi lô gần hết hạn
                                         </p>
                                         {product.nearExpiryPriceTiers.map((tier) => (
                                             <div
                                                 key={tier.maxDaysLeft}
-                                                className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-amber-900"
+                                                className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-amber-900"
                                             >
-                                                <span className="rounded-md bg-amber-100 px-2 py-0.5 font-bold">
+                                                <span className="rounded bg-amber-100 px-1.5 py-0.5 font-bold">
                                                     ≤ {tier.maxDaysLeft} ngày
                                                 </span>
                                                 <span className="font-semibold">
@@ -282,21 +295,26 @@ export default function ProductDetailPage() {
                                         ))}
                                     </div>
                                 ) : null}
-                                <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-slate-200/60 pt-4 text-sm text-slate-600">
-                                    <span className="inline-flex items-center gap-2">
-                                        <Clock size={16} className="text-slate-400" />
-                                        Hạn dùng: <strong className="font-semibold text-slate-800">{product.shelfLifeDays} ngày</strong>
-                                    </span>
                                 </div>
-                            </div>
 
-                            <div>
-                                <h3 className="text-sm font-bold uppercase tracking-wide text-slate-800">
+                            <div
+                                className={`flex min-h-0 flex-1 flex-col pt-4 ${
+                                    needsBoxListScroll ? "justify-start" : "justify-center"
+                                }`}
+                            >
+                                <h3 className="shrink-0 text-sm font-bold uppercase tracking-wide text-slate-800 lg:text-base">
                                     Chọn loại hộp
                                 </h3>
-                                <p className="mt-1 text-xs text-slate-500">Chọn khối lượng và loại đóng gói phù hợp.</p>
                                 {product.boxTypes.length > 0 ? (
-                                    <div className="mt-4 flex flex-col gap-3">
+                                    <div
+                                        className={`mt-3 grid gap-2.5 ${
+                                            product.boxTypes.length > 1 ? "sm:grid-cols-2" : "grid-cols-1"
+                                        } ${
+                                            needsBoxListScroll
+                                                ? "min-h-0 max-h-[min(42vh,16rem)] flex-1 overflow-y-auto overscroll-y-contain [scrollbar-gutter:stable] [scrollbar-width:thin]"
+                                                : ""
+                                        }`}
+                                    >
                                         {product.boxTypes.map((box) => {
                                             const key = boxTypeKey(box);
                                             const isSelected = selectedBox ? boxTypeKey(selectedBox) === key : false;
@@ -308,12 +326,12 @@ export default function ProductDetailPage() {
                                                     type="button"
                                                     onClick={() => setSelectedBox(box)}
                                                     disabled={disabled}
-                                                    className={`rounded-xl border-2 px-4 py-3.5 text-left transition-all ${
+                                                    className={`box-border min-h-[4rem] w-full rounded-xl border-2 border-solid px-3.5 py-3 text-left text-base shadow-none outline-none transition-[background-color,border-color,color] [-webkit-tap-highlight-color:transparent] focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#1a5f2a]/35 sm:min-h-0 ${
                                                         disabled
                                                             ? "cursor-not-allowed border-slate-100 bg-slate-50 opacity-55"
                                                             : isSelected
-                                                              ? "border-[#1a5f2a] bg-emerald-50/80 shadow-md shadow-emerald-900/5 ring-2 ring-[#1a5f2a]/20"
-                                                              : "border-slate-200 bg-white hover:border-[#1a5f2a]/40 hover:shadow-md"
+                                                              ? "border-[#1a5f2a] bg-emerald-50/90"
+                                                              : "border-slate-200 bg-white hover:border-[#1a5f2a]/40"
                                                     }`}
                                                 >
                                                     <span className="font-semibold text-slate-900">
@@ -337,19 +355,29 @@ export default function ProductDetailPage() {
                                 )}
                             </div>
 
-                            <div className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-5">
-                                <h3 className="text-sm font-bold uppercase tracking-wide text-slate-800">
+                                <div className="mt-auto shrink-0 border-t border-slate-100 pt-4">
+                                <h3 className="text-sm font-bold uppercase tracking-wide text-slate-800 lg:text-base">
                                     Đặt hàng
                                 </h3>
-                                {product.boxTypes.length > 0 && !selectedBox && (
-                                    <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-amber-700">
-                                        <AlertCircle size={14} className="shrink-0" />
-                                        Chọn loại hộp trước khi thêm vào giỏ.
-                                    </p>
-                                )}
-                                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
+                                {/* Giữ chỗ cố định — đổi nội dung khi đã chọn hộp để trang không nhảy / co */}
+                                {product.boxTypes.length > 0 ? (
+                                    <div className="mt-2 flex min-h-[2.75rem] items-center">
+                                        {!selectedBox ? (
+                                            <p className="flex items-center gap-2 text-xs font-medium leading-snug text-amber-800 sm:text-sm">
+                                                <AlertCircle size={15} className="shrink-0" aria-hidden />
+                                                Chọn loại hộp trước khi thêm vào giỏ.
+                                            </p>
+                                        ) : (
+                                            <p className="flex items-center gap-2 text-xs font-medium leading-snug text-emerald-800 sm:text-sm">
+                                                <CheckCircle2 size={15} className="shrink-0 text-emerald-600" aria-hidden />
+                                                Đã chọn loại hộp — chỉnh số lượng rồi thêm vào giỏ.
+                                            </p>
+                                        )}
+                                    </div>
+                                ) : null}
+                                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-3">
                                     <div className="shrink-0">
-                                        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 lg:text-xs">
                                             Số lượng
                                         </p>
                                         <div
@@ -383,11 +411,12 @@ export default function ProductDetailPage() {
                                         type="button"
                                         onClick={handleAddToCart}
                                         disabled={isAdding || !canAddToCart}
-                                        className="inline-flex h-11 min-h-[2.75rem] w-full flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-[#1a5f2a] px-5 text-sm font-semibold text-white shadow-md shadow-[#1a5f2a]/20 transition hover:bg-[#145026] disabled:cursor-not-allowed disabled:opacity-45 sm:min-w-0"
+                                        className="inline-flex h-11 min-h-[2.75rem] w-full flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-[#1a5f2a] px-5 text-base font-semibold text-white shadow-md shadow-[#1a5f2a]/20 transition hover:bg-[#145026] disabled:cursor-not-allowed disabled:opacity-45 sm:min-w-0"
                                     >
-                                        <ShoppingCart size={18} className="shrink-0" />
+                                        <ShoppingCart size={19} className="shrink-0" />
                                         <span>Thêm vào giỏ</span>
                                     </button>
+                                </div>
                                 </div>
                             </div>
                         </div>
