@@ -18,6 +18,8 @@ import ForgotPasswordPage from './features/auth/pages/ForgotPasswordPage';
 import ProfilePage from './features/home/pages/ProfilePage';
 import ProductDetailPage from './features/home/pages/ProductDetailPage';
 import CartPage from './features/cart/pages/CartPage';
+import CheckoutPage from './features/cart/pages/CheckoutPage';
+import OrderReceivedPage from './features/cart/pages/OrderReceivedPage';
 import MyOrdersPage from './features/order/pages/MyOrdersPage';
 import MyOrderDetailPage from './features/order/pages/MyOrderDetailPage';
 import CustomerComplaintsPage from './features/complaint/pages/CustomerComplaintsPage';
@@ -38,6 +40,22 @@ function App() {
                             element={
                                 <ProtectedRoute allowedRoles={[AUTH_ROLE.CUSTOMER]}>
                                     <CartPage />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
+                            path={ROUTES.CHECKOUT}
+                            element={
+                                <ProtectedRoute allowedRoles={[AUTH_ROLE.CUSTOMER]}>
+                                    <CheckoutPage />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
+                            path={ROUTES.CHECKOUT_ORDER_RECEIVED}
+                            element={
+                                <ProtectedRoute allowedRoles={[AUTH_ROLE.CUSTOMER]}>
+                                    <OrderReceivedPage />
                                 </ProtectedRoute>
                             }
                         />
