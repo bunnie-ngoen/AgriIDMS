@@ -95,8 +95,11 @@ const NearExpiryDiscountConfigPage = lazy(
 const VariantDiscountOverrideConfigPage = lazy(
   () => import("./pages/VariantDiscountOverrideConfigPage"),
 );
-const DamageDiscountApprovalPage = lazy(
-  () => import("./pages/DamageDiscountApprovalPage"),
+const ManagerDamageReportListPage = lazy(
+  () => import("./pages/damage-reports/ManagerDamageReportListPage"),
+);
+const ManagerDamageReportDetailPage = lazy(
+  () => import("./pages/damage-reports/ManagerDamageReportDetailPage"),
 );
 const BoxTypeConfigPage = lazy(() => import("./pages/BoxTypeConfigPage"));
 const DisposalRequestsPage = lazy(
@@ -130,7 +133,9 @@ export const managerRoutes = [
       { path: "inventory-issues", element: <InventoryIssueManagementPage /> },
       { path: "near-expiry-discount-config", element: <NearExpiryDiscountConfigPage /> },
       { path: "variant-discount-config", element: <VariantDiscountOverrideConfigPage /> },
-      { path: "damage-discount-approvals", element: <DamageDiscountApprovalPage /> },
+      { path: "damage-discount-approvals", element: <ManagerDamageReportListPage /> },
+      { path: "damage-reports", element: <ManagerDamageReportListPage /> },
+      { path: "damage-reports/:id", element: <ManagerDamageReportDetailPage /> },
       { path: "box-type-config", element: <BoxTypeConfigPage /> },
       { path: "disposal-requests", element: <DisposalRequestsPage /> },
 

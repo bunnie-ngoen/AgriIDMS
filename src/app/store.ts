@@ -4,6 +4,7 @@ import storage from "redux-persist/lib/storage";
 
 import authReducer from "../features/auth/slices/auth.slice";
 import { api } from "../shared/api";
+import "../features/damage-report/api/damage-report.api";
 
 const authPersistConfig = {
   key: "auth",

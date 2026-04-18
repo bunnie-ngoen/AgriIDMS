@@ -316,7 +316,7 @@ export default function WarehouseStaffLayout() {
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-800 text-slate-200">
                   <CircleAlert size={15} />
                 </span>
-                Phiếu hỏng & giảm giá
+                Phiếu báo hỏng
               </NavLink>
             </li>
 
@@ -397,7 +397,7 @@ export default function WarehouseStaffLayout() {
                         }`
                       }
                     >
-                      Gửi phiếu hỏng & đề xuất giảm
+                      Phiếu báo hỏng
                     </NavLink>
                   </li>
                 </ul>
