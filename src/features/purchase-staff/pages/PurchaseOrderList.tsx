@@ -30,10 +30,20 @@ export default function PurchaseOrderList() {
   const navigate = useNavigate();
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin/purchase-orders");
-  const backLink = isAdmin ? "/admin/dashboard" : "/purchase-staff/dashboard";
-  const createLink = isAdmin ? "/admin/purchase-orders/create" : "/purchase-staff/orders/create";
+  const isManager = location.pathname.startsWith("/manager/purchase-orders");
+  const isReviewer = isAdmin || isManager;
+  const backLink = isAdmin
+    ? "/admin/dashboard"
+    : isManager
+      ? "/manager/dashboard"
+      : "/purchase-staff/dashboard";
+  const createLink = "/purchase-staff/orders/create";
   const editLink = (id: number) =>
-    isAdmin ? `/admin/purchase-orders/${id}/edit` : `/purchase-staff/orders/${id}/edit`;
+    isAdmin
+      ? `/admin/purchase-orders/${id}/edit`
+      : isManager
+        ? `/manager/purchase-orders/${id}/edit`
+        : `/purchase-staff/orders/${id}/edit`;
 
   const [detailModalId, setDetailModalId] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -78,8 +88,8 @@ export default function PurchaseOrderList() {
     }
   };
 
-  const canEdit = !isAdmin && order?.status === "Pending";
-  const canApprove = isAdmin && order?.status === "Pending";
+  const canEdit = !isReviewer && order?.status === "Pending";
+  const canApprove = isReviewer && order?.status === "Pending";
 
   // Tính toán và validate khoảng ngày lọc
   const dateValidation = useMemo(() => {
@@ -173,16 +183,16 @@ export default function PurchaseOrderList() {
             </button>
             <div>
               <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-                {isAdmin ? "Duyệt đơn mua hàng" : "Danh sách đơn mua"}
+                {isReviewer ? "Duyệt đơn mua hàng" : "Danh sách đơn mua"}
               </h1>
               <p className="text-xs text-slate-400 mt-0.5">
-                {isAdmin
-                  ? "Purchasing Staff tạo đơn → Admin duyệt. Bấm vào đơn để xem và duyệt."
+                {isReviewer
+                  ? "Nhân viên mua hàng tạo đơn → Quản lý/Admin duyệt. Bấm vào đơn để xem và duyệt."
                   : "Danh sách đơn mua do bạn tạo. Bấm để xem chi tiết."}
               </p>
             </div>
           </div>
-          {!isAdmin && (
+          {!isReviewer && (
             <button
               type="button"
               onClick={() => navigate(createLink)}
@@ -523,7 +533,7 @@ export default function PurchaseOrderList() {
                             Còn lại
                           </th>
                           <th className="text-right py-2.5 px-3 font-semibold text-slate-700">
-                            Đơn giá
+                            Đơn giá (VNĐ)
                           </th>
                           <th className="text-right py-2.5 px-3 font-semibold text-slate-700">
                             Thu hoạch

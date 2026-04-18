@@ -26,6 +26,11 @@ import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 import type { AppDispatch } from "../../../app/store";
 
 const getNowMs = () => Date.now();
+const formatM3 = (value: number | null | undefined) =>
+  Number(value ?? 0).toLocaleString("vi-VN", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
 
 const DisposeReasonModal = ({
   isOpen,
@@ -445,7 +450,7 @@ const SlotDetailPanel = ({
                 <div className="rounded-xl border border-slate-100 px-3 py-2">
                   <dt className="text-[10px] text-slate-500">Thể tích</dt>
                   <dd className="font-semibold text-slate-900 tabular-nums mt-1">
-                    {selectedBox.volumeM3 ?? 0} m³
+                    {formatM3(selectedBox.volumeM3)} m³
                   </dd>
                 </div>
                 <div className="rounded-xl border border-slate-100 px-3 py-2">
@@ -557,7 +562,7 @@ const SlotDetailPanel = ({
                   {contents.productName || "Sản phẩm"}
                   {contents.variantName ? ` · ${contents.variantName}` : ""} —{" "}
                   {contents.boxCount} hàng ·{" "}
-                  {contents.totalBoxVolumeM3 ?? contents.currentCapacity} m³
+                  {formatM3(contents.totalBoxVolumeM3 ?? contents.currentCapacity)} m³
                 </p>
               </div>
               <button
@@ -703,7 +708,7 @@ const SlotDetailPanel = ({
                           </div>
                         </td>
                         <td className="px-3 py-2 text-right tabular-nums">
-                          {b.volumeM3 ?? 0}
+                          {formatM3(b.volumeM3)}
                         </td>
                       </tr>
                     ))}
@@ -737,11 +742,11 @@ const SlotDetailPanel = ({
       <dl className="space-y-1.5 text-[11px]">
         <div className="flex justify-between">
           <dt className="text-slate-500">Sức chứa (m³)</dt>
-          <dd className="font-medium text-slate-800">{effectiveCapacity}</dd>
+          <dd className="font-medium text-slate-800">{formatM3(effectiveCapacity)}</dd>
         </div>
         <div className="flex justify-between">
           <dt className="text-slate-500">Đang chứa (m³)</dt>
-          <dd className="font-medium text-slate-800">{effectiveCurrentCapacity}</dd>
+          <dd className="font-medium text-slate-800">{formatM3(effectiveCurrentCapacity)}</dd>
         </div>
         <div className="flex justify-between">
           <dt className="text-slate-500">Tỷ lệ sử dụng</dt>
@@ -784,7 +789,7 @@ const SlotDetailPanel = ({
           <p className="text-[11px] text-slate-500">Đang tải chi tiết...</p>
         ) : !contents || contents.boxCount === 0 ? (
           <p className="text-[11px] text-slate-700">
-            Trống ({effectiveCurrentCapacity} / {effectiveCapacity} m³ ·{" "}
+            Trống ({formatM3(effectiveCurrentCapacity)} / {formatM3(effectiveCapacity)} m³ ·{" "}
             {ratio.toFixed(0)}% tải)
           </p>
         ) : (
@@ -795,11 +800,11 @@ const SlotDetailPanel = ({
               </span>
               {contents.variantName ? ` · ${contents.variantName}` : ""} —{" "}
               {contents.boxCount} box ·{" "}
-              {contents.totalBoxVolumeM3 ?? contents.currentCapacity} m³
+              {formatM3(contents.totalBoxVolumeM3 ?? contents.currentCapacity)} m³
             </p>
             <p className="text-[10px] text-slate-500">
-              {contents.currentCapacity} / {contents.capacity} m³ · còn{" "}
-              {contents.remainingCapacity} m³ trống
+              {formatM3(contents.currentCapacity)} / {formatM3(contents.capacity)} m³ · còn{" "}
+              {formatM3(contents.remainingCapacity)} m³ trống
             </p>
             <button
               type="button"
@@ -876,7 +881,7 @@ const RackOverview = ({
       >
         <span className="font-semibold text-sm truncate">{name}</span>
         <span className="text-[10px] opacity-90 whitespace-nowrap shrink-0">
-          {totalCurrent}/{totalCapacity} ({Math.round(ratio * 100)}%)
+          {formatM3(totalCurrent)}/{formatM3(totalCapacity)} ({Math.round(ratio * 100)}%)
         </span>
       </div>
       {isLoading && (
@@ -919,13 +924,13 @@ const RackOverview = ({
                     ? "opacity-40 saturate-50"
                     : ""
                 }`}
-                title={`${s.code}: ${s.currentCapacity}/${s.capacity} (${pct}%) — Bấm xem chi tiết`}
+                title={`${s.code}: ${formatM3(s.currentCapacity)}/${formatM3(s.capacity)} (${pct}%) — Bấm xem chi tiết`}
               >
                 <span className="truncate max-w-full font-semibold">
                   {s.code}
                 </span>
                 <span className="text-[9px] opacity-90 mt-0.5">
-                  {s.currentCapacity}/{s.capacity} ({pct}%)
+                  {formatM3(s.currentCapacity)}/{formatM3(s.capacity)} ({pct}%)
                 </span>
               </button>
             );
@@ -2116,7 +2121,7 @@ const WarehouseMap = () => {
                       >
                         <span className="truncate max-w-[80%]">{slot.code}</span>
                         <span className="mt-0.5 text-[9px] opacity-90">
-                          {slot.currentCapacity}/{slot.capacity} (
+                          {formatM3(slot.currentCapacity)}/{formatM3(slot.capacity)} (
                           {ratio.toFixed(0)}%)
                         </span>
                       </button>

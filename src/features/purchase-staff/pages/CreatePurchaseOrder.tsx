@@ -53,35 +53,6 @@ export default function CreatePurchaseOrder() {
 
   const [serverError, setServerError] = useState<string | null>(null);
   const today = useMemo(() => getTodayLocalYmd(), []);
-  const watchedSupplierId = form.watch("supplierId");
-  const watchedDetails = form.watch("details");
-
-  const isCreateDisabled = useMemo(() => {
-    if (isLoading) return true;
-    if (!watchedSupplierId || watchedSupplierId <= 0) return true;
-    if (!watchedDetails || watchedDetails.length === 0) return true;
-    return watchedDetails.some((d) => {
-      if (!d) return true;
-      const variantId = Number(d.productVariantId);
-      const orderedWeight = Number(d.orderedWeight);
-      const unitPrice = Number(d.unitPrice);
-      const tolerancePercent = Number(d.tolerancePercent);
-      const harvestDate = d.harvestDate;
-      if (!variantId || variantId <= 0) return true;
-      if (!harvestDate) return true;
-      if (harvestDate > today) return true;
-      if (!Number.isFinite(orderedWeight) || orderedWeight <= 0) return true;
-      if (!Number.isFinite(unitPrice) || unitPrice <= 0) return true;
-      if (
-        !Number.isFinite(tolerancePercent) ||
-        tolerancePercent < 0 ||
-        tolerancePercent > 100
-      )
-        return true;
-      return false;
-    });
-  }, [isLoading, watchedSupplierId, watchedDetails, today]);
-
   const onSubmit = async (values: FormValues) => {
     setServerError(null);
 
@@ -276,7 +247,7 @@ export default function CreatePurchaseOrder() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-500 mb-1">
-                      Đơn giá
+                      Đơn giá (VNĐ)
                     </label>
                     <input
                       type="number"
@@ -337,7 +308,7 @@ export default function CreatePurchaseOrder() {
           </button>
           <button
             type="submit"
-            disabled={isCreateDisabled}
+            disabled={isLoading}
             className="flex-[2] rounded-xl py-3 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {isLoading ? (

@@ -402,10 +402,18 @@ export const userApi = api.injectEndpoints({
         url: `racks/${rackId}/slots`,
       }),
       transformResponse: (raw: unknown): SlotItem[] => {
-        const arr = (raw as Array<Record<string, unknown>>) ?? [];
+        let arr: Array<Record<string, unknown>> = [];
+        if (Array.isArray(raw)) {
+          arr = raw as Array<Record<string, unknown>>;
+        } else if (raw && typeof raw === "object") {
+          const obj = raw as Record<string, unknown>;
+          if (Array.isArray(obj.data)) arr = obj.data as Array<Record<string, unknown>>;
+          else if (Array.isArray(obj.result)) arr = obj.result as Array<Record<string, unknown>>;
+          else if (Array.isArray(obj.items)) arr = obj.items as Array<Record<string, unknown>>;
+        }
         return arr.map((row) => ({
-          id: (row.id as number) ?? 0,
-          code: (row.code as string) ?? "",
+          id: Number(row.id ?? row.Id ?? 0),
+          code: String(row.code ?? row.Code ?? ""),
           qrCode:
             (row.qrCode as string | null | undefined) ??
             (row.QrCode as string | null | undefined) ??
@@ -415,12 +423,17 @@ export const userApi = api.injectEndpoints({
             (row.QrImageUrl as string | null | undefined) ??
             null,
           productVariantId:
-            (row.productVariantId as number | null | undefined) ??
-            (row.ProductVariantId as number | null | undefined) ??
-            null,
+            Number(
+              row.productVariantId ??
+                row.ProductVariantId ??
+                row.ProductVariantID ??
+                row.product_variant_id ??
+                0,
+            ) || null,
           productVariantName:
             (row.productVariantName as string | null | undefined) ??
             (row.ProductVariantName as string | null | undefined) ??
+            (row.ProductVarientName as string | null | undefined) ??
             null,
           productName:
             (row.productName as string | null | undefined) ??
@@ -434,7 +447,7 @@ export const userApi = api.injectEndpoints({
           widthCm: Number(row.widthCm ?? row.WidthCm ?? 0),
           heightCm: Number(row.heightCm ?? row.HeightCm ?? 0),
           volumeM3: Number(row.volumeM3 ?? row.VolumeM3 ?? 0),
-          rackId: (row.rackId as number) ?? (row.RackId as number) ?? 0,
+          rackId: Number(row.rackId ?? row.RackId ?? 0),
         }));
       },
       providesTags: (_result, _error, rackId) => [

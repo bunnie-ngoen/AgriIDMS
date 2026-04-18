@@ -7,16 +7,40 @@ import {
 import { ArrowLeft, Pencil, Trash2, Loader2, CheckCircle } from "lucide-react";
 import { useState } from "react";
 
+function toVietnamesePoStatus(status: string): string {
+  switch (status) {
+    case "Pending":
+      return "Chờ duyệt";
+    case "Approved":
+      return "Đã duyệt";
+    case "Rejected":
+      return "Đã từ chối";
+    case "Completed":
+      return "Hoàn tất";
+    case "Cancelled":
+      return "Đã hủy";
+    default:
+      return status;
+  }
+}
+
 export default function PurchaseOrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin/purchase-orders");
-  const backLink = isAdmin ? "/admin/purchase-orders" : "/purchase-staff/dashboard";
+  const isManager = location.pathname.startsWith("/manager/purchase-orders");
+  const backLink = isAdmin
+    ? "/admin/purchase-orders"
+    : isManager
+      ? "/manager/purchase-orders"
+      : "/purchase-staff/dashboard";
   const editLink = isAdmin
     ? `/admin/purchase-orders/${id}/edit`
-    : `/purchase-staff/orders/${id}/edit`;
-  const showApprove = isAdmin; // Admin/Manager only (BE kiểm tra role)
+    : isManager
+      ? `/manager/purchase-orders/${id}/edit`
+      : `/purchase-staff/orders/${id}/edit`;
+  const showApprove = isAdmin || isManager; // Admin/Manager only (BE kiểm tra role)
 
   const poId = id ? parseInt(id, 10) : 0;
   const { data: order, isLoading, error } = useGetPurchaseOrderByIdQuery(poId, {
@@ -82,7 +106,7 @@ export default function PurchaseOrderDetail() {
     );
   }
 
-  const canEdit = order.status === "Pending";
+  const canEdit = !showApprove && order.status === "Pending";
   const canApprove = showApprove && order.status === "Pending";
 
   return (
@@ -113,7 +137,7 @@ export default function PurchaseOrderDetail() {
                         : "text-rose-600"
                   }
                 >
-                  {order.status}
+                  {toVietnamesePoStatus(order.status)}
                 </span>
               </p>
             </div>
@@ -198,7 +222,7 @@ export default function PurchaseOrderDetail() {
                         : "text-rose-600"
                   }
                 >
-                  {order.status}
+                  {toVietnamesePoStatus(order.status)}
                 </span>
               </p>
             </div>
@@ -249,7 +273,7 @@ export default function PurchaseOrderDetail() {
                     Còn lại
                   </th>
                   <th className="text-right py-3 px-4 font-semibold text-slate-700">
-                    Đơn giá
+                    Đơn giá (VNĐ)
                   </th>
                   <th className="text-right py-3 px-4 font-semibold text-slate-700">
                     Người duyệt

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Bell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -8,6 +8,8 @@ import {
   useMarkNotificationAsReadMutation,
 } from "../../../notification/api/notification.api";
 import { useRoleGuard } from "../../../auth/hooks/useRoleGuard";
+import { useGetWarehousesQuery } from "../../api/create-user.api";
+import { useGetUnassignedBoxesByWarehouseQuery } from "../../../goods-receipt/api/goods-receipt.api";
 
 function formatNotificationTime(iso: string): string {
   const dt = new Date(iso);
@@ -32,17 +34,92 @@ export default function AdminHeaderNotificationBell() {
     : isManager()
       ? "/manager/goods-receipts"
       : "/admin/goods-receipts";
+  const purchaseOrderBasePath = isManager()
+    ? "/manager/purchase-orders"
+    : "/admin/purchase-orders";
+  const putawayBasePath = isWarehouseStaff()
+    ? "/warehouse/putaway"
+    : isManager()
+      ? "/manager/putaway"
+      : "/admin/putaway";
 
   const { data: notificationData, refetch: refetchNotifications } =
     useGetMyNotificationsQuery({ page: 1, pageSize: 10 });
   const { data: unreadCountData, refetch: refetchUnreadCount } =
     useGetUnreadNotificationCountQuery();
+  const shouldShowPutawayFallback = isManager() || isWarehouseStaff();
+  const { data: warehouses = [] } = useGetWarehousesQuery(undefined, {
+    skip: !shouldShowPutawayFallback,
+  });
+  const warehouseWithMostUnassigned = useMemo(() => {
+    return warehouses
+      .filter((w) => Number(w.unassignedStockWeight ?? 0) > 0)
+      .sort(
+        (a, b) =>
+          Number(b.unassignedStockWeight ?? 0) - Number(a.unassignedStockWeight ?? 0),
+      )[0];
+  }, [warehouses]);
+  const { data: unassignedBoxes = [] } = useGetUnassignedBoxesByWarehouseQuery(
+    warehouseWithMostUnassigned?.id ?? 0,
+    { skip: !warehouseWithMostUnassigned?.id },
+  );
 
   const [markAsRead] = useMarkNotificationAsReadMutation();
   const [markAllAsRead, { isLoading: isMarkingAllAsRead }] =
     useMarkAllNotificationsAsReadMutation();
 
-  const unreadCount = unreadCountData?.unreadCount ?? 0;
+  const hasServerPutawayNotification = useMemo(() => {
+    const items = notificationData?.items ?? [];
+    return items.some((item) => {
+      const ref = item.referenceType ?? "";
+      const t = item.type ?? "";
+      return (
+        ref.includes("Putaway") ||
+        ref.includes("Unassigned") ||
+        ref === "LotPendingPutaway" ||
+        t.includes("Putaway") ||
+        t.includes("Unassigned")
+      );
+    });
+  }, [notificationData?.items]);
+
+  const fallbackPutawayNotification = useMemo(() => {
+    if (!shouldShowPutawayFallback || hasServerPutawayNotification) return null;
+    if (!warehouseWithMostUnassigned) return null;
+    const lotId =
+      unassignedBoxes.find((b) => Number(b.lotId) > 0)?.lotId ?? null;
+    const unassignedWeight = Number(
+      warehouseWithMostUnassigned.unassignedStockWeight ?? 0,
+    );
+    if (unassignedWeight <= 0) return null;
+
+    return {
+      userNotificationId: -1,
+      notificationId: -1,
+      type: "NeedPutawayLocal",
+      message: `Kho ${warehouseWithMostUnassigned.name} còn ${unassignedWeight.toLocaleString("vi-VN")} kg hàng chưa xếp vị trí.`,
+      referenceType: "LotPendingPutaway",
+      referenceId: lotId,
+      createdAt: new Date().toISOString(),
+      isRead: false,
+      readAt: null,
+    };
+  }, [
+    shouldShowPutawayFallback,
+    hasServerPutawayNotification,
+    warehouseWithMostUnassigned,
+    unassignedBoxes,
+  ]);
+
+  const displayedNotifications = useMemo(() => {
+    const base = notificationData?.items ?? [];
+    return fallbackPutawayNotification
+      ? [fallbackPutawayNotification, ...base]
+      : base;
+  }, [notificationData?.items, fallbackPutawayNotification]);
+
+  const unreadCount =
+    (unreadCountData?.unreadCount ?? 0) + (fallbackPutawayNotification ? 1 : 0);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -73,12 +150,34 @@ export default function AdminHeaderNotificationBell() {
   };
 
   const getNavigationPath = (item: {
+    type?: string | null;
     referenceType?: string | null;
     referenceId?: number | null;
   }): string | null => {
-    if (!item.referenceType || !item.referenceId) return null;
+    if (!item.referenceId) return null;
 
-    switch (item.referenceType) {
+    const referenceType = item.referenceType ?? "";
+    const notificationType = item.type ?? "";
+
+    if (
+      referenceType === "PurchaseOrder" ||
+      referenceType === "PurchaseOrderApproval" ||
+      referenceType === "PurchaseOrderApprovalRequest" ||
+      referenceType.includes("PurchaseOrder") ||
+      notificationType.includes("PurchaseOrder")
+    ) {
+      return `${purchaseOrderBasePath}/${item.referenceId}`;
+    }
+
+    const putawayKeywords = ["Putaway", "Unassigned", "Unslotted", "NeedSlot", "NeedPutaway"];
+    const isPutawayNotification =
+      putawayKeywords.some((k) => referenceType.includes(k) || notificationType.includes(k)) ||
+      referenceType === "LotPendingPutaway";
+    if (isPutawayNotification) {
+      return `${putawayBasePath}?lotId=${item.referenceId}`;
+    }
+
+    switch (referenceType) {
       case "NearExpiryLot":
         return `${lotBasePath}/${item.referenceId}`;
       case "StockCheck": {
@@ -108,6 +207,7 @@ export default function AdminHeaderNotificationBell() {
   const handleNotificationClick = async (item: {
     notificationId: number;
     isRead: boolean;
+    type?: string | null;
     referenceType?: string | null;
     referenceId?: number | null;
   }) => {
@@ -157,13 +257,13 @@ export default function AdminHeaderNotificationBell() {
           </div>
 
           <div className="max-h-[380px] overflow-auto">
-            {!notificationData?.items?.length ? (
+            {!displayedNotifications.length ? (
               <p className="px-4 py-5 text-sm text-gray-500">
                 Chưa có thông báo nào.
               </p>
             ) : (
               <div className="divide-y divide-gray-100">
-                {notificationData.items.map((item) => (
+                {displayedNotifications.map((item) => (
                   <button
                     key={item.userNotificationId}
                     type="button"

@@ -113,6 +113,9 @@ function toVietnameseQcResult(qcResult?: string | null): string {
   if (!qcResult) return "Chưa kiểm tra chất lượng";
   if (qcResult === "Passed") return "Đạt";
   if (qcResult === "Rejected") return "Loại";
+  if (qcResult === "Failed") return "Không đạt";
+  if (qcResult === "Fail") return "Không đạt";
+  if (qcResult === "NotPassed") return "Không đạt";
   if (qcResult === "Pending") return "Chờ kiểm tra chất lượng";
   return qcResult;
 }
