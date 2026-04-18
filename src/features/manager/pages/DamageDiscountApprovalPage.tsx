@@ -71,9 +71,13 @@ export default function DamageDiscountApprovalPage() {
       return;
     }
 
+    const nextPriority =
+      existingOverrides.reduce((m, o) => Math.max(m, o.priority ?? 0), 0) + 1;
+
     const payload = existingOverrides.map((o) => ({
       productVariantId: o.productVariantId,
       lotId: o.lotId ?? null,
+      priority: o.priority ?? 0,
       overrideNearExpiryDiscountPercent: o.overrideNearExpiryDiscountPercent,
       reason: o.reason ?? null,
       isActive: o.isActive,
@@ -84,6 +88,7 @@ export default function DamageDiscountApprovalPage() {
     payload.push({
       productVariantId: report.productVariantId,
       lotId: report.lotId ?? null,
+      priority: nextPriority,
       overrideNearExpiryDiscountPercent: report.suggestedDiscountPercent,
       reason: `Hàng hỏng (${report.targetType} ${report.targetCode}) - ${report.damageReason}`,
       isActive: true,
