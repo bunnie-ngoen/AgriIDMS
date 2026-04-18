@@ -26,7 +26,7 @@ export default function PurchaseStaffLayout() {
             <LayoutDashboard size={18} />
           </div>
           <div>
-            <p className="text-sm font-semibold tracking-wide">Purchase Staff</p>
+            <p className="text-sm font-semibold tracking-wide">Nhân viên mua hàng</p>
             <p className="text-[11px] text-slate-300">Đơn mua hàng</p>
           </div>
         </div>
@@ -34,7 +34,7 @@ export default function PurchaseStaffLayout() {
         {/* Nav */}
         <div className="flex-1 overflow-y-auto px-3 py-4">
           <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            Menu
+            Danh mục
           </p>
           <ul className="space-y-1">
             <li>

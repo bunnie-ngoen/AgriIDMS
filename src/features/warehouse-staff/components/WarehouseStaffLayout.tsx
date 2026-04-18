@@ -14,7 +14,7 @@ import {
   User,
   Warehouse,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppDispatch } from "../../../app/hook";
 import { logout } from "../../auth/slices/auth.slice";
 import { api } from "../../../shared/api";
@@ -25,6 +25,8 @@ import {
   useMarkAllNotificationsAsReadMutation,
   useMarkNotificationAsReadMutation,
 } from "../../notification/api/notification.api";
+import { useGetWarehousesQuery } from "../../admin/api/create-user.api";
+import { useGetUnassignedBoxesByWarehouseQuery } from "../../goods-receipt/api/goods-receipt.api";
 
 export default function WarehouseStaffLayout() {
   const dispatch = useAppDispatch();
@@ -38,9 +40,64 @@ export default function WarehouseStaffLayout() {
     pageSize: 10,
   });
   const { data: unreadCountData, refetch: refetchUnreadCount } = useGetUnreadNotificationCountQuery();
+  const { data: warehouses = [] } = useGetWarehousesQuery();
+  const warehouseWithMostUnassigned = useMemo(() => {
+    return warehouses
+      .filter((w) => Number(w.unassignedStockWeight ?? 0) > 0)
+      .sort(
+        (a, b) =>
+          Number(b.unassignedStockWeight ?? 0) - Number(a.unassignedStockWeight ?? 0),
+      )[0];
+  }, [warehouses]);
+  const { data: unassignedBoxes = [] } = useGetUnassignedBoxesByWarehouseQuery(
+    warehouseWithMostUnassigned?.id ?? 0,
+    { skip: !warehouseWithMostUnassigned?.id },
+  );
   const [markAsRead] = useMarkNotificationAsReadMutation();
   const [markAllAsRead, { isLoading: isMarkingAllAsRead }] = useMarkAllNotificationsAsReadMutation();
-  const unreadCount = unreadCountData?.unreadCount ?? 0;
+  const hasServerPutawayNotification = useMemo(() => {
+    const items = notificationData?.items ?? [];
+    return items.some((item) => {
+      const ref = item.referenceType ?? "";
+      const t = item.type ?? "";
+      return (
+        ref.includes("Putaway") ||
+        ref.includes("Unassigned") ||
+        ref === "LotPendingPutaway" ||
+        t.includes("Putaway") ||
+        t.includes("Unassigned")
+      );
+    });
+  }, [notificationData?.items]);
+  const fallbackPutawayNotification = useMemo(() => {
+    if (hasServerPutawayNotification || !warehouseWithMostUnassigned) return null;
+    const lotId =
+      unassignedBoxes.find((b) => Number(b.lotId) > 0)?.lotId ?? null;
+    const unassignedWeight = Number(
+      warehouseWithMostUnassigned.unassignedStockWeight ?? 0,
+    );
+    if (unassignedWeight <= 0) return null;
+
+    return {
+      userNotificationId: -1,
+      notificationId: -1,
+      type: "NeedPutawayLocal",
+      message: `Kho ${warehouseWithMostUnassigned.name} còn ${unassignedWeight.toLocaleString("vi-VN")} kg hàng chưa xếp vị trí.`,
+      referenceType: "LotPendingPutaway",
+      referenceId: lotId,
+      createdAt: new Date().toISOString(),
+      isRead: false,
+      readAt: null,
+    };
+  }, [hasServerPutawayNotification, warehouseWithMostUnassigned, unassignedBoxes]);
+  const displayedNotifications = useMemo(() => {
+    const base = notificationData?.items ?? [];
+    return fallbackPutawayNotification
+      ? [fallbackPutawayNotification, ...base]
+      : base;
+  }, [notificationData?.items, fallbackPutawayNotification]);
+  const unreadCount =
+    (unreadCountData?.unreadCount ?? 0) + (fallbackPutawayNotification ? 1 : 0);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -63,6 +120,7 @@ export default function WarehouseStaffLayout() {
     isRead: boolean,
     referenceId?: number | null,
     referenceType?: string | null,
+    type?: string | null,
   ) => {
     if (!isRead) {
       try {
@@ -73,13 +131,29 @@ export default function WarehouseStaffLayout() {
       }
     }
 
-    if (referenceType === "ExportReceipt" && referenceId) {
+    const normalizedReferenceType = referenceType ?? "";
+    const normalizedType = type ?? "";
+
+    if (normalizedReferenceType === "ExportReceipt" && referenceId) {
       navigate(`/warehouse/exports?exportId=${referenceId}`);
       setNotificationOpen(false);
       return;
     }
 
-    if (referenceType && referenceType.startsWith("Order")) {
+    const putawayKeywords = ["Putaway", "Unassigned", "Unslotted", "NeedSlot", "NeedPutaway"];
+    const isPutawayNotification =
+      !!referenceId &&
+      (putawayKeywords.some(
+        (k) => normalizedReferenceType.includes(k) || normalizedType.includes(k),
+      ) ||
+        normalizedReferenceType === "LotPendingPutaway");
+    if (isPutawayNotification) {
+      navigate(`/warehouse/putaway?lotId=${referenceId}`);
+      setNotificationOpen(false);
+      return;
+    }
+
+    if (normalizedReferenceType.startsWith("Order")) {
       navigate(referenceId ? `/warehouse/orders?orderId=${referenceId}` : "/warehouse/orders");
       setNotificationOpen(false);
       return;
@@ -442,11 +516,11 @@ export default function WarehouseStaffLayout() {
                 </div>
 
                 <div className="max-h-[380px] overflow-auto">
-                  {!notificationData?.items?.length ? (
+                  {!displayedNotifications.length ? (
                     <p className="px-4 py-5 text-sm text-slate-500">Chưa có thông báo nào.</p>
                   ) : (
                     <div className="divide-y divide-slate-100">
-                      {notificationData.items.map((item) => (
+                      {displayedNotifications.map((item) => (
                         <button
                           key={item.userNotificationId}
                           type="button"
@@ -456,6 +530,7 @@ export default function WarehouseStaffLayout() {
                               item.isRead,
                               item.referenceId,
                               item.referenceType,
+                              item.type,
                             )
                           }
                           className={`w-full px-4 py-3 text-left transition-colors hover:bg-slate-50 ${
