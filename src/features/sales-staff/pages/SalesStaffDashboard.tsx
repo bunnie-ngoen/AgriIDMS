@@ -18,7 +18,7 @@ export default function SalesStaffDashboard() {
           <h1 className="text-2xl font-bold text-slate-900">Tổng quan Sales Staff</h1>
         </div>
         <p className="text-sm text-slate-600">
-          Theo dõi các đơn cần xử lý, allocate và xác nhận tiền mặt theo thời gian thực.
+          Theo dõi các đơn cần xử lý, allocate và xác nhận theo thời gian thực.
         </p>
         <div className="mt-5 grid sm:grid-cols-3 gap-3">
           <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">

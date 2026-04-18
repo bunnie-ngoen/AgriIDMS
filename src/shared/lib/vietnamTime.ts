@@ -71,3 +71,9 @@ export function formatVietnamDateTime(input: string | number | Date | null | und
     if (Number.isNaN(d.getTime())) return "—";
     return d.toLocaleString("vi-VN", dateTimeFmt);
 }
+
+/** Thời gian trong panel thông báo: cùng logic parse API + múi VN như đơn hàng; rỗng nếu không hợp lệ. */
+export function formatVietnamNotificationTime(iso: string | null | undefined): string {
+    const s = formatVietnamDateTime(iso ?? "");
+    return s === "—" ? "" : s;
+}

@@ -8,12 +8,7 @@ import {
   useMarkNotificationAsReadMutation,
 } from "../../../notification/api/notification.api";
 import { useRoleGuard } from "../../../auth/hooks/useRoleGuard";
-
-function formatNotificationTime(iso: string): string {
-  const dt = new Date(iso);
-  if (Number.isNaN(dt.getTime())) return "";
-  return dt.toLocaleString("vi-VN");
-}
+import { formatVietnamNotificationTime } from "../../../../shared/lib/vietnamTime";
 
 export default function AdminHeaderNotificationBell() {
   const [open, setOpen] = useState(false);
@@ -181,7 +176,7 @@ export default function AdminHeaderNotificationBell() {
                       ) : null}
                     </div>
                     <p className="mt-1 text-[11px] text-gray-500">
-                      {formatNotificationTime(item.createdAt)}
+                      {formatVietnamNotificationTime(item.createdAt)}
                     </p>
                   </button>
                 ))}
