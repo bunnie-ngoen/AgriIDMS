@@ -65,6 +65,19 @@ export const orderApi = api.injectEndpoints({
             },
         }),
 
+        getStaffOrderById: builder.query<OrderDetail, number>({
+            query: (id) => ({
+                url: `Orders/staff/${id}`,
+                method: "GET",
+            }),
+            transformResponse: (raw: unknown) => {
+                const normalized = toCamelCase(raw);
+                const parsed = orderDetailSchema.safeParse(normalized);
+                if (!parsed.success) throw new Error("Invalid order detail");
+                return parsed.data;
+            },
+        }),
+
         getPendingSaleConfirmOrders: builder.query<
             OrderListItem[],
             { customerUserId?: string; skip?: number; take?: number } | void
@@ -342,6 +355,16 @@ export const orderApi = api.injectEndpoints({
             }),
         }),
 
+        staffCancelOverduePayBefore: builder.mutation<
+            { message: string; orderId: number; status: string },
+            number
+        >({
+            query: (id) => ({
+                url: `Orders/${id}/staff/cancel-overdue-paybefore`,
+                method: "PATCH",
+            }),
+        }),
+
         confirmDeliveredAsStaff: builder.mutation<void, number>({
             query: (id) => ({
                 url: `Orders/${id}/delivery/confirm`,
@@ -386,6 +409,7 @@ export const orderApi = api.injectEndpoints({
 export const {
     useGetMyOrdersQuery,
     useGetMyOrderByIdQuery,
+    useGetStaffOrderByIdQuery,
     useGetPendingSaleConfirmOrdersQuery,
     useGetPendingAllocationOrdersQuery,
     useGetPaidPendingExportOrdersQuery,
@@ -402,6 +426,7 @@ export const {
     useGetAllocationProposalsByOrderIdQuery,
     useConfirmAllocationAsStaffMutation,
     useCancelOrderMutation,
+    useStaffCancelOverduePayBeforeMutation,
     useConfirmDeliveredAsStaffMutation,
     useConfirmFailedDeliveryAsStaffMutation,
     useConfirmReturnedAsStaffMutation,

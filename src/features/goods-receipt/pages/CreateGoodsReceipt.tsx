@@ -28,9 +28,8 @@ const Schema = z
     transportCompany: z
       .string()
       .trim()
-      .max(100, "Tên công ty vận chuyển tối đa 100 ký tự.")
-      .optional()
-      .or(z.literal("")),
+      .min(1, "Đơn vị vận chuyển không được để trống.")
+      .max(100, "Tên công ty vận chuyển tối đa 100 ký tự."),
     purchaseOrderId: z.number().min(1, "Vui lòng chọn đơn mua."),
   });
 
@@ -58,6 +57,7 @@ export default function CreateGoodsReceipt() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(Schema),
+    mode: "onChange",
     defaultValues: {
       warehouseId: 0,
       vehicleNumber: "",
@@ -87,6 +87,11 @@ export default function CreateGoodsReceipt() {
   const [selectedPoDetailId, setSelectedPoDetailId] = useState<number>(0);
   // Dùng string để tránh ô input luôn hiển thị "0" khi mới vào form
   const [receivedWeightInput, setReceivedWeightInput] = useState<string>("");
+  const [detailInputErrors, setDetailInputErrors] = useState<{
+    poDetail?: string;
+    receivedWeight?: string;
+    details?: string;
+  }>({});
 
   const {
     data: purchaseOrderForDetails,
@@ -100,6 +105,7 @@ export default function CreateGoodsReceipt() {
     setDetailLines([]);
     setSelectedPoDetailId(0);
     setReceivedWeightInput("");
+    setDetailInputErrors({});
   }, [watchedPurchaseOrderId]);
 
   const poDetailOptions = useMemo(() => {
@@ -166,7 +172,9 @@ export default function CreateGoodsReceipt() {
     const toastId = toast.loading("Đang tạo phiếu nhập kho...");
     try {
       if (detailLines.length === 0) {
-        toast.error("Vui lòng thêm ít nhất 1 dòng chi tiết trước khi lưu phiếu.");
+        const msg = "Vui lòng thêm ít nhất 1 dòng chi tiết sản phẩm trước khi lưu phiếu.";
+        setDetailInputErrors((prev) => ({ ...prev, details: msg }));
+        toast.error(msg);
         return;
       }
 
@@ -178,14 +186,14 @@ export default function CreateGoodsReceipt() {
         const capacity = Number(warehouse.totalCapacity ?? 0);
         const remaining = Math.max(0, capacity - occupied);
         if (missingDensityLines.length > 0) {
-          const msg = `Thiếu khối lượng riêng cho ${missingDensityLines.length} dòng sản phẩm. Vui lòng cấu hình khối lượng riêng trước khi chọn kho theo sức chứa m³.`;
-          form.setError("warehouseId", { type: "manual", message: msg });
-          toast.error(msg);
-          return;
+          toast(
+            `Có ${missingDensityLines.length} dòng chưa có khối lượng riêng. Hệ thống sẽ bỏ qua kiểm tra sức chứa theo m³ cho các dòng này.`,
+            { icon: "⚠️" },
+          );
         }
         const incoming = totalIncomingVolume;
 
-        if (incoming > remaining + EPS) {
+        if (missingDensityLines.length === 0 && incoming > remaining + EPS) {
           const msg = `Vượt sức chứa: cần khoảng ${incoming.toLocaleString("vi-VN")} m³, kho còn trống ${remaining.toLocaleString("vi-VN")} m³.`;
           form.setError("warehouseId", { type: "manual", message: msg });
           toast.error(msg);
@@ -235,13 +243,18 @@ export default function CreateGoodsReceipt() {
   });
 
   const handleAddDetailLine = () => {
+    setDetailInputErrors({});
     if (!selectedPoDetailId || selectedPoDetailId <= 0) {
-      toast.error("Vui lòng chọn dòng sản phẩm từ đơn mua.");
+      const msg = "Vui lòng chọn chi tiết sản phẩm từ đơn mua.";
+      setDetailInputErrors((prev) => ({ ...prev, poDetail: msg }));
+      toast.error(msg);
       return;
     }
     const receivedWeight = Number(receivedWeightInput);
     if (Number.isNaN(receivedWeight) || receivedWeight <= 0) {
-      toast.error("Khối lượng nhận phải lớn hơn 0.");
+      const msg = "Vui lòng nhập khối lượng nhận hợp lệ và lớn hơn 0.";
+      setDetailInputErrors((prev) => ({ ...prev, receivedWeight: msg }));
+      toast.error(msg);
       return;
     }
     if (receivedWeight < 0) {
@@ -262,11 +275,6 @@ export default function CreateGoodsReceipt() {
       return;
     }
 
-    const densityOfSelected = Number(densityByVariantId.get(matched.productVariantId) ?? 0);
-    if (densityOfSelected <= 0) {
-      toast.error("Biến thể này chưa có khối lượng riêng (kg/m³), chưa thể kiểm tra sức chứa kho theo thể tích.");
-      return;
-    }
     const nextLines = detailLines
       .filter((line) => line.purchaseOrderDetailId !== matched.id)
       .concat({
@@ -283,8 +291,12 @@ export default function CreateGoodsReceipt() {
       return sum + Number(line.receivedWeight ?? 0) / density;
     }, 0);
 
+    const nextMissingDensityCount = nextLines.filter(
+      (line) => Number(densityByVariantId.get(line.productVariantId) ?? 0) <= 0,
+    ).length;
     if (
       selectedWarehouse &&
+      nextMissingDensityCount === 0 &&
       nextIncomingVolume > remainingCapacityOfWarehouse + 0.0001
     ) {
       toast.error(
@@ -322,6 +334,7 @@ export default function CreateGoodsReceipt() {
 
     setSelectedPoDetailId(0);
     setReceivedWeightInput("");
+    setDetailInputErrors((prev) => ({ ...prev, details: undefined }));
     toast.success("Đã thêm dòng chi tiết.");
   };
 
@@ -455,9 +468,10 @@ export default function CreateGoodsReceipt() {
                       </label>
                       <select
                         value={selectedPoDetailId}
-                        onChange={(e) =>
-                          setSelectedPoDetailId(Number(e.target.value))
-                        }
+                        onChange={(e) => {
+                          setSelectedPoDetailId(Number(e.target.value));
+                          setDetailInputErrors((prev) => ({ ...prev, poDetail: undefined }));
+                        }}
                         className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
                       >
                         <option value={0}>
@@ -470,6 +484,11 @@ export default function CreateGoodsReceipt() {
                           </option>
                         ))}
                       </select>
+                      {detailInputErrors.poDetail && (
+                        <p className="text-[11px] text-red-500 mt-1">
+                          {detailInputErrors.poDetail}
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -481,9 +500,10 @@ export default function CreateGoodsReceipt() {
                         step="0.01"
                         min={0.01}
                         value={receivedWeightInput}
-                        onChange={(e) =>
-                          setReceivedWeightInput(e.target.value)
-                        }
+                        onChange={(e) => {
+                          setReceivedWeightInput(e.target.value);
+                          setDetailInputErrors((prev) => ({ ...prev, receivedWeight: undefined }));
+                        }}
                         placeholder="Ví dụ: 1000"
                         onBlur={() => {
                           // Chuẩn hoá input rỗng -> ""
@@ -503,6 +523,11 @@ export default function CreateGoodsReceipt() {
                         }}
                         className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
                       />
+                      {detailInputErrors.receivedWeight && (
+                        <p className="text-[11px] text-red-500 mt-1">
+                          {detailInputErrors.receivedWeight}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -581,6 +606,11 @@ export default function CreateGoodsReceipt() {
                       </tbody>
                     </table>
                   </div>
+                  {detailInputErrors.details && (
+                    <p className="text-[11px] text-red-500 -mt-1">
+                      {detailInputErrors.details}
+                    </p>
+                  )}
                 </>
               )}
             </div>
@@ -713,11 +743,11 @@ export default function CreateGoodsReceipt() {
 
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Đơn vị vận chuyển (tuỳ chọn)
+                  Đơn vị vận chuyển *
                 </label>
                 <input
                   {...form.register("transportCompany")}
-                  placeholder="Tên công ty vận chuyển, nếu có"
+                  placeholder="Nhập tên công ty vận chuyển"
                   className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
                 />
                 {form.formState.errors.transportCompany && (
@@ -751,7 +781,12 @@ export default function CreateGoodsReceipt() {
             </button>
             <button
               type="submit"
-              disabled={isLoading || detailLines.length === 0 || isOverCapacity || missingDensityLines.length > 0}
+              disabled={
+                isLoading ||
+                detailLines.length === 0 ||
+                isOverCapacity ||
+                !form.formState.isValid
+              }
               className="flex-[2] rounded-2xl py-3.5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 disabled:opacity-50 flex items-center justify-center gap-2.5 transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:translate-y-0"
             >
               {isLoading ? (

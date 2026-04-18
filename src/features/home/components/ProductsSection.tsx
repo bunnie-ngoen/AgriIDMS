@@ -5,6 +5,7 @@ import { useGetCategoriesQuery } from "../../category/api/category.api";
 import { useGetProductsQuery } from "../../product/api/product.api";
 import { useGetHomeProductsQuery, useGetHomeProductDetailQuery } from "../api/home.api";
 import type { HomeProduct } from "../schemas/home.schema";
+import { productHasActiveSaleDisplay } from "../utils/productDiscountDisplay";
 import { ROUTES } from "../../../shared/constants/routes";
 import { stripGradeSuffixFromProductName } from "../utils/productDisplayName";
 
@@ -50,6 +51,14 @@ function ProductCard({ product }: ProductCardProps) {
         >
             {/* Image */}
             <div className="relative aspect-square bg-slate-100 overflow-hidden">
+                {productHasActiveSaleDisplay(product) ? (
+                    <div
+                        className="absolute right-2 top-2 z-10 rounded-md bg-red-600 px-2 py-1 text-[10px] font-bold uppercase leading-tight tracking-wide text-white shadow-md ring-1 ring-white/90 sm:text-[11px]"
+                        title="Giảm giá"
+                    >
+                        Giảm Giá
+                    </div>
+                ) : null}
                 {product.imageUrl ? (
                     <img
                         src={product.imageUrl}
@@ -83,19 +92,6 @@ function ProductCard({ product }: ProductCardProps) {
                 <p className="text-[#c0392b] font-bold text-base">
                     {product.price.toLocaleString("vi-VN")} ₫/kg
                 </p>
-                {product.hasNearExpiryStock && product.nearExpiryPriceTiers.length > 0 ? (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 space-y-1">
-                        <p className="text-[11px] font-semibold text-amber-700">
-                            Có lô gần hết hạn
-                        </p>
-                        {product.nearExpiryPriceTiers.map((tier) => (
-                            <p key={tier.maxDaysLeft} className="text-[11px] text-amber-800">
-                                ≤ {tier.maxDaysLeft} ngày: giảm {tier.discountPercent.toLocaleString("vi-VN")}% ·{" "}
-                                {tier.pricePerKg.toLocaleString("vi-VN")} ₫/kg
-                            </p>
-                        ))}
-                    </div>
-                ) : null}
 
                 <button
                     type="button"

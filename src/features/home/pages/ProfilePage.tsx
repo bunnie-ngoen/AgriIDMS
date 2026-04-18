@@ -47,6 +47,25 @@ export default function ProfilePage() {
     newPassword: "",
     confirmPassword: "",
   });
+  const [passwordErrorMessage, setPasswordErrorMessage] = useState("");
+
+  const extractApiErrorMessage = (err: unknown, fallback: string) => {
+    const e = err as {
+      data?: { message?: unknown; error?: unknown; errors?: unknown };
+      error?: string;
+    };
+    const data = e?.data;
+    if (typeof data?.message === "string" && data.message.trim()) return data.message;
+    if (typeof data?.error === "string" && data.error.trim()) return data.error;
+    if (data?.errors && typeof data.errors === "object") {
+      const first = Object.values(data.errors as Record<string, unknown>)
+        .flatMap((v) => (Array.isArray(v) ? v : [v]))
+        .find((v) => typeof v === "string" && v.trim());
+      if (typeof first === "string") return first;
+    }
+    if (typeof e?.error === "string" && e.error.trim()) return e.error;
+    return fallback;
+  };
 
   useEffect(() => {
     if (user) {
@@ -85,8 +104,10 @@ export default function ProfilePage() {
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setPasswordErrorMessage("");
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       setPasswordStatus("error");
+      setPasswordErrorMessage("Mật khẩu xác nhận không khớp.");
       setTimeout(() => setPasswordStatus("idle"), 3000);
       return;
     }
@@ -96,10 +117,14 @@ export default function ProfilePage() {
         newPassword: passwordForm.newPassword,
       }).unwrap();
       setPasswordStatus("success");
+      setPasswordErrorMessage("");
       setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
       setTimeout(() => setPasswordStatus("idle"), 3000);
-    } catch {
+    } catch (err) {
       setPasswordStatus("error");
+      setPasswordErrorMessage(
+        extractApiErrorMessage(err, "Đổi mật khẩu thất bại."),
+      );
       setTimeout(() => setPasswordStatus("idle"), 3000);
     }
   };
@@ -434,9 +459,7 @@ export default function ProfilePage() {
                   {passwordStatus === "error" && (
                     <p className="flex items-center gap-2 text-sm font-medium text-red-600">
                       <AlertCircle size={18} />
-                      {passwordForm.newPassword !== passwordForm.confirmPassword
-                        ? "Mật khẩu xác nhận không khớp."
-                        : "Đổi mật khẩu thất bại."}
+                      {passwordErrorMessage || "Đổi mật khẩu thất bại."}
                     </p>
                   )}
                 </div>

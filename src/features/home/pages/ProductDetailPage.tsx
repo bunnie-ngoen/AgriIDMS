@@ -17,6 +17,7 @@ import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import toast from "react-hot-toast";
 import { useGetApprovedReviewsByProductVariantQuery } from "../../review/api/review.api";
 import { stripGradeSuffixFromProductName } from "../utils/productDisplayName";
+import { getHomeProductDiscountViewModel } from "../utils/productDiscountDisplay";
 
 // ─── Skeleton loading ────────────────────────────────────────
 
@@ -46,11 +47,6 @@ function DetailSkeleton() {
             </div>
         </div>
     );
-}
-
-/** Tạo key duy nhất cho từng loại hộp (BE không trả id). */
-function boxKey(box: BoxType) {
-    return `${box.boxType}-${box.weight}`;
 }
 
 // ─── Main ─────────────────────────────────────────────────────
@@ -183,6 +179,7 @@ export default function ProductDetailPage() {
     const imageUrl = product.imageUrl && product.imageUrl.trim() !== "" ? product.imageUrl : null;
     const displayName = stripGradeSuffixFromProductName(product.productName);
     const gradeLabel = product.grade === 1 ? "Loại 1" : product.grade === 2 ? "Loại 2" : product.grade === 3 ? "Loại 3" : `Hạng ${product.grade}`;
+    const discountVm = getHomeProductDiscountViewModel(product);
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-emerald-50/30">
@@ -206,6 +203,14 @@ export default function ProductDetailPage() {
                         <div className="relative mx-auto w-full max-w-lg lg:mx-0 lg:max-w-none">
                             <div className="absolute -inset-1 rounded-[1.35rem] bg-gradient-to-br from-[#1a5f2a]/10 via-transparent to-emerald-100/50 blur-sm" aria-hidden />
                             <div className="relative aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-slate-100 to-slate-50 ring-1 ring-slate-200/80 shadow-inner">
+                                {discountVm.hasDiscount ? (
+                                    <div
+                                        className="absolute right-2 top-2 z-10 rounded-md bg-red-600 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white shadow-lg"
+                                        title="Giảm giá"
+                                    >
+                                        Giảm Giá
+                                    </div>
+                                ) : null}
                                 {imageUrl ? (
                                     <img
                                         src={imageUrl}

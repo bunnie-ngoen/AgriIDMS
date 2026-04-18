@@ -2,27 +2,23 @@ import { api } from "../../../shared/api";
 
 export type NearExpiryDiscountRule = {
   id: number;
-  name: string;
+  name?: string | null;
   minDaysLeft?: number | null;
   maxDaysLeft: number;
   discountPercent: number;
   priority: number;
   isActive: boolean;
-  startAtUtc?: string | null;
-  endAtUtc?: string | null;
   createdAt: string;
   updatedAt?: string | null;
 };
 
 export type UpsertNearExpiryDiscountRule = {
-  name: string;
+  name?: string | null;
   minDaysLeft?: number | null;
   maxDaysLeft: number;
   discountPercent: number;
   priority: number;
   isActive: boolean;
-  startAtUtc?: string | null;
-  endAtUtc?: string | null;
 };
 
 export const nearExpiryDiscountApi = api.injectEndpoints({

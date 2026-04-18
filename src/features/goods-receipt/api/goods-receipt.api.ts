@@ -126,6 +126,10 @@ const mapLotListItem = (row: RawObject): LotListItem => ({
   status: (row.status as string) ?? (row.Status as string) ?? "",
   goodsReceiptId:
     (row.goodsReceiptId as number) ?? (row.GoodsReceiptId as number) ?? 0,
+  productVariantId:
+    (row.productVariantId as number | null | undefined) ??
+    (row.ProductVariantId as number | null | undefined) ??
+    null,
   productName: (row.productName as string) ?? (row.ProductName as string) ?? "",
   productVariantName:
     (row.productVariantName as string) ??
@@ -495,6 +499,16 @@ export const goodsReceiptApi = api.injectEndpoints({
 
     getAllLots: builder.query<LotListItem[], void>({
       query: () => ({ url: "Lots" }),
+      transformResponse: (raw: unknown): LotListItem[] => {
+        const arr = Array.isArray(raw) ? raw : [];
+        return arr.map((item) => mapLotListItem((item ?? {}) as RawObject));
+      },
+    }),
+
+    getLotsByProductVariantId: builder.query<LotListItem[], number>({
+      query: (productVariantId) => ({
+        url: `Lots/by-product-variant/${productVariantId}`,
+      }),
       transformResponse: (raw: unknown): LotListItem[] => {
         const arr = Array.isArray(raw) ? raw : [];
         return arr.map((item) => mapLotListItem((item ?? {}) as RawObject));
@@ -1384,6 +1398,17 @@ export const goodsReceiptApi = api.injectEndpoints({
                 ? (row.Boxes as RawObject[])
                 : [];
 
+            const rawGrade = row.grade ?? row.Grade;
+            let gradeStr = "";
+            if (typeof rawGrade === "number" && Number.isFinite(rawGrade)) {
+              if (rawGrade === 1) gradeStr = "Grade1";
+              else if (rawGrade === 2) gradeStr = "Grade2";
+              else if (rawGrade === 3) gradeStr = "Grade3";
+              else gradeStr = String(rawGrade);
+            } else if (typeof rawGrade === "string") {
+              gradeStr = rawGrade;
+            }
+
             return {
               lotId: (row.lotId as number) ?? (row.LotId as number) ?? 0,
               lotCode:
@@ -1396,7 +1421,11 @@ export const goodsReceiptApi = api.injectEndpoints({
                 (row.productName as string) ??
                 (row.ProductName as string) ??
                 "",
-              grade: (row.grade as string) ?? (row.Grade as string) ?? "",
+              productVariantName:
+                (row.productVariantName as string) ??
+                (row.ProductVariantName as string) ??
+                "",
+              grade: gradeStr,
               remainingQuantity:
                 (row.remainingQuantity as number) ??
                 (row.RemainingQuantity as number) ??
@@ -1785,6 +1814,7 @@ export const {
   useUpdateGoodsReceiptWarehouseMutation,
   useGetLotsByGoodsReceiptIdQuery,
   useGetAllLotsQuery,
+  useLazyGetLotsByProductVariantIdQuery,
   useGetLotDetailByIdQuery,
   useLazyGetLotByQrQuery,
   useGetUnassignedBoxesByWarehouseQuery,

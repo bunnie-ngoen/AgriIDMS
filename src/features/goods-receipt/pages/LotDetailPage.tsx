@@ -381,21 +381,25 @@ export default function LotDetailPage() {
                   Danh sách thùng thuộc lô này
                 </h2>
                 <div className="ml-auto">
-                  <button
-                    type="button"
-                    onClick={exportAllBoxQrsInLot}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-sky-50 hover:border-sky-200"
-                  >
-                    <FileDown size={14} className="text-sky-600" />
-                    In loạt QR thùng của lô
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={exportAllBoxQrsInLot}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-sky-50 hover:border-sky-200"
+                    >
+                      <FileDown size={14} className="text-sky-600" />
+                      In loạt QR thùng của lô
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {boxes.length === 0 ? (
-                <p className="text-slate-500 text-sm py-8 text-center">
-                  Chưa có thùng nào được tạo từ lô này.
-                </p>
+                <div className="py-8 text-center space-y-2">
+                  <p className="text-slate-500 text-sm">
+                    Chưa có thùng nào được tạo từ lô này.
+                  </p>
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-sm">

@@ -10,35 +10,35 @@ export const useRoleGuard = () => {
         : typeof rawRoles === "string"
             ? [rawRoles]
             : [];
+    const roleSet = new Set(roles as UserRole[]);
     const currentRole = roles[0] as UserRole | undefined;
 
     const hasRole = (roles: UserRole[]): boolean => {
-        if (!currentRole) return false;
-        return roles.includes(currentRole);
+        return roles.some((role) => roleSet.has(role));
     };
 
     const isAdmin = (): boolean => {
-        return currentRole === AUTH_ROLE.ADMIN;
+        return roleSet.has(AUTH_ROLE.ADMIN);
     };
 
     const isManager = (): boolean => {
-        return currentRole === AUTH_ROLE.MANAGER;
+        return roleSet.has(AUTH_ROLE.MANAGER);
     };
 
     const isWarehouseStaff = (): boolean => {
-        return currentRole === AUTH_ROLE.WAREHOUSE_STAFF;
+        return roleSet.has(AUTH_ROLE.WAREHOUSE_STAFF);
     };
 
     const isSalesStaff = (): boolean => {
-        return currentRole === AUTH_ROLE.SALES_STAFF;
+        return roleSet.has(AUTH_ROLE.SALES_STAFF);
     };
 
     const isCustomer = (): boolean => {
-        return currentRole === AUTH_ROLE.CUSTOMER;
+        return roleSet.has(AUTH_ROLE.CUSTOMER);
     };
 
     const isPurchasingStaff = (): boolean => {
-        return currentRole === AUTH_ROLE.PURCHASING_STAFF;
+        return roleSet.has(AUTH_ROLE.PURCHASING_STAFF);
     };
 
     const getDefaultRoute = (): string => {
