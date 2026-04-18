@@ -9,6 +9,21 @@ function formatVnDate(input: string): string {
   return `Ngày ${day} tháng ${month} năm ${year}`;
 }
 
+function formatNumber(value: number): string {
+  return Number(value).toLocaleString("vi-VN");
+}
+
+function formatCurrency(value?: number): string {
+  if (value === undefined || Number.isNaN(value)) return "";
+  return formatNumber(value);
+}
+
+/** Giống buildExportPrintHtml: hậu tố mã thùng (vd. BOX-12 → 12). */
+function getBoxCodeSuffix(boxCode: string): string {
+  const match = boxCode.match(/-(\d+)$/);
+  return match ? match[1] : boxCode;
+}
+
 function buildLineRow(
   lineNo: number | string,
   itemName: string,
@@ -34,20 +49,24 @@ function buildLineRow(
 export function buildExportPrintPdfDoc(d: ExportPrintData): TDocumentDefinitions {
   const dotted = ".......................................";
   const printDate = formatVnDate(d.snapshotAtUtc);
-  const totalStr = Number(d.totalAmount).toLocaleString("vi-VN");
+  const totalStr = formatNumber(d.totalAmount);
 
-  const lineRows: TableCell[][] = d.lines.map((x, idx) =>
-    buildLineRow(
+  const lineRows: TableCell[][] = d.lines.map((x) => {
+    const requestedQty = formatNumber(x.requestedQuantity ?? x.actualQuantity);
+    const actualQty = formatNumber(x.actualQuantity);
+    const unitPrice = formatCurrency(x.unitPrice);
+    const lineAmount = formatCurrency(x.lineAmount);
+    return buildLineRow(
       x.lineNo,
       x.productName,
-      x.boxCode,
+      getBoxCodeSuffix(x.boxCode),
       "kg",
-      "1",
-      Number(x.actualQuantity).toLocaleString("vi-VN"),
-      "",
-      idx === 0 ? totalStr : "",
-    ),
-  );
+      requestedQty,
+      actualQty,
+      unitPrice,
+      lineAmount,
+    );
+  });
 
   while (lineRows.length < 5) {
     lineRows.push(buildLineRow("", "", "", "", "", "", "", ""));

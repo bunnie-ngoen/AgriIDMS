@@ -1,7 +1,7 @@
 import { Link, Navigate, useParams, generatePath } from "react-router-dom";
 
 import { ROUTES } from "../../../shared/constants/routes";
-import { formatVietnamDate, formatVietnamTime } from "../../../shared/lib/vietnamTime";
+import { formatVietnamDateTime } from "../../../shared/lib/vietnamTime";
 import { orderStatusLabel } from "../../../shared/lib/orderStatusUi";
 import { useGetMyOrderByIdQuery } from "../../order/api/order.api";
 import type { OrderDetail } from "../../order/schemas/order.schema";
@@ -83,12 +83,8 @@ export default function OrderReceivedPage() {
                         <dd className="font-semibold text-slate-900">#{order.orderId}</dd>
                     </div>
                     <div className="flex justify-between gap-4">
-                        <dt className="text-slate-600">Ngày tạo</dt>
-                        <dd className="font-semibold text-slate-900 tabular-nums">{formatVietnamDate(order.createdAt)}</dd>
-                    </div>
-                    <div className="flex justify-between gap-4">
-                        <dt className="text-slate-600">Giờ tạo</dt>
-                        <dd className="font-semibold text-slate-900 tabular-nums">{formatVietnamTime(order.createdAt)}</dd>
+                        <dt className="text-slate-600">Ngày và giờ</dt>
+                        <dd className="font-semibold text-slate-900 tabular-nums">{formatVietnamDateTime(order.createdAt)}</dd>
                     </div>
 
                     {order.recipient && (

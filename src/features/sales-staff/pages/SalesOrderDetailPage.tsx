@@ -16,7 +16,7 @@ import {
   useGetLatestPaymentByOrderQuery,
 } from "../../payment/api/payment.api";
 import { paymentMethodEnum, shouldUseStaffOnlinePayBeforeEndpoint } from "../../payment/schemas/payment.schema";
-import { formatVietnamDate, formatVietnamTime } from "../../../shared/lib/vietnamTime";
+import { formatVietnamDateTime } from "../../../shared/lib/vietnamTime";
 import {
   isPaymentActive,
   isPaymentSettled,
@@ -56,7 +56,7 @@ function orderStatusLabel(status: string) {
   if (status === "PartiallyAllocated") return "Giữ hàng một phần";
   if (status === "BackorderWaiting") return "Chờ backorder";
   if (status === "Confirmed") return "Đã xác nhận";
-  if (status === "ApprovedExport") return "Đã duyệt xuất";
+  if (status === "ApprovedExport") return "Xác nhận đơn hàng đã giao";
   if (status === "Delivered") return "Đã giao hàng";
   if (status === "FailedDelivery") return "Giao thất bại";
   if (status === "Returned") return "Hoàn hàng";
@@ -130,7 +130,7 @@ export default function SalesOrderDetailPage() {
     "w-full rounded-xl px-4 py-2.5 text-sm font-semibold shadow-sm transition-all active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50";
   const btnSecondary = `${btnBase} border border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:bg-slate-50`;
   const btnDanger = `${btnBase} border border-rose-200 bg-white text-rose-700 hover:bg-rose-50`;
-  const btnEmerald = `${btnBase} border border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100`;
+  const btnConfirmBlack = `${btnBase} border border-neutral-900 bg-neutral-950 text-white shadow-md shadow-black/10 hover:bg-neutral-900`;
   const btnAmber = `${btnBase} border border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100`;
   const btnPrimary = `${btnBase} bg-[#1a5f2a] text-white shadow-md shadow-emerald-900/10 hover:bg-[#145026]`;
 
@@ -210,9 +210,9 @@ export default function SalesOrderDetailPage() {
                     </dd>
                   </div>
                   <div className="min-w-0 sm:col-span-2">
-                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Thời gian tạo</dt>
+                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Ngày và giờ</dt>
                     <dd className="mt-1 text-sm font-semibold tabular-nums text-slate-900">
-                      {formatVietnamDate(order.createdAt)} · {formatVietnamTime(order.createdAt)}
+                      {formatVietnamDateTime(order.createdAt)}
                     </dd>
                   </div>
                   <div className="border-t border-slate-100 pt-5 sm:col-span-2 sm:border-t-0 sm:pt-0">
@@ -311,8 +311,8 @@ export default function SalesOrderDetailPage() {
                         <>
                           {order.shippingStatus === "ShippingPendingPickup" && (
                             <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                              Chờ kho xác nhận bắt đầu giao (shipper lấy hàng) — thao tác thực hiện tại mục{" "}
-                              <span className="font-semibold text-slate-800">Kho → Bắt đầu giao hàng</span>.
+                              Chờ kho xác nhận shipper đã lấy hàng — thao tác tại mục{" "}
+                              <span className="font-semibold text-slate-800">Kho → Xác nhận shipper đã lấy hàng</span>.
                             </p>
                           )}
                           <button
@@ -325,7 +325,7 @@ export default function SalesOrderDetailPage() {
                               )
                             }
                             disabled={isConfirmingDelivered}
-                            className={btnEmerald}
+                            className={btnConfirmBlack}
                           >
                             {isConfirmingDelivered ? "Đang xử lý..." : "Xác nhận giao thành công"}
                           </button>
@@ -396,7 +396,7 @@ export default function SalesOrderDetailPage() {
                       className="mt-1.5 w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-sm outline-none transition-shadow focus:border-[#1a5f2a] focus:ring-2 focus:ring-[#1a5f2a]/20 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
                     >
                       <option value={paymentMethodEnum.COD}>Tiền mặt</option>
-                      <option value={paymentMethodEnum.BANKING}>Chuyển khoản / PayOS</option>
+                      <option value={paymentMethodEnum.BANKING}>Chuyển khoản</option>
                     </select>
                   </div>
 

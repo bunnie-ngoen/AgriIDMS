@@ -1,12 +1,24 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Leaf, ShoppingCart } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useGetHomeProductsQuery } from "../api/home.api";
+import { useGetCategoriesQuery } from "../../category/api/category.api";
+import { useGetProductsQuery } from "../../product/api/product.api";
+import { useGetHomeProductsQuery, useGetHomeProductDetailQuery } from "../api/home.api";
 import type { HomeProduct } from "../schemas/home.schema";
 import { productHasActiveSaleDisplay } from "../utils/productDiscountDisplay";
 import { ROUTES } from "../../../shared/constants/routes";
+import { stripGradeSuffixFromProductName } from "../utils/productDisplayName";
 
 const VISIBLE_COUNT = 4;
+
+function normCategoryName(s: string | null | undefined) {
+    return (s ?? "").trim().toLowerCase();
+}
+
+function isCategoryVisible(status: number | undefined) {
+    if (status == null) return true;
+    return status === 1;
+}
 
 // ─── ProductCard ─────────────────────────────────────────────
 
@@ -16,11 +28,26 @@ interface ProductCardProps {
 
 function ProductCard({ product }: ProductCardProps) {
     const navigate = useNavigate();
+    const title = stripGradeSuffixFromProductName(product.productName);
+
+    /** Dùng API chi tiết (có sẵn) để biết tồn — không cần đổi BE list. */
+    const { data: detail } = useGetHomeProductDetailQuery(product.id);
+    const outOfStock =
+        detail != null && (!detail.isActive || detail.availableBoxCount <= 0);
 
     return (
         <div
-            onClick={() => navigate(ROUTES.PRODUCT_DETAIL.replace(":id", String(product.id)))}
-            className="cursor-pointer rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md hover:border-[#1a5f2a]/40 transition-all group"
+            role="group"
+            aria-disabled={outOfStock}
+            onClick={() => {
+                if (outOfStock) return;
+                navigate(ROUTES.PRODUCT_DETAIL.replace(":id", String(product.id)));
+            }}
+            className={`relative rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm transition-all group ${
+                outOfStock
+                    ? "cursor-not-allowed pointer-events-none opacity-[0.92]"
+                    : "cursor-pointer hover:shadow-md hover:border-[#1a5f2a]/40"
+            }`}
         >
             {/* Image */}
             <div className="relative aspect-square bg-slate-100 overflow-hidden">
@@ -35,12 +62,21 @@ function ProductCard({ product }: ProductCardProps) {
                 {product.imageUrl ? (
                     <img
                         src={product.imageUrl}
-                        alt={product.productName}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        alt={title}
+                        className={`w-full h-full object-cover transition-transform duration-300 ${
+                            outOfStock ? "scale-100" : "group-hover:scale-105"
+                        }`}
                     />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center">
                         <Leaf className="text-slate-300" size={48} />
+                    </div>
+                )}
+                {outOfStock && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/40 backdrop-blur-[3px]">
+                        <span className="rounded-lg bg-white/95 px-4 py-2 text-sm font-bold tracking-wide text-slate-800 shadow-lg ring-1 ring-slate-200/80">
+                            Không có hàng
+                        </span>
                     </div>
                 )}
             </div>
@@ -48,7 +84,7 @@ function ProductCard({ product }: ProductCardProps) {
             {/* Info */}
             <div className="p-4 flex flex-col gap-2">
                 <h3 className="font-semibold text-slate-900 line-clamp-2 text-sm leading-snug min-h-[2.5rem]">
-                    {product.productName}
+                    {title}
                 </h3>
                 <p className="text-xs text-slate-500">
                     {product.grade === 1 ? "Loại 1" : product.grade === 2 ? "Loại 2" : product.grade === 3 ? "Loại 3" : `Hạng ${product.grade}`}
@@ -59,11 +95,18 @@ function ProductCard({ product }: ProductCardProps) {
 
                 <button
                     type="button"
+                    tabIndex={outOfStock ? -1 : 0}
                     onClick={(e) => {
                         e.stopPropagation();
+                        if (outOfStock) return;
                         navigate(ROUTES.PRODUCT_DETAIL.replace(":id", String(product.id)));
                     }}
-                    className="mt-1 w-full flex items-center justify-center gap-2 py-2 px-3 rounded-md text-white text-sm font-medium bg-[#1a5f2a] hover:bg-[#145026]"
+                    className={`mt-1 w-full flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium ${
+                        outOfStock
+                            ? "bg-slate-300 text-slate-500 cursor-not-allowed"
+                            : "text-white bg-[#1a5f2a] hover:bg-[#145026]"
+                    }`}
+                    disabled={outOfStock}
                 >
                     <ShoppingCart size={15} />
                     Xem chi tiết
@@ -91,15 +134,51 @@ function ProductSkeletons() {
 // ─── Main Section ─────────────────────────────────────────────
 
 export default function ProductsSection() {
-    const { data: products = [], isLoading, isError } = useGetHomeProductsQuery();
+    const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+
+    const { data: homeProducts = [], isLoading, isError } = useGetHomeProductsQuery();
+    const { data: catalogProducts = [] } = useGetProductsQuery();
+    const { data: categories = [], isLoading: isCategoriesLoading } = useGetCategoriesQuery();
+
+    const productIdToCategoryName = useMemo(() => {
+        const m = new Map<number, string>();
+        for (const p of catalogProducts) {
+            if (p.category != null && String(p.category).trim() !== "") {
+                m.set(p.id, p.category);
+            }
+        }
+        return m;
+    }, [catalogProducts]);
+
+    const filteredProducts = useMemo(() => {
+        if (selectedCategoryId == null) return homeProducts;
+        const cat = categories.find((c) => c.id === selectedCategoryId);
+        if (!cat) return homeProducts;
+        const target = normCategoryName(cat.name);
+        return homeProducts.filter(
+            (h) => normCategoryName(productIdToCategoryName.get(h.productId)) === target,
+        );
+    }, [homeProducts, selectedCategoryId, categories, productIdToCategoryName]);
+
+    const list = filteredProducts;
 
     const [startIndex, setStartIndex] = useState(0);
     const [animating, setAnimating] = useState(false);
     const [direction, setDirection] = useState<"left" | "right">("right");
 
+    useEffect(() => {
+        setStartIndex(0);
+    }, [selectedCategoryId]);
+
+    useEffect(() => {
+        setStartIndex((i) =>
+            Math.min(i, Math.max(0, list.length - VISIBLE_COUNT)),
+        );
+    }, [list.length]);
+
     const canPrev = startIndex > 0;
-    const canNext = startIndex + VISIBLE_COUNT < products.length;
-    const dotCount = Math.max(0, products.length - VISIBLE_COUNT + 1);
+    const canNext = startIndex + VISIBLE_COUNT < list.length;
+    const dotCount = Math.max(0, list.length - VISIBLE_COUNT + 1);
 
     const slide = (dir: "left" | "right") => {
         if (animating) return;
@@ -110,7 +189,7 @@ export default function ProductsSection() {
         setTimeout(() => {
             setStartIndex((i) =>
                 dir === "right"
-                    ? Math.min(i + 1, products.length - VISIBLE_COUNT)
+                    ? Math.min(i + 1, list.length - VISIBLE_COUNT)
                     : Math.max(i - 1, 0)
             );
 
@@ -118,7 +197,9 @@ export default function ProductsSection() {
         }, 250);
     };
 
-    const visibleProducts = products.slice(startIndex, startIndex + VISIBLE_COUNT);
+    const visibleProducts = list.slice(startIndex, startIndex + VISIBLE_COUNT);
+
+    const visibleCategories = categories.filter((c) => isCategoryVisible(c.status));
 
     return (
         <section id="san-pham" className="py-16 border-t border-slate-100 scroll-mt-20">
@@ -133,7 +214,50 @@ export default function ProductsSection() {
                     Một số sản phẩm hoa quả trong hệ thống.
                 </p>
 
-                <div className="mt-12">
+                <div className="mt-6 flex flex-wrap justify-center gap-2 overflow-x-auto pb-1">
+                    {isCategoriesLoading ? (
+                        Array.from({ length: 5 }).map((_, i) => (
+                            <div
+                                key={i}
+                                className="h-9 w-24 shrink-0 rounded-full bg-slate-100 animate-pulse"
+                            />
+                        ))
+                    ) : (
+                        <>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedCategoryId(null)}
+                                className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors border ${
+                                    selectedCategoryId === null
+                                        ? "bg-[#1a5f2a] text-white border-[#1a5f2a]"
+                                        : "bg-white text-slate-700 border-slate-200 hover:border-[#1a5f2a]/50"
+                                }`}
+                            >
+                                Tất cả
+                            </button>
+                            {visibleCategories.map((c) => {
+                                const active = selectedCategoryId === c.id;
+                                return (
+                                    <button
+                                        key={c.id}
+                                        type="button"
+                                        onClick={() => setSelectedCategoryId(c.id)}
+                                        className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors border max-w-[200px] truncate ${
+                                            active
+                                                ? "bg-[#1a5f2a] text-white border-[#1a5f2a]"
+                                                : "bg-white text-slate-700 border-slate-200 hover:border-[#1a5f2a]/50"
+                                        }`}
+                                        title={c.name}
+                                    >
+                                        {c.name}
+                                    </button>
+                                );
+                            })}
+                        </>
+                    )}
+                </div>
+
+                <div className="mt-10">
 
                     {isLoading && <ProductSkeletons />}
 
@@ -143,13 +267,22 @@ export default function ProductsSection() {
                         </p>
                     )}
 
-                    {!isLoading && !isError && products.length === 0 && (
+                    {!isLoading && !isError && homeProducts.length === 0 && (
                         <p className="text-center text-slate-500">
                             Chưa có sản phẩm nào.
                         </p>
                     )}
 
-                    {!isLoading && !isError && products.length > 0 && (
+                    {!isLoading &&
+                        !isError &&
+                        homeProducts.length > 0 &&
+                        list.length === 0 && (
+                            <p className="text-center text-slate-500">
+                                Không có sản phẩm nào trong danh mục này.
+                            </p>
+                        )}
+
+                    {!isLoading && !isError && list.length > 0 && (
                         <div className="relative">
 
                             {/* Prev Button */}

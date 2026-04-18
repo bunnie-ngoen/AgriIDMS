@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ROUTES } from "../../../shared/constants/routes";
-import { formatVietnamDate, formatVietnamTime } from "../../../shared/lib/vietnamTime";
+import { formatVietnamDateTime } from "../../../shared/lib/vietnamTime";
 import {
     isPaymentActive,
     isPaymentSettled,
@@ -228,7 +228,6 @@ export default function MyOrderDetailPage() {
     const latestPaymentStatus = latestPayment?.paymentStatus;
     const isLatestPaymentPaid = isPaymentSettled(latestPaymentStatus);
     const isLatestPaymentActive = isPaymentActive(latestPaymentStatus);
-    const isTakeAway = order?.fulfillmentType === "TakeAway";
     const isDelivery = order?.fulfillmentType === "Delivery";
     const canCreatePayment =
         !!order &&
@@ -261,7 +260,6 @@ export default function MyOrderDetailPage() {
         setMsg("");
         try {
             const res = await createPayment({ orderId, paymentMethod }).unwrap();
-            setMsg(`Đã tạo thanh toán #${res.id} (${paymentStatusLabel(res.paymentStatus)}).`);
             if (res.checkoutUrl) window.open(res.checkoutUrl, "_blank", "noopener,noreferrer");
             await refetchPayment();
             await refetch();
@@ -357,12 +355,8 @@ export default function MyOrderDetailPage() {
                                     <dd className="font-semibold text-slate-900">{fulfillmentTypeLabel(order.fulfillmentType)}</dd>
                                 </div>
                                 <div>
-                                    <dt className="text-slate-500">Ngày tạo</dt>
-                                    <dd className="font-semibold text-slate-900">{formatVietnamDate(order.createdAt)}</dd>
-                                </div>
-                                <div>
-                                    <dt className="text-slate-500">Giờ tạo</dt>
-                                    <dd className="font-semibold tabular-nums text-slate-900">{formatVietnamTime(order.createdAt)}</dd>
+                                    <dt className="text-slate-500">Ngày và giờ</dt>
+                                    <dd className="font-semibold tabular-nums text-slate-900">{formatVietnamDateTime(order.createdAt)}</dd>
                                 </div>
                             </dl>
                         </div>
@@ -505,7 +499,7 @@ export default function MyOrderDetailPage() {
                                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
                             >
                                 <option value={paymentMethodEnum.COD}>Tiền mặt</option>
-                                <option value={paymentMethodEnum.BANKING}>Chuyển khoản/PayOS (3)</option>
+                                <option value={paymentMethodEnum.BANKING}>Chuyển khoản</option>
                             </select>
                         </div>
                         <button
@@ -516,11 +510,6 @@ export default function MyOrderDetailPage() {
                         >
                             {isCreating ? "Đang tạo thanh toán..." : "Tạo thanh toán"}
                         </button>
-                        {!canCreatePayment && (
-                            <p className="mt-2 text-xs text-amber-700">
-                                Chỉ tạo thanh toán khi đơn ở trạng thái Confirmed và không có payment đang chờ xử lý.
-                            </p>
-                        )}
                         {latestPayment && (
                             <div className="mt-3 rounded-lg bg-slate-50 border border-slate-200 p-3 text-xs space-y-1">
                                 <p>Thanh toán #{latestPayment.id}</p>
@@ -540,38 +529,6 @@ export default function MyOrderDetailPage() {
                                 </button>
                             </div>
                         )}
-                        <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 space-y-1">
-                            <p className="font-semibold text-slate-900">Tiến trình đơn hàng</p>
-                            <p>
-                                Bước 4 - Thanh toán:{" "}
-                                <span className="font-semibold">
-                                    {isLatestPaymentPaid ? "Hoàn tất" : "Chưa hoàn tất"}
-                                </span>
-                            </p>
-                            <p>
-                                Bước 5 - Giao hàng/hoàn thành:{" "}
-                                <span className="font-semibold">
-                                    {order.status === "ApprovedExport"
-                                        ? "Đã duyệt xuất / đang vận chuyển"
-                                        : order.status === "Delivered"
-                                          ? "Đã giao hàng"
-                                          : order.status === "FailedDelivery"
-                                            ? "Giao thất bại"
-                                            : order.status === "Returned"
-                                              ? "Hoàn hàng"
-                                              : order.status === "Completed"
-                                                ? "Hoàn thành"
-                                                : isTakeAway && order.status === "Confirmed"
-                                                  ? "Đã giữ hàng tại quầy"
-                                                  : "Chưa bắt đầu"}
-                                </span>
-                            </p>
-                            {(order.status === "ApprovedExport" || order.status === "Delivered" || order.status === "Completed") && (
-                                <p className="text-emerald-700">
-                                    Đơn đã đủ điều kiện để tạo khiếu nại theo rule backend.
-                                </p>
-                            )}
-                        </div>
                         {!!msg && <p className="mt-3 text-xs text-slate-700">{msg}</p>}
                     </div>
                 </div>

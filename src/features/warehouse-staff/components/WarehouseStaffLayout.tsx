@@ -25,6 +25,8 @@ import {
   useMarkAllNotificationsAsReadMutation,
   useMarkNotificationAsReadMutation,
 } from "../../notification/api/notification.api";
+
+import { formatVietnamNotificationTime } from "../../../shared/lib/vietnamTime";
 import { useGetWarehousesQuery } from "../../admin/api/create-user.api";
 import { useGetUnassignedBoxesByWarehouseQuery } from "../../goods-receipt/api/goods-receipt.api";
 
@@ -108,12 +110,6 @@ export default function WarehouseStaffLayout() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const formatNotificationTime = (iso: string) => {
-    const dt = new Date(iso);
-    if (Number.isNaN(dt.getTime())) return "";
-    return dt.toLocaleString("vi-VN");
-  };
 
   const handleNotificationClick = async (
     userNotificationId: number,
@@ -252,7 +248,7 @@ export default function WarehouseStaffLayout() {
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-800 text-slate-200">
                   <Truck size={15} />
                 </span>
-                Bắt đầu giao hàng
+                Xác nhận shipper đã lấy hàng
               </NavLink>
             </li>
             <li>
@@ -542,7 +538,7 @@ export default function WarehouseStaffLayout() {
                             {!item.isRead && <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-amber-500" />}
                           </div>
                           <p className="mt-1 text-[11px] text-slate-500">
-                            {formatNotificationTime(item.createdAt)}
+                            {formatVietnamNotificationTime(item.createdAt)}
                           </p>
                         </button>
                       ))}

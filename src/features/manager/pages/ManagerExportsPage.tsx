@@ -8,6 +8,7 @@ import {
   useLazyGetExportReceiptByIdQuery,
 } from "../../export/api/export.api";
 import { ROUTES } from "../../../shared/constants/routes";
+import { formatVietnamDateTime } from "../../../shared/lib/vietnamTime";
 
 function exportStatusLabel(status: string) {
   if (status === "ReadyToExport") return "Sẵn sàng xuất";
@@ -318,7 +319,7 @@ export default function ManagerExportsPage() {
                         </span>
                       </td>
                       <td className="py-2 px-3">{r.boxCount}</td>
-                      <td className="py-2 px-3">{new Date(r.createdAt).toLocaleString("vi-VN")}</td>
+                      <td className="py-2 px-3">{formatVietnamDateTime(r.createdAt)}</td>
                       <td className="py-2 px-3">
                         <div className="flex flex-wrap gap-1">
                           <button
@@ -355,7 +356,7 @@ export default function ManagerExportsPage() {
                         </span>
                       </td>
                       <td className="py-2 px-3">{r.boxCount}</td>
-                      <td className="py-2 px-3">{new Date(r.createdAt).toLocaleString("vi-VN")}</td>
+                      <td className="py-2 px-3">{formatVietnamDateTime(r.createdAt)}</td>
                       <td className="py-2 px-3">
                         <button
                           type="button"
@@ -465,7 +466,7 @@ export default function ManagerExportsPage() {
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <p className="text-xs text-slate-500">Thời gian tạo</p>
                 <p className="text-sm font-semibold text-slate-900">
-                  {new Date(receipt.createdAt).toLocaleString("vi-VN")}
+                  {formatVietnamDateTime(receipt.createdAt)}
                 </p>
               </div>
             </div>

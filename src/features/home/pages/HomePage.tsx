@@ -36,55 +36,58 @@ export default function HomePage() {
 
     const [bannerIndex, setBannerIndex] = useState(0);
     useEffect(() => {
+        if (isLoggedIn) return;
         const timer = setInterval(() => {
             setBannerIndex((i) => (i + 1) % BANNER_IMAGES.length);
         }, BANNER_INTERVAL_MS);
         return () => clearInterval(timer);
-    }, []);
+    }, [isLoggedIn]);
 
     return (
         <>
-            {/* Banner carousel */}
-            <section className="relative w-full overflow-hidden bg-slate-100">
-                <div className="relative w-full aspect-[1920/500] min-h-[280px] max-h-[420px] sm:min-h-[320px]">
-                    {BANNER_IMAGES.map((src, i) => (
-                        <div
-                            key={src}
-                            className="absolute inset-0 w-full transition-opacity duration-600 ease-in-out"
-                            style={{ opacity: i === bannerIndex ? 1 : 0, zIndex: i === bannerIndex ? 1 : 0 }}
-                        >
-                            <img src={src} alt="" className="w-full h-full object-cover object-center" referrerPolicy="no-referrer" />
-                        </div>
-                    ))}
-                </div>
-                <button
-                    type="button"
-                    aria-label="Banner trước"
-                    onClick={() => setBannerIndex((i) => (i - 1 + BANNER_IMAGES.length) % BANNER_IMAGES.length)}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors"
-                >
-                    <ChevronLeft size={24} />
-                </button>
-                <button
-                    type="button"
-                    aria-label="Banner sau"
-                    onClick={() => setBannerIndex((i) => (i + 1) % BANNER_IMAGES.length)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors"
-                >
-                    <ChevronRight size={24} />
-                </button>
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-                    {BANNER_IMAGES.map((_, i) => (
-                        <button
-                            key={i}
-                            type="button"
-                            aria-label={`Banner ${i + 1}`}
-                            onClick={() => setBannerIndex(i)}
-                            className={`h-2 rounded-full transition-all ${i === bannerIndex ? "w-6 bg-white shadow" : "w-2 bg-white/60 hover:bg-white/80"}`}
-                        />
-                    ))}
-                </div>
-            </section>
+            {/* Banner carousel — chỉ khách chưa đăng nhập */}
+            {!isLoggedIn && (
+                <section className="relative w-full overflow-hidden bg-slate-100">
+                    <div className="relative w-full aspect-[1920/500] min-h-[280px] max-h-[420px] sm:min-h-[320px]">
+                        {BANNER_IMAGES.map((src, i) => (
+                            <div
+                                key={src}
+                                className="absolute inset-0 w-full transition-opacity duration-600 ease-in-out"
+                                style={{ opacity: i === bannerIndex ? 1 : 0, zIndex: i === bannerIndex ? 1 : 0 }}
+                            >
+                                <img src={src} alt="" className="w-full h-full object-cover object-center" referrerPolicy="no-referrer" />
+                            </div>
+                        ))}
+                    </div>
+                    <button
+                        type="button"
+                        aria-label="Banner trước"
+                        onClick={() => setBannerIndex((i) => (i - 1 + BANNER_IMAGES.length) % BANNER_IMAGES.length)}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors"
+                    >
+                        <ChevronLeft size={24} />
+                    </button>
+                    <button
+                        type="button"
+                        aria-label="Banner sau"
+                        onClick={() => setBannerIndex((i) => (i + 1) % BANNER_IMAGES.length)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center transition-colors"
+                    >
+                        <ChevronRight size={24} />
+                    </button>
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-10">
+                        {BANNER_IMAGES.map((_, i) => (
+                            <button
+                                key={i}
+                                type="button"
+                                aria-label={`Banner ${i + 1}`}
+                                onClick={() => setBannerIndex(i)}
+                                className={`h-2 rounded-full transition-all ${i === bannerIndex ? "w-6 bg-white shadow" : "w-2 bg-white/60 hover:bg-white/80"}`}
+                            />
+                        ))}
+                    </div>
+                </section>
+            )}
 
             {/* Hero */}
             <section className="bg-gradient-to-b from-[#e8f5e9] to-white">
@@ -126,7 +129,6 @@ export default function HomePage() {
                 </div>
             </section>
 
-            {/* ✅ Phần sản phẩm — tách riêng thành component */}
             <ProductsSection />
 
             {/* Vì sao chọn */}
