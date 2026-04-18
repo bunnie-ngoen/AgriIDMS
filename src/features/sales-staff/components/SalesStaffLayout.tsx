@@ -1,6 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ClipboardList, LogOut, ShieldCheck, MessageCircleWarning, ChevronDown, Bell, PlusCircle, Wallet, User } from "lucide-react";
+import {
+  LayoutDashboard,
+  ClipboardList,
+  LogOut,
+  ShieldCheck,
+  MessageCircleWarning,
+  ChevronDown,
+  Bell,
+  PlusCircle,
+  Wallet,
+  User,
+  UserCheck,
+  CreditCard,
+  PackageCheck,
+  Clock,
+  CheckCircle2,
+} from "lucide-react";
 import { useAppDispatch } from "../../../app/hook";
 import { logout } from "../../auth/slices/auth.slice";
 import { persistor } from "../../../app/store";
@@ -11,6 +27,7 @@ import {
   useMarkAllNotificationsAsReadMutation,
   useMarkNotificationAsReadMutation,
 } from "../../notification/api/notification.api";
+import { formatVietnamNotificationTime } from "../../../shared/lib/vietnamTime";
 
 export default function SalesStaffLayout() {
   const dispatch = useAppDispatch();
@@ -52,12 +69,6 @@ export default function SalesStaffLayout() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const formatNotificationTime = (iso: string) => {
-    const dt = new Date(iso);
-    if (Number.isNaN(dt.getTime())) return "";
-    return dt.toLocaleString("vi-VN");
-  };
 
   const handleNotificationClick = async (
     userNotificationId: number,
@@ -120,7 +131,7 @@ export default function SalesStaffLayout() {
               Kênh nội bộ Sales Staff
             </div>
             <p className="mt-1 text-[11px] text-slate-400">
-              Theo dõi trạng thái đơn và xác nhận tiền mặt.
+              Theo dõi trạng thái đơn và xác nhận.
             </p>
           </div>
         </div>
@@ -190,7 +201,7 @@ export default function SalesStaffLayout() {
                         }`
                       }
                     >
-                      <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
+                      <UserCheck size={14} />
                       Đơn hàng chờ xác nhận bán
                     </NavLink>
                   </li>
@@ -205,8 +216,8 @@ export default function SalesStaffLayout() {
                         }`
                       }
                     >
-                      <span className="h-1.5 w-1.5 rounded-full bg-violet-400" />
-                      Thanh toán tiền mặt chờ xử lý
+                      <CreditCard size={14} />
+                      Thanh toán chờ xử lý
                     </NavLink>
                   </li>
                   <li>
@@ -220,8 +231,8 @@ export default function SalesStaffLayout() {
                         }`
                       }
                     >
-                      <span className="h-1.5 w-1.5 rounded-full bg-teal-400" />
-                      Đơn đã duyệt xuất
+                      <PackageCheck size={14} />
+                      Xác nhận đơn hàng đã giao
                     </NavLink>
                   </li>
                 </ul>
@@ -277,7 +288,7 @@ export default function SalesStaffLayout() {
                         }`
                       }
                     >
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                      <Clock size={14} />
                       Khiếu nại chờ xử lý
                     </NavLink>
                   </li>
@@ -292,7 +303,7 @@ export default function SalesStaffLayout() {
                         }`
                       }
                     >
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      <CheckCircle2 size={14} />
                       Khiếu nại đã xử lý
                     </NavLink>
                   </li>
@@ -377,7 +388,7 @@ export default function SalesStaffLayout() {
                             )}
                           </div>
                           <p className="text-[11px] text-slate-500 mt-1">
-                            {formatNotificationTime(item.createdAt)}
+                            {formatVietnamNotificationTime(item.createdAt)}
                           </p>
                         </button>
                       ))}

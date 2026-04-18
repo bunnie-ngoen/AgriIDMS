@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { ClipboardList } from "lucide-react";
 import { ROUTES } from "../../../shared/constants/routes";
-import { formatVietnamDate, formatVietnamTime, parseApiDateInput } from "../../../shared/lib/vietnamTime";
+import { formatVietnamDateTime, parseApiDateInput } from "../../../shared/lib/vietnamTime";
 import { paymentStatusLabelVietnam } from "../../../shared/lib/paymentStatus";
 import { useGetMyOrdersQuery } from "../api/order.api";
 import type { OrderListItem } from "../schemas/order.schema";
@@ -342,13 +342,9 @@ export default function MyOrdersPage() {
                                         </div>
 
                                         <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                                            <div>
-                                                <dt className="text-slate-500">Ngày tạo</dt>
-                                                <dd className="font-medium text-slate-800">{formatVietnamDate(o.createdAt)}</dd>
-                                            </div>
-                                            <div>
-                                                <dt className="text-slate-500">Giờ tạo</dt>
-                                                <dd className="font-medium tabular-nums text-slate-800">{formatVietnamTime(o.createdAt)}</dd>
+                                            <div className="col-span-2">
+                                                <dt className="text-slate-500">Ngày và giờ</dt>
+                                                <dd className="font-medium tabular-nums text-slate-800">{formatVietnamDateTime(o.createdAt)}</dd>
                                             </div>
                                             <div>
                                                 <dt className="text-slate-500">Số sản phẩm</dt>
@@ -392,8 +388,7 @@ export default function MyOrdersPage() {
                                     <thead className="bg-slate-50">
                                         <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
                                             <th className="px-4 py-3">Mã đơn</th>
-                                            <th className="px-4 py-3">Ngày tạo</th>
-                                            <th className="px-4 py-3">Giờ tạo</th>
+                                            <th className="px-4 py-3">Ngày và giờ</th>
                                             <th className="px-4 py-3">Trạng thái đơn</th>
                                             <th className="px-4 py-3">Trình trạng thanh toán</th>
                                             <th className="px-4 py-3">Số sản phẩm</th>
@@ -405,8 +400,7 @@ export default function MyOrdersPage() {
                                         {pageRows.map((o) => (
                                             <tr key={o.orderId} className="border-b border-slate-100 text-sm last:border-b-0">
                                                 <td className="px-4 py-3 font-semibold text-slate-900">#{o.orderId}</td>
-                                                <td className="px-4 py-3 text-slate-700">{formatVietnamDate(o.createdAt)}</td>
-                                                <td className="px-4 py-3 tabular-nums text-slate-700">{formatVietnamTime(o.createdAt)}</td>
+                                                <td className="px-4 py-3 tabular-nums text-slate-700">{formatVietnamDateTime(o.createdAt)}</td>
                                                 <td className="px-4 py-3">
                                                     <div className="flex flex-col gap-1.5">
                                                         <span

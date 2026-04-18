@@ -83,11 +83,10 @@ export default function WarehouseStartShippingPage() {
             <Truck size={20} aria-hidden />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-slate-900">Bắt đầu giao hàng</h1>
+            <h1 className="text-lg font-bold text-slate-900">Xác nhận shipper đã lấy hàng</h1>
             <p className="mt-1 text-sm text-slate-600">
               Đơn <span className="font-semibold">Đã duyệt xuất</span> và{" "}
-              <span className="font-semibold">chờ lấy hàng</span> — xác nhận shipper đã bắt đầu giao (
-              <code className="rounded bg-slate-100 px-1 text-xs">ShippingInProgress</code>).
+              <span className="font-semibold">chờ lấy hàng</span> — xác nhận khi shipper đã lấy hàng và đi giao.
             </p>
           </div>
         </div>
@@ -126,7 +125,7 @@ export default function WarehouseStartShippingPage() {
           </div>
         ) : pendingRows.length === 0 ? (
           <p className="mt-6 rounded-lg border border-dashed border-slate-200 bg-slate-50/80 px-4 py-8 text-center text-sm text-slate-600">
-            Không có đơn nào đang chờ bắt đầu giao (chờ lấy hàng).
+            Không có đơn nào chờ xác nhận shipper đã lấy hàng.
           </p>
         ) : (
           <div className="mt-4 overflow-auto rounded-lg border border-slate-200">
@@ -168,7 +167,7 @@ export default function WarehouseStartShippingPage() {
                         disabled={busyOrderId === o.orderId}
                         className="rounded-lg border border-sky-300 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-900 shadow-sm hover:bg-sky-100 disabled:opacity-50"
                       >
-                        {busyOrderId === o.orderId ? "Đang xử lý..." : "Bắt đầu giao hàng"}
+                        {busyOrderId === o.orderId ? "Đang xử lý..." : "Xác nhận shipper đã lấy hàng"}
                       </button>
                     </td>
                   </tr>

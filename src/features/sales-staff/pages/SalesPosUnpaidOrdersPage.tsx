@@ -6,7 +6,7 @@ import {
   useGetPendingWarehouseConfirmOrdersQuery,
 } from "../../order/api/order.api";
 import type { OrderListItem } from "../../order/schemas/order.schema";
-import { formatVietnamDate, formatVietnamTime } from "../../../shared/lib/vietnamTime";
+import { formatVietnamDateTime, parseApiDateInput } from "../../../shared/lib/vietnamTime";
 import { isPaymentSettled } from "../../../shared/lib/paymentStatus";
 import { orderStatusLabel, orderStatusTone } from "../../../shared/lib/orderStatusUi";
 import SalesStaffPageShell from "../components/SalesStaffPageShell";
@@ -70,7 +70,7 @@ export default function SalesPosUnpaidOrdersPage() {
       existed.fulfillmentType = order.fulfillmentType ?? existed.fulfillmentType;
       existed.paymentTiming = order.paymentTiming ?? existed.paymentTiming;
       if (!existed.queueLabels.includes(queueLabel)) existed.queueLabels.push(queueLabel);
-      if (new Date(order.createdAt).getTime() > new Date(existed.createdAt).getTime()) {
+      if (parseApiDateInput(order.createdAt).getTime() > parseApiDateInput(existed.createdAt).getTime()) {
         existed.createdAt = order.createdAt;
       }
     };
@@ -129,7 +129,7 @@ export default function SalesPosUnpaidOrdersPage() {
                   <th className="px-3 py-2">Mã đơn</th>
                   <th className="px-3 py-2">Tiến độ xử lý</th>
                   <th className="px-3 py-2">Trạng thái đơn</th>
-                  <th className="px-3 py-2">Ngày tạo</th>
+                  <th className="px-3 py-2">Ngày và giờ</th>
                   <th className="px-3 py-2 text-right">Thao tác</th>
                 </tr>
               </thead>
@@ -156,7 +156,7 @@ export default function SalesPosUnpaidOrdersPage() {
                         </span>
                       </td>
                       <td className="px-3 py-2">
-                        {formatVietnamDate(row.createdAt)} {formatVietnamTime(row.createdAt)}
+                        {formatVietnamDateTime(row.createdAt)}
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex justify-end gap-2">

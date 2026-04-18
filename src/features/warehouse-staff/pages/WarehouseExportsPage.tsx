@@ -11,6 +11,8 @@ import {
 } from "../../export/api/export.api";
 import { useGetPaidPendingExportOrdersQuery } from "../../order/api/order.api";
 import { ROUTES } from "../../../shared/constants/routes";
+import { boxStatusLabelVietnam } from "../../../shared/lib/boxStatusUi";
+import { formatVietnamDateTime } from "../../../shared/lib/vietnamTime";
 
 function vnd(n: number) {
   return n.toLocaleString("vi-VN");
@@ -76,8 +78,9 @@ export default function WarehouseExportsPage() {
   const [approvedPage, setApprovedPage] = useState(1);
   const [approvedSort, setApprovedSort] = useState<"createdAtDesc" | "createdAtAsc">("createdAtDesc");
 
-  const [exportIdManual, setExportIdManual] = useState("");
   const [currentExportId, setCurrentExportId] = useState<number | null>(null);
+  /** Chỉ hiện khối chi tiết phiếu sau khi bấm Chi tiết / tạo phiếu / mở từ URL — tránh hiện nhầm do cache RTK. */
+  const [detailPanelExportId, setDetailPanelExportId] = useState<number | null>(null);
   const [msg, setMsg] = useState("");
 
   const paidSkip = (paidPage - 1) * pageSize;
@@ -160,18 +163,24 @@ export default function WarehouseExportsPage() {
   const openExportDetail = async (exportId: number, silentToast = false) => {
     setMsg("");
     setCurrentExportId(exportId);
-    setExportIdManual(String(exportId));
+    setDetailPanelExportId(exportId);
     try {
       await loadExport(exportId).unwrap();
       if (!silentToast) {
         toast.success(`Đã tải phiếu xuất #${exportId}.`);
       }
     } catch (err) {
+      setDetailPanelExportId(null);
+      setCurrentExportId(null);
       const m = getApiErrorMessage(err, "Không tải được phiếu xuất.");
       setMsg(m);
       toast.error(m);
     }
   };
+
+  useEffect(() => {
+    setDetailPanelExportId(null);
+  }, [activeTab]);
 
   /** Mở phiếu khi vào từ thông báo: /warehouse/exports?exportId=… */
   const exportIdFromUrl = searchParams.get("exportId");
@@ -209,17 +218,6 @@ export default function WarehouseExportsPage() {
       toast.error(m, { id: t });
       setMsg(m);
     }
-  };
-
-  const onLoadManual = async () => {
-    const exportId = Number(exportIdManual);
-    if (!Number.isInteger(exportId) || exportId <= 0) {
-      const m = "ExportId không hợp lệ.";
-      setMsg(m);
-      toast.error(m);
-      return;
-    }
-    await openExportDetail(exportId);
   };
 
   const onConfirmPick = async () => {
@@ -287,10 +285,8 @@ export default function WarehouseExportsPage() {
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <h1 className="text-lg font-bold text-slate-900">Xuất kho sau thanh toán</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Kho tạo phiếu và xác nhận lấy hàng. Admin/Manager duyệt xuất để đơn chuyển sang đang giao.
-        </p>
+        <h1 className="text-lg font-bold text-slate-900">Xuất kho</h1>
+        <p className="mt-1 text-sm text-slate-600">Lập phiếu xuất kho và xác nhận lấy hàng.</p>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -303,7 +299,7 @@ export default function WarehouseExportsPage() {
               : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
           }`}
         >
-          Đơn Paid chờ xuất
+          Đơn chờ xuất
         </button>
         <button
           type="button"
@@ -314,7 +310,7 @@ export default function WarehouseExportsPage() {
               : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
           }`}
         >
-          Đã xác nhận lấy hàng (chờ Manager)
+          Đã xác nhận lấy hàng
         </button>
         <button
           type="button"
@@ -325,7 +321,7 @@ export default function WarehouseExportsPage() {
               : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
           }`}
         >
-          Đã duyệt xuất (in phiếu)
+          Đã duyệt xuất
         </button>
       </div>
 
@@ -364,14 +360,14 @@ export default function WarehouseExportsPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-600">Lọc OrderId</label>
+              <label className="text-xs font-medium text-slate-600">Số đơn</label>
               <input
                 value={orderIdFilter}
                 onChange={(e) => {
                   setOrderIdFilter(e.target.value);
                   setPaidPage(1);
                 }}
-                placeholder="Để trống = tất cả"
+                placeholder="Nhập theo số đơn"
                 className="mt-1 block w-full min-w-[140px] rounded-lg border border-slate-300 px-3 py-2 text-sm"
               />
             </div>
@@ -394,7 +390,7 @@ export default function WarehouseExportsPage() {
               type="button"
               onClick={async () => {
                 await refetchPaid();
-                toast.success("Đã làm mới danh sách đơn Paid.");
+                toast.success("Đã làm mới danh sách đơn chờ xuất.");
               }}
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
@@ -422,7 +418,7 @@ export default function WarehouseExportsPage() {
                   {paidRows.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-3 py-6 text-center text-slate-500">
-                        Không có đơn Paid nào khớp điều kiện xuất kho.
+                        Không có đơn chờ xuất nào khớp điều kiện.
                       </td>
                     </tr>
                   ) : (
@@ -431,10 +427,10 @@ export default function WarehouseExportsPage() {
                         <td className="py-2 px-3 font-semibold text-slate-900">Đơn hàng {row.orderId}</td>
                         <td className="py-2 px-3">{sourceLabel(row.source)}</td>
                         <td className="py-2 px-3 text-slate-700">
-                          {row.paidAt ? new Date(row.paidAt).toLocaleString("vi-VN") : "—"}
+                          {row.paidAt ? formatVietnamDateTime(row.paidAt) : "—"}
                         </td>
                         <td className="py-2 px-3 text-slate-700">
-                          {new Date(row.createdAt).toLocaleString("vi-VN")}
+                          {formatVietnamDateTime(row.createdAt)}
                         </td>
                         <td className="py-2 px-3 text-right font-semibold">{vnd(row.totalAmount)} ₫</td>
                         <td className="py-2 px-3">
@@ -509,9 +505,6 @@ export default function WarehouseExportsPage() {
 
       {activeTab === "postPick" && (
         <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-          <p className="text-sm text-slate-600">
-            Các phiếu đã xác nhận lấy hàng (ReadyToExport), đang chờ Admin/Manager duyệt xuất kho.
-          </p>
           <div className="flex flex-wrap items-end gap-3">
             <div>
               <label className="text-xs font-medium text-slate-600">Sắp xếp</label>
@@ -567,7 +560,7 @@ export default function WarehouseExportsPage() {
                         </td>
                         <td className="py-2 px-3">Đơn hàng {r.orderId}</td>
                         <td className="py-2 px-3">{r.boxCount}</td>
-                        <td className="py-2 px-3">{new Date(r.createdAt).toLocaleString("vi-VN")}</td>
+                        <td className="py-2 px-3">{formatVietnamDateTime(r.createdAt)}</td>
                         <td className="py-2 px-3">
                           <button
                             type="button"
@@ -669,7 +662,7 @@ export default function WarehouseExportsPage() {
                         </td>
                         <td className="py-2 px-3">Đơn hàng {r.orderId}</td>
                         <td className="py-2 px-3">{r.boxCount}</td>
-                        <td className="py-2 px-3">{new Date(r.createdAt).toLocaleString("vi-VN")}</td>
+                        <td className="py-2 px-3">{formatVietnamDateTime(r.createdAt)}</td>
                         <td className="py-2 px-3">
                           <div className="flex flex-wrap gap-1">
                             <button
@@ -713,27 +706,16 @@ export default function WarehouseExportsPage() {
         </div>
       )}
 
-      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
-        <h2 className="text-sm font-semibold text-slate-800">Mở phiếu theo mã (tuỳ chọn)</h2>
-        <div className="mt-2 flex gap-2">
-          <input
-            value={exportIdManual}
-            onChange={(e) => setExportIdManual(e.target.value)}
-            placeholder="ExportId"
-            className="w-full max-w-xs rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
-          />
-          <button
-            type="button"
-            onClick={onLoadManual}
-            disabled={isLoadingReceipt}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-60"
-          >
-            Tải
-          </button>
-        </div>
-      </div>
+      {detailPanelExportId !== null &&
+        (isLoadingReceipt || !receipt || receipt.id !== detailPanelExportId) && (
+          <div className="rounded-xl border border-slate-200 bg-white px-4 py-10 text-center text-sm text-slate-600">
+            Đang tải phiếu xuất...
+          </div>
+        )}
 
-      {receipt && (
+      {detailPanelExportId !== null &&
+        receipt &&
+        receipt.id === detailPanelExportId && (
         <div className="space-y-4">
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -757,15 +739,10 @@ export default function WarehouseExportsPage() {
                 Đã xác nhận lấy hàng. Chờ Admin/Manager duyệt xuất kho.
               </div>
             )}
-            {receiptNorm === "PendingPick" && (
-              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                Bước kho: bấm &quot;Kho xác nhận lấy hàng&quot; để chuyển sang Sẵn sàng xuất.
-              </div>
-            )}
             {receiptNorm === "Approved" && (
               <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
                 Phiếu đã duyệt xuất. Bạn có thể <span className="font-semibold">In phiếu xuất</span> bên dưới; tra cứu lại trong tab{" "}
-                <span className="font-semibold">Đã duyệt xuất (in phiếu)</span>.
+                <span className="font-semibold">Đã duyệt xuất</span>.
               </div>
             )}
 
@@ -785,7 +762,7 @@ export default function WarehouseExportsPage() {
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                 <p className="text-xs text-slate-500">Thời gian tạo</p>
                 <p className="text-sm font-semibold text-slate-900">
-                  {new Date(receipt.createdAt).toLocaleString("vi-VN")}
+                  {formatVietnamDateTime(receipt.createdAt)}
                 </p>
               </div>
             </div>
@@ -809,7 +786,7 @@ export default function WarehouseExportsPage() {
                       <td className="py-2 pr-3">#{d.id}</td>
                       <td className="py-2 pr-3 font-semibold text-slate-900">{d.boxCode}</td>
                       <td className="py-2 pr-3 text-right">{d.actualQuantity}</td>
-                      <td className="py-2 pr-3">{d.boxStatus}</td>
+                      <td className="py-2 pr-3">{boxStatusLabelVietnam(d.boxStatus)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -832,7 +809,7 @@ export default function WarehouseExportsPage() {
                 }
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
               >
-                {isConfirmingPick ? "Đang xác nhận..." : "Kho xác nhận lấy hàng"}
+                {isConfirmingPick ? "Đang xác nhận..." : "Xác nhận lấy hàng"}
               </button>
 
               <button
@@ -853,9 +830,6 @@ export default function WarehouseExportsPage() {
                 In phiếu xuất
               </button>
             </div>
-            <p className="mt-2 text-xs text-amber-700">
-              Tài khoản kho chỉ tạo phiếu và xác nhận lấy hàng. Duyệt xuất do Admin/Manager.
-            </p>
           </div>
         </div>
       )}

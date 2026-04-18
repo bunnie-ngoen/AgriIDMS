@@ -28,6 +28,7 @@ import {
   useMarkAllNotificationsAsReadMutation,
   useMarkNotificationAsReadMutation,
 } from "../../../features/notification/api/notification.api";
+import { formatVietnamNotificationTime } from "../../lib/vietnamTime";
 
 export default function PublicHeader() {
   const { isLoggedIn, hasDashboard, dashboardPath } = usePublicLayout();
@@ -95,12 +96,6 @@ export default function PublicHeader() {
     .charAt(0)
     .toUpperCase();
   const unreadCount = unreadCountData?.unreadCount ?? 0;
-
-  const formatNotificationTime = (iso: string) => {
-    const dt = new Date(iso);
-    if (Number.isNaN(dt.getTime())) return "";
-    return dt.toLocaleString("vi-VN");
-  };
 
   const handleNotificationClick = async (
     userNotificationId: number,
@@ -287,7 +282,7 @@ export default function PublicHeader() {
                                 )}
                               </div>
                               <p className="text-[11px] text-slate-500 mt-1">
-                                {formatNotificationTime(item.createdAt)}
+                                {formatVietnamNotificationTime(item.createdAt)}
                               </p>
                             </button>
                           ))}

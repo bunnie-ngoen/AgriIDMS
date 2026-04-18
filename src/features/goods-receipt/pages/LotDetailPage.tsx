@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 import { useGetLotDetailByIdQuery } from "../api/goods-receipt.api";
 import type { LotBoxItem } from "../types/goods-receipt.type";
+import { boxStatusLabelVietnam } from "../../../shared/lib/boxStatusUi";
 
 function toVietnameseLotStatus(status: string): string {
   if (status === "Active") return "Đang hoạt động";
@@ -18,15 +19,6 @@ function toStatusTone(status: string): string {
   if (status === "Blocked") return "text-amber-600";
   if (status === "Expired") return "text-rose-600";
   return "text-slate-600";
-}
-
-function toVietnameseBoxStatus(status: string): string {
-  if (status === "Stored") return "Đang lưu kho";
-  if (status === "Disposed") return "Đã tiêu hủy";
-  if (status === "Sold") return "Đã xuất bán";
-  if (status === "Blocked") return "Tạm khóa";
-  if (status === "Damaged") return "Hư hỏng";
-  return status;
 }
 
 function escHtml(s: string): string {
@@ -449,7 +441,7 @@ export default function LotDetailPage() {
                             {b.weight}
                           </td>
                           <td className="px-5 py-3.5 text-slate-700">
-                            {toVietnameseBoxStatus(b.status)}
+                            {boxStatusLabelVietnam(b.status)}
                           </td>
                           <td className="px-5 py-3.5 text-slate-700">
                             {b.slotCode || "Chưa xếp slot"}
@@ -588,7 +580,7 @@ export default function LotDetailPage() {
                         Trạng thái
                       </p>
                       <p className="mt-1 font-medium text-slate-900">
-                        {toVietnameseBoxStatus(selectedBox.status)}
+                        {boxStatusLabelVietnam(selectedBox.status)}
                       </p>
                     </div>
                     <div>
