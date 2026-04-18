@@ -32,6 +32,10 @@ export const ROUTES = {
     CUSTOMER_ORDER_DETAIL: "/my-orders/:id",
     CUSTOMER_COMPLAINTS: "/my-complaints",
     CART: "/cart",
+    /** Màn PO / xác nhận đơn — map với POST Orders/from-cart/variants */
+    CHECKOUT: "/checkout/purchase-order",
+    /** Sau khi đặt hàng thành công — `orderId` khớp GET Orders/:id */
+    CHECKOUT_ORDER_RECEIVED: "/checkout/purchase-order/received/:orderId",
 
     /** Tab in phiếu xuất (cùng origin, tránh URL blob ở chân trang in). */
     PRINT_EXPORT_SLIP: "/print/export-slip",
