@@ -6,7 +6,8 @@ import {
   useConfirmDeliveredAsStaffMutation,
   useConfirmFailedDeliveryAsStaffMutation,
   useConfirmReturnedAsStaffMutation,
-  useGetMyOrderByIdQuery,
+  useGetStaffOrderByIdQuery,
+  useStaffCancelOverduePayBeforeMutation,
 } from "../../order/api/order.api";
 import {
   useCancelPaymentMutation,
@@ -73,7 +74,7 @@ export default function SalesOrderDetailPage() {
   const orderId = Number(id);
   const valid = Number.isInteger(orderId) && orderId > 0;
 
-  const { data: order, isLoading, isError, refetch } = useGetMyOrderByIdQuery(orderId, { skip: !valid });
+  const { data: order, isLoading, isError, refetch } = useGetStaffOrderByIdQuery(orderId, { skip: !valid });
   const { data: latestPayment, refetch: refetchPayment } = useGetLatestPaymentByOrderQuery(orderId, { skip: !valid });
 
   const [createPayment, { isLoading: isCreatingPayment }] = useCreatePaymentMutation();
@@ -82,6 +83,8 @@ export default function SalesOrderDetailPage() {
   const isCreatingAnyPayment = isCreatingPayment || isCreatingStaffPayment;
   const [cancelPayment, { isLoading: isCancellingPayment }] = useCancelPaymentMutation();
   const [cancelOrder, { isLoading: isCancellingOrder }] = useCancelOrderMutation();
+  const [staffCancelOverduePayBefore, { isLoading: isCancellingOverduePayBefore }] =
+    useStaffCancelOverduePayBeforeMutation();
   const [confirmDelivered, { isLoading: isConfirmingDelivered }] = useConfirmDeliveredAsStaffMutation();
   const [confirmFailedDelivery, { isLoading: isConfirmingFailed }] = useConfirmFailedDeliveryAsStaffMutation();
   const [confirmReturned, { isLoading: isConfirmingReturned }] = useConfirmReturnedAsStaffMutation();
@@ -162,7 +165,7 @@ export default function SalesOrderDetailPage() {
         ) : isError || !order ? (
           <div className="rounded-2xl border border-rose-200/80 bg-white p-6 shadow-sm ring-1 ring-rose-900/5">
             <p className="text-sm font-medium text-rose-800">
-              Không tải được chi tiết đơn. Có thể bạn không phải người tạo đơn này.
+              Không tải được chi tiết đơn. Kiểm tra quyền truy cập hoặc thử tải lại.
             </p>
             <button
               type="button"
@@ -285,6 +288,23 @@ export default function SalesOrderDetailPage() {
                     </button>
                   )}
 
+                  {order.staffCanCancelOverduePayBefore && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        runOrderAction(
+                          () => staffCancelOverduePayBefore(orderId).unwrap(),
+                          "Đã hủy đơn quá hạn thanh toán trả trước.",
+                          "Không thể hủy đơn (kiểm tra đủ điều kiện quá hạn 24h, chưa thanh toán, chưa có phiếu xuất).",
+                        )
+                      }
+                      disabled={isCancellingOverduePayBefore}
+                      className={btnDanger}
+                    >
+                      {isCancellingOverduePayBefore ? "Đang xử lý..." : "Hủy đơn (quá hạn TT trả trước)"}
+                    </button>
+                  )}
+
                   {isDelivery && (order.status === "ApprovedExport" || order.status === "FailedDelivery") && (
                     <>
                       {order.status === "ApprovedExport" && (
@@ -348,6 +368,18 @@ export default function SalesOrderDetailPage() {
                     <CreditCard className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
                     <h3 className="text-xs font-bold uppercase tracking-wide text-slate-700">Thanh toán</h3>
                   </div>
+                  {order.source === "Online" &&
+                    order.paymentTiming === "PayBefore" &&
+                    order.payBeforeOnlinePaymentDeadlineUtc && (
+                      <p className="rounded-xl border border-amber-200/80 bg-amber-50/90 px-3 py-2 text-xs font-medium leading-relaxed text-amber-950">
+                        Hạn thanh toán trả trước:{" "}
+                        <span className="font-semibold tabular-nums">
+                          {formatVietnamDate(order.payBeforeOnlinePaymentDeadlineUtc)}{" "}
+                          {formatVietnamTime(order.payBeforeOnlinePaymentDeadlineUtc)}
+                        </span>
+                        . Sau hạn, khách không tự thanh toán online; sale có thể hủy đơn nếu đủ điều kiện.
+                      </p>
+                    )}
                   <div>
                     <label htmlFor="payment-method" className="sr-only">
                       Phương thức thanh toán

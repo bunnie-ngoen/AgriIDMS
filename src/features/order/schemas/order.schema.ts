@@ -48,6 +48,8 @@ export const orderDetailSchema = z.object({
     paymentTiming: z.string().nullable().optional(),
     createdAt: z.string(),
     latestPaymentStatus: z.string().nullable().optional(),
+    payBeforeOnlinePaymentDeadlineUtc: z.string().nullable().optional(),
+    staffCanCancelOverduePayBefore: z.boolean().optional(),
     recipient: orderRecipientSnapshotSchema.optional().nullable(),
     items: z.array(orderDetailItemSchema),
 });
