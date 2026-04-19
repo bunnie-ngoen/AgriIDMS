@@ -23,6 +23,7 @@ import type {
   DisposeHistoryItem,
   GoodsReceiptPrintData,
 } from "../types/goods-receipt.type";
+import { normalizeBoxStatus } from "../utils/boxStatus";
 
 type RawObject = Record<string, unknown>;
 
@@ -147,7 +148,7 @@ const mapLotBoxItem = (row: RawObject): LotBoxItem => ({
     (row.volumeM3 as number | undefined) ??
     (row.VolumeM3 as number | undefined) ??
     0,
-  status: (row.status as string) ?? (row.Status as string) ?? "",
+  status: normalizeBoxStatus(row.status ?? row.Status),
   slotId:
     (row.slotId as number | null | undefined) ??
     (row.SlotId as number | null | undefined) ??
@@ -590,7 +591,7 @@ export const goodsReceiptApi = api.injectEndpoints({
             (row.volumeM3 as number | undefined) ??
             (row.VolumeM3 as number | undefined) ??
             0,
-          status: (row.status as string) ?? (row.Status as string) ?? "",
+          status: normalizeBoxStatus(row.status ?? row.Status),
           slotId:
             (row.slotId as number | null | undefined) ??
             (row.SlotId as number | null | undefined) ??
@@ -697,10 +698,7 @@ export const goodsReceiptApi = api.injectEndpoints({
               (row.volumeM3 as number | undefined) ??
               (row.VolumeM3 as number | undefined) ??
               0,
-            status:
-              (row.status as string) ??
-              (row.Status as string) ??
-              "",
+            status: normalizeBoxStatus(row.status ?? row.Status),
             slotId:
               (row.slotId as number | null | undefined) ??
               (row.SlotId as number | null | undefined) ??
@@ -783,10 +781,7 @@ export const goodsReceiptApi = api.injectEndpoints({
               (row.volumeM3 as number | undefined) ??
               (row.VolumeM3 as number | undefined) ??
               0,
-            status:
-              (row.status as string) ??
-              (row.Status as string) ??
-              "",
+            status: normalizeBoxStatus(row.status ?? row.Status),
             slotId:
               (row.slotId as number | null | undefined) ??
               (row.SlotId as number | null | undefined) ??
@@ -872,10 +867,7 @@ export const goodsReceiptApi = api.injectEndpoints({
               (row.volumeM3 as number | undefined) ??
               (row.VolumeM3 as number | undefined) ??
               0,
-            status:
-              (row.status as string) ??
-              (row.Status as string) ??
-              "",
+            status: normalizeBoxStatus(row.status ?? row.Status),
             slotId:
               (row.slotId as number | null | undefined) ??
               (row.SlotId as number | null | undefined) ??
@@ -958,10 +950,7 @@ export const goodsReceiptApi = api.injectEndpoints({
               (row.volumeM3 as number | undefined) ??
               (row.VolumeM3 as number | undefined) ??
               0,
-            status:
-              (row.status as string) ??
-              (row.Status as string) ??
-              "",
+            status: normalizeBoxStatus(row.status ?? row.Status),
             slotId:
               (row.slotId as number | null | undefined) ??
               (row.SlotId as number | null | undefined) ??
@@ -1462,7 +1451,7 @@ export const goodsReceiptApi = api.injectEndpoints({
                   (b.isPartial as boolean) ??
                   (b.IsPartial as boolean) ??
                   false,
-                status: (b.status as string) ?? (b.Status as string) ?? "",
+                status: normalizeBoxStatus(b.status ?? b.Status),
                 slotId:
                   (b.slotId as number | null | undefined) ??
                   (b.SlotId as number | null | undefined) ??
