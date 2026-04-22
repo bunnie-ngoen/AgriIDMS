@@ -10,7 +10,6 @@ import { useGetPurchaseOrdersQuery } from "../../purchase-order/api/purchase-ord
 import { useGetPurchaseOrderByIdQuery } from "../../purchase-order/api/purchase-order.api";
 import { useCreateGoodsReceiptMutation } from "../api/goods-receipt.api";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
-import { useGetProductVariantsQuery } from "../../product/api/product-variant.api";
 
 const Schema = z
   .object({
@@ -52,7 +51,6 @@ export default function CreateGoodsReceipt() {
   } = useGetWarehousesQuery();
   const { data: purchaseOrders = [] } = useGetPurchaseOrdersQuery();
   const [createReceipt, { isLoading }] = useCreateGoodsReceiptMutation();
-  const { data: productVariants = [] } = useGetProductVariantsQuery();
   const [serverMessage, setServerMessage] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
@@ -76,7 +74,6 @@ export default function CreateGoodsReceipt() {
 
   type DetailLine = {
     purchaseOrderDetailId: number;
-    productVariantId: number;
     productName: string;
     orderedWeight: number;
     remainingWeight: number;
@@ -117,7 +114,6 @@ export default function CreateGoodsReceipt() {
     [warehouses, watchedWarehouseId],
   );
   const MAX_WAREHOUSE_UTILIZATION = 0.8;
-  const OPERATIONAL_BUFFER_RATIO = 0.8;
 
   const occupiedWeightOfWarehouse = useMemo(() => {
     if (!selectedWarehouse) return 0;
@@ -132,40 +128,10 @@ export default function CreateGoodsReceipt() {
     totalCapacityOfWarehouse - occupiedWeightOfWarehouse,
   );
 
-  const EPS = 0.0001;
-
-  const densityByVariantId = useMemo(() => {
-    const map = new Map<number, number>();
-    for (const v of productVariants) {
-      map.set(v.id, Number(v.densityKgPerM3 ?? 0));
-    }
-    return map;
-  }, [productVariants]);
-
-  const missingDensityLines = useMemo(
-    () =>
-      detailLines.filter(
-        (line) => Number(densityByVariantId.get(line.productVariantId) ?? 0) <= 0,
-      ),
-    [detailLines, densityByVariantId],
+  const totalIncomingWeight = useMemo(
+    () => detailLines.reduce((sum, line) => sum + Number(line.receivedWeight ?? 0), 0),
+    [detailLines],
   );
-
-  const totalIncomingVolumeRaw = useMemo(() => {
-    return detailLines.reduce((sum, line) => {
-      const density = Number(densityByVariantId.get(line.productVariantId) ?? 0);
-      if (density <= 0) return sum;
-      return sum + Number(line.receivedWeight ?? 0) / density;
-    }, 0);
-  }, [detailLines, densityByVariantId]);
-  const totalIncomingVolume = useMemo(
-    () => (totalIncomingVolumeRaw > 0 ? totalIncomingVolumeRaw / OPERATIONAL_BUFFER_RATIO : 0),
-    [totalIncomingVolumeRaw],
-  );
-
-  const isOverCapacity =
-    !!selectedWarehouse &&
-    missingDensityLines.length === 0 &&
-    totalIncomingVolume > remainingCapacityOfWarehouse + EPS;
 
   const onSubmit = async (values: FormValues) => {
     setServerMessage(null);
@@ -178,29 +144,6 @@ export default function CreateGoodsReceipt() {
         return;
       }
 
-      const warehouse = warehouses.find((w) => w.id === values.warehouseId);
-      if (warehouse) {
-        const occupied =
-          Number(warehouse.storedInSlotsWeight ?? 0) +
-          Number(warehouse.unassignedStockWeight ?? 0);
-        const capacity = Number(warehouse.totalCapacity ?? 0);
-        const remaining = Math.max(0, capacity - occupied);
-        if (missingDensityLines.length > 0) {
-          toast(
-            `Có ${missingDensityLines.length} dòng chưa có khối lượng riêng. Hệ thống sẽ bỏ qua kiểm tra sức chứa theo m³ cho các dòng này.`,
-            { icon: "⚠️" },
-          );
-        }
-        const incoming = totalIncomingVolume;
-
-        if (missingDensityLines.length === 0 && incoming > remaining + EPS) {
-          const msg = `Vượt sức chứa: cần khoảng ${incoming.toLocaleString("vi-VN")} m³, kho còn trống ${remaining.toLocaleString("vi-VN")} m³.`;
-          form.setError("warehouseId", { type: "manual", message: msg });
-          toast.error(msg);
-          return;
-        }
-      }
-
       const result = await createReceipt({
         warehouseId: values.warehouseId,
         vehicleNumber: values.vehicleNumber.trim(),
@@ -209,7 +152,6 @@ export default function CreateGoodsReceipt() {
         purchaseOrderId: values.purchaseOrderId,
         details: detailLines.map((d) => ({
           purchaseOrderDetailId: d.purchaseOrderDetailId,
-          productVariantId: d.productVariantId,
           receivedWeight: d.receivedWeight,
         })),
       }).unwrap();
@@ -275,36 +217,6 @@ export default function CreateGoodsReceipt() {
       return;
     }
 
-    const nextLines = detailLines
-      .filter((line) => line.purchaseOrderDetailId !== matched.id)
-      .concat({
-        purchaseOrderDetailId: matched.id,
-        productVariantId: matched.productVariantId,
-        productName: matched.productName,
-        orderedWeight: matched.orderedWeight,
-        remainingWeight: matched.remainingWeight,
-        receivedWeight,
-      });
-    const nextIncomingVolume = nextLines.reduce((sum, line) => {
-      const density = Number(densityByVariantId.get(line.productVariantId) ?? 0);
-      if (density <= 0) return sum;
-      return sum + Number(line.receivedWeight ?? 0) / density;
-    }, 0);
-
-    const nextMissingDensityCount = nextLines.filter(
-      (line) => Number(densityByVariantId.get(line.productVariantId) ?? 0) <= 0,
-    ).length;
-    if (
-      selectedWarehouse &&
-      nextMissingDensityCount === 0 &&
-      nextIncomingVolume > remainingCapacityOfWarehouse + 0.0001
-    ) {
-      toast.error(
-        `Tổng thể tích ước tính (${nextIncomingVolume.toLocaleString("vi-VN")} m³) vượt sức chứa còn trống của kho (${remainingCapacityOfWarehouse.toLocaleString("vi-VN")} m³).`,
-      );
-      return;
-    }
-
     setDetailLines((prev) => {
       // nếu đã thêm line cùng PO detail -> update receivedWeight
       const exists = prev.find((x) => x.purchaseOrderDetailId === matched.id);
@@ -323,7 +235,6 @@ export default function CreateGoodsReceipt() {
         ...prev,
         {
           purchaseOrderDetailId: matched.id,
-          productVariantId: matched.productVariantId,
           productName: matched.productName,
           orderedWeight: matched.orderedWeight,
           remainingWeight: matched.remainingWeight,
@@ -689,20 +600,8 @@ export default function CreateGoodsReceipt() {
                       </p>
                       <p className="text-[11px] text-slate-500">
                         Còn trống: {remainingCapacityOfWarehouse.toLocaleString("vi-VN")} m³ ·
-                        Phiếu này (ước tính vận hành): {totalIncomingVolume.toLocaleString("vi-VN")} m³
+                        Phiếu này (tổng khối lượng nhận): {totalIncomingWeight.toLocaleString("vi-VN")} kg
                       </p>
-                      {missingDensityLines.length > 0 && (
-                        <p className="text-[11px] text-amber-600 font-medium">
-                          Có {missingDensityLines.length} dòng chưa có khối lượng riêng, chưa thể quy đổi đầy đủ sang m³.
-                        </p>
-                      )}
-                      {isOverCapacity && (
-                        <p className="text-[11px] text-red-500 font-medium">
-                          Vượt sức chứa: cần{" "}
-                          {totalIncomingVolume.toLocaleString("vi-VN")} m³, kho còn trống{" "}
-                          {remainingCapacityOfWarehouse.toLocaleString("vi-VN")} m³.
-                        </p>
-                      )}
                     </div>
                   )}
                 </div>
@@ -784,7 +683,6 @@ export default function CreateGoodsReceipt() {
               disabled={
                 isLoading ||
                 detailLines.length === 0 ||
-                isOverCapacity ||
                 !form.formState.isValid
               }
               className="flex-[2] rounded-2xl py-3.5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 disabled:opacity-50 flex items-center justify-center gap-2.5 transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:translate-y-0"

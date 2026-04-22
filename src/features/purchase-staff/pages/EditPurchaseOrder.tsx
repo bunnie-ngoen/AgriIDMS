@@ -4,7 +4,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { useGetPurchaseOrderByIdQuery } from "../../purchase-order/api/purchase-order.api";
 import { useUpdatePurchaseOrderMutation } from "../../purchase-order/api/purchase-order.api";
 import { useGetSuppliersQuery } from "../../supplier/api/supplier.api";
-import { useGetProductVariantsQuery } from "../../product/api/product-variant.api";
+import { useGetProductsQuery } from "../../product/api/product.api";
 import type { UpdatePurchaseOrderDetailRequest } from "../../purchase-order/types/purchase-order.type";
 import { ArrowLeft, Plus, Trash2, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -29,7 +29,7 @@ export default function EditPurchaseOrder() {
   });
   const [updatePo, { isLoading: isSaving }] = useUpdatePurchaseOrderMutation();
   const { data: suppliers = [] } = useGetSuppliersQuery();
-  const { data: variants = [] } = useGetProductVariantsQuery();
+  const { data: products = [] } = useGetProductsQuery();
 
   const form = useForm<FormValues>({
     defaultValues: {
@@ -50,7 +50,7 @@ export default function EditPurchaseOrder() {
       details:
         order.details?.map((d) => ({
           id: d.id,
-          productVariantId: d.productVariantId,
+          productId: d.productId,
           orderedWeight: d.orderedWeight,
           unitPrice: d.unitPrice,
           tolerancePercent: d.tolerancePercent,
@@ -78,24 +78,14 @@ export default function EditPurchaseOrder() {
 
     values.details.forEach((d, idx) => {
       const row = idx + 1;
-      if (!d.productVariantId || d.productVariantId === 0) {
-        localErrors.push(`Dòng ${row}: vui lòng chọn sản phẩm (variant).`);
+      if (!d.productId || d.productId === 0) {
+        localErrors.push(`Dòng ${row}: vui lòng chọn sản phẩm.`);
       }
       if (!d.harvestDate) {
         localErrors.push(`Dòng ${row}: vui lòng chọn ngày thu hoạch.`);
       }
       if (!d.orderedWeight || Number(d.orderedWeight) <= 0) {
         localErrors.push(`Dòng ${row}: khối lượng đặt phải lớn hơn 0.`);
-      }
-      const matchedVariant = variants.find((v) => v.id === d.productVariantId);
-      const minLine =
-        typeof matchedVariant?.minReceiptWeight === "number"
-          ? matchedVariant.minReceiptWeight
-          : null;
-      if (minLine != null && Number(d.orderedWeight) < minLine) {
-        localErrors.push(
-          `Khối lượng đặt (kg) phải >= định mức tối thiểu (${minLine} kg) của sản phẩm.`,
-        );
       }
       if (d.unitPrice != null && Number(d.unitPrice) < 0) {
         localErrors.push(`Dòng ${row}: đơn giá không được âm.`);
@@ -122,7 +112,7 @@ export default function EditPurchaseOrder() {
           supplierId: values.supplierId,
           details: values.details.map((d) => ({
             id: d.id ?? undefined,
-            productVariantId: d.productVariantId,
+            productId: d.productId,
             orderedWeight: Number(d.orderedWeight),
             unitPrice: Number(d.unitPrice),
             tolerancePercent: Number(d.tolerancePercent),
@@ -216,7 +206,7 @@ export default function EditPurchaseOrder() {
               type="button"
               onClick={() =>
                 append({
-                  productVariantId: 0,
+                  productId: 0,
                   orderedWeight: 0,
                   unitPrice: 0,
                   tolerancePercent: 2,
@@ -238,21 +228,21 @@ export default function EditPurchaseOrder() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-slate-500 mb-1">
-                      Sản phẩm (variant) *
+                      Sản phẩm *
                     </label>
                     <select
-                      {...form.register(`details.${index}.productVariantId`, {
+                      {...form.register(`details.${index}.productId`, {
                         valueAsNumber: true,
                         required: true,
                       })}
                       className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                     >
-                      <option value={0}>Chọn variant</option>
-                      {variants
-                        .filter((v) => v.isActive)
-                        .map((v) => (
-                          <option key={v.id} value={v.id}>
-                            {v.productName} (Grade {v.grade})
+                      <option value={0}>Chọn sản phẩm</option>
+                      {products
+                        .filter((p) => p.isActive)
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
                           </option>
                         ))}
                     </select>
