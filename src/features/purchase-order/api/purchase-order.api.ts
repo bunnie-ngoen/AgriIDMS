@@ -31,9 +31,9 @@ const mapDetail = (raw: RawObject): PurchaseOrderDetailResponse => {
 
   return {
     id: (raw.id as number) ?? (raw.Id as number) ?? 0,
-    productVariantId:
-      (raw.productVariantId as number) ??
-      (raw.ProductVariantId as number) ??
+    productId:
+      (raw.productId as number) ??
+      (raw.ProductId as number) ??
       0,
     productName:
       (raw.productName as string) ??

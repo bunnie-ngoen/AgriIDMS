@@ -26,6 +26,7 @@ import { BoxTypeEnum } from "../types/goods-receipt.type";
 import { useGetBoxTypeSpecsQuery } from "../../admin/api/create-user.api";
 
 type QCForm = {
+  productVariantId: number;
   usableWeight: number;
 };
 
@@ -253,6 +254,7 @@ export default function GoodsReceiptQC() {
 
   const qcForm = useForm<QCForm>({
     defaultValues: {
+      productVariantId: 0,
       usableWeight: 0,
     },
   });
@@ -467,6 +469,7 @@ export default function GoodsReceiptQC() {
   const handleOpenQcForDetail = (detailId: number, currentUsable: number) => {
     setSelectedDetailIdForQc(detailId);
     qcForm.reset({
+      productVariantId: 0,
       usableWeight: currentUsable,
     });
     // Reset AI QC state per line
@@ -588,8 +591,13 @@ export default function GoodsReceiptQC() {
     }
 
     const usable = Number(values.usableWeight);
+    const productVariantId = Number(values.productVariantId);
     if (Number.isNaN(usable) || usable < 0) {
       toast.error("Khối lượng dùng được phải >= 0.");
+      return;
+    }
+    if (Number.isNaN(productVariantId) || productVariantId <= 0) {
+      toast.error("Vui lòng chọn Product Variant sau QC.");
       return;
     }
     if (usable > Number(detail.receivedWeight)) {
@@ -604,7 +612,14 @@ export default function GoodsReceiptQC() {
     try {
       await qcInspection({
         detailId: selectedDetailIdForQc,
-        usableWeight: usable,
+        inspectedWeight: Number(detail.receivedWeight),
+        damagedWeight: Number(detail.receivedWeight) - usable,
+        classificationDetails: [
+          {
+            productVariantId,
+            quantity: usable,
+          },
+        ],
       }).unwrap();
       toast.success("Cập nhật kiểm tra chất lượng thành công.", {
         id: toastId,
@@ -1072,6 +1087,26 @@ export default function GoodsReceiptQC() {
                 onSubmit={qcForm.handleSubmit(handleSubmitQc)}
                 className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm items-end"
               >
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">
+                    Product variant sau QC
+                  </label>
+                  <select
+                    {...qcForm.register("productVariantId", {
+                      valueAsNumber: true,
+                    })}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
+                  >
+                    <option value={0}>Chọn product variant</option>
+                    {productVariants
+                      .filter((v) => v.isActive)
+                      .map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.productName} (Grade {v.grade})
+                        </option>
+                      ))}
+                  </select>
+                </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">
                     Khối lượng dùng được (kg)

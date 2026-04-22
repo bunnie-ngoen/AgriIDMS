@@ -82,10 +82,14 @@ const mapSummary = (row: RawObject): GoodsReceiptSummary => {
 
 const mapDetail = (row: RawObject) => ({
   id: (row.id as number) ?? (row.Id as number) ?? 0,
-  productVariantId:
-    (row.productVariantId as number) ??
-    (row.ProductVariantId as number) ??
+  productId:
+    (row.productId as number) ??
+    (row.ProductId as number) ??
     0,
+  productVariantId:
+    (row.productVariantId as number | null | undefined) ??
+    (row.ProductVariantId as number | null | undefined) ??
+    null,
   productName:
     (row.productName as string) ?? (row.ProductName as string) ?? "",
   receivedWeight:
@@ -97,6 +101,27 @@ const mapDetail = (row: RawObject) => ({
   rejectWeight:
     (row.rejectWeight as number) ?? (row.RejectWeight as number) ?? 0,
   qcResult: (row.qcResult as string) ?? (row.QCResult as string) ?? "",
+  inspectedWeight:
+    (row.inspectedWeight as number | null | undefined) ??
+    (row.InspectedWeight as number | null | undefined) ??
+    null,
+  damagedWeight:
+    (row.damagedWeight as number | null | undefined) ??
+    (row.DamagedWeight as number | null | undefined) ??
+    null,
+  classificationDetails: (
+    (row.classificationDetails as RawObject[] | undefined) ??
+    (row.ClassificationDetails as RawObject[] | undefined) ??
+    []
+  ).map((c) => ({
+    productVariantId:
+      (c.productVariantId as number) ?? (c.ProductVariantId as number) ?? 0,
+    productVariantName:
+      (c.productVariantName as string) ??
+      (c.ProductVariantName as string) ??
+      "",
+    quantity: (c.quantity as number) ?? (c.Quantity as number) ?? 0,
+  })),
   unitPrice:
     (row.unitPrice as number | null | undefined) ??
     (row.UnitPrice as number | null | undefined) ??
@@ -1525,7 +1550,9 @@ export const goodsReceiptApi = api.injectEndpoints({
         method: "POST",
         body: {
           detailId: body.detailId,
-          usableWeight: body.usableWeight,
+          inspectedWeight: body.inspectedWeight,
+          damagedWeight: body.damagedWeight,
+          classificationDetails: body.classificationDetails,
         },
       }),
       invalidatesTags: () => [{ type: "GoodsReceipt" as const, id: "LIST" }],

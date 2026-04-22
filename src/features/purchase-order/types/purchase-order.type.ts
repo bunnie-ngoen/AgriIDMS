@@ -15,7 +15,7 @@ export type PurchaseOrderListItem = {
 
 /** Match BE CreatePurchaseOrderRequest / CreatePurchaseOrderDetailRequest */
 export type CreatePurchaseOrderDetailRequest = {
-  productVariantId: number;
+  productId: number;
   orderedWeight: number;
   unitPrice: number;
   tolerancePercent: number;
@@ -30,7 +30,7 @@ export type CreatePurchaseOrderRequest = {
 /** Match BE UpdatePurchaseOrderRequest / UpdatePurchaseOrderDetailRequest */
 export type UpdatePurchaseOrderDetailRequest = {
   id?: number | null;
-  productVariantId: number;
+  productId: number;
   orderedWeight: number;
   unitPrice: number;
   tolerancePercent: number;
@@ -45,7 +45,7 @@ export type UpdatePurchaseOrderRequest = {
 /** Match BE PurchaseOrderResponse / PurchaseOrderDetailResponse */
 export type PurchaseOrderDetailResponse = {
   id: number;
-  productVariantId: number;
+  productId: number;
   productName: string;
   orderedWeight: number;
   unitPrice: number;

@@ -18,12 +18,20 @@ export type GoodsReceiptSummary = {
 
 export type GoodsReceiptDetailLine = {
   id: number;
-  productVariantId: number;
+  productId: number;
+  productVariantId?: number | null;
   productName: string;
   receivedWeight: number;
   usableWeight: number;
   rejectWeight: number;
   qcResult: string;
+  inspectedWeight?: number | null;
+  damagedWeight?: number | null;
+  classificationDetails?: {
+    productVariantId: number;
+    productVariantName: string;
+    quantity: number;
+  }[];
   unitPrice?: number | null;
   lineTotal?: number | null;
 };
@@ -158,7 +166,6 @@ export type CreateGoodsReceiptRequest = {
   purchaseOrderId: number;
   details?: {
     purchaseOrderDetailId: number;
-    productVariantId: number;
     receivedWeight: number;
   }[];
 };
@@ -166,7 +173,6 @@ export type CreateGoodsReceiptRequest = {
 export type AddGoodsReceiptDetailRequest = {
   goodsReceiptId: number;
   purchaseOrderDetailId: number;
-  productVariantId: number;
   receivedWeight: number;
 };
 
@@ -178,7 +184,12 @@ export type UpdateTruckWeightRequest = {
 
 export type QCInspectionRequest = {
   detailId: number;
-  usableWeight: number;
+  inspectedWeight: number;
+  damagedWeight: number;
+  classificationDetails: {
+    productVariantId: number;
+    quantity: number;
+  }[];
 };
 
 // Khớp BE enum BoxType:
