@@ -4,6 +4,7 @@ import type {
   CreateMultiSupplierPurchaseOrderRequest,
   UpdatePurchaseOrderRequest,
   PurchaseOrderResponse,
+  PurchaseOrderStructuredResponse,
   PurchaseOrderListItem,
   PurchaseOrderDetailResponse,
 } from "../types/purchase-order.type";
@@ -172,6 +173,113 @@ export const purchaseOrderApi = api.injectEndpoints({
       providesTags: (_res, _err, id) => [{ type: "PurchaseOrder" as const, id }],
     }),
 
+    getPurchaseOrderStructuredById: builder.query<PurchaseOrderStructuredResponse, number>({
+      query: (id) => ({ url: `PurchaseOrder/${id}/structured` }),
+      transformResponse: (raw: unknown): PurchaseOrderStructuredResponse => {
+        const row = (raw ?? {}) as RawObject;
+        const statusObj = ((row.status as RawObject) ?? (row.Status as RawObject) ?? {}) as RawObject;
+        const procurementObj = ((row.procurement as RawObject) ?? (row.Procurement as RawObject) ?? {}) as RawObject;
+        const createdByObj = ((row.createdBy as RawObject) ?? (row.CreatedBy as RawObject) ?? {}) as RawObject;
+        const summaryObj = ((row.summary as RawObject) ?? (row.Summary as RawObject) ?? {}) as RawObject;
+        const plansRaw =
+          (row.supplierPlans as unknown[]) ??
+          (row.SupplierPlans as unknown[]) ??
+          [];
+
+        return {
+          id: (row.id as number) ?? (row.Id as number) ?? 0,
+          orderCode: (row.orderCode as string) ?? (row.OrderCode as string) ?? "",
+          status: {
+            code: (statusObj.code as string) ?? (statusObj.Code as string) ?? "",
+            label: (statusObj.label as string) ?? (statusObj.Label as string) ?? "",
+          },
+          procurement: {
+            mode: (procurementObj.mode as string) ?? (procurementObj.Mode as string) ?? "",
+            label: (procurementObj.label as string) ?? (procurementObj.Label as string) ?? "",
+          },
+          orderDate: (row.orderDate as string) ?? (row.OrderDate as string) ?? "",
+          createdBy: {
+            id: (createdByObj.id as string) ?? (createdByObj.Id as string) ?? null,
+            name: (createdByObj.name as string) ?? (createdByObj.Name as string) ?? "",
+          },
+          summary: {
+            totalSuppliers: (summaryObj.totalSuppliers as number) ?? (summaryObj.TotalSuppliers as number) ?? 0,
+            totalProducts: (summaryObj.totalProducts as number) ?? (summaryObj.TotalProducts as number) ?? 0,
+            totalOrderedWeight:
+              (summaryObj.totalOrderedWeight as number) ?? (summaryObj.TotalOrderedWeight as number) ?? 0,
+            totalEstimatedAmount:
+              (summaryObj.totalEstimatedAmount as number) ?? (summaryObj.TotalEstimatedAmount as number) ?? 0,
+          },
+          supplierPlans: plansRaw.map((p) => {
+            const plan = (p ?? {}) as RawObject;
+            const supplierObj = ((plan.supplier as RawObject) ?? (plan.Supplier as RawObject) ?? {}) as RawObject;
+            const planSummaryObj = ((plan.summary as RawObject) ?? (plan.Summary as RawObject) ?? {}) as RawObject;
+            const detailsRaw = (plan.details as unknown[]) ?? (plan.Details as unknown[]) ?? [];
+            return {
+              supplierPlanId: (plan.supplierPlanId as number) ?? (plan.SupplierPlanId as number) ?? 0,
+              supplier: {
+                supplierId:
+                  (supplierObj.supplierId as number) ??
+                  (supplierObj.SupplierId as number) ??
+                  0,
+                supplierName:
+                  (supplierObj.supplierName as string) ??
+                  (supplierObj.SupplierName as string) ??
+                  "",
+                isPrimary:
+                  (supplierObj.isPrimary as boolean) ??
+                  (supplierObj.IsPrimary as boolean) ??
+                  false,
+              },
+              orderDate: (plan.orderDate as string) ?? (plan.OrderDate as string) ?? "",
+              notes: (plan.notes as string) ?? (plan.Notes as string) ?? null,
+              summary: {
+                totalOrderedWeight:
+                  (planSummaryObj.totalOrderedWeight as number) ??
+                  (planSummaryObj.TotalOrderedWeight as number) ??
+                  0,
+                totalEstimatedAmount:
+                  (planSummaryObj.totalEstimatedAmount as number) ??
+                  (planSummaryObj.TotalEstimatedAmount as number) ??
+                  0,
+              },
+              details: detailsRaw.map((d) => {
+                const line = (d ?? {}) as RawObject;
+                return {
+                  lineId: (line.lineId as number) ?? (line.LineId as number) ?? 0,
+                  productId:
+                    (line.productId as number) ??
+                    (line.ProductId as number) ??
+                    0,
+                  productName:
+                    (line.productName as string) ??
+                    (line.ProductName as string) ??
+                    "",
+                  orderedWeight:
+                    (line.orderedWeight as number) ??
+                    (line.OrderedWeight as number) ??
+                    0,
+                  unitPriceAtOrder:
+                    (line.unitPriceAtOrder as number) ??
+                    (line.UnitPriceAtOrder as number) ??
+                    0,
+                  priceDate:
+                    (line.priceDate as string) ??
+                    (line.PriceDate as string) ??
+                    "",
+                  lineAmount:
+                    (line.lineAmount as number) ??
+                    (line.LineAmount as number) ??
+                    0,
+                };
+              }),
+            };
+          }),
+        };
+      },
+      providesTags: (_res, _err, id) => [{ type: "PurchaseOrder" as const, id }],
+    }),
+
     createPurchaseOrder: builder.mutation<
       { message: string; purchaseOrderId: number },
       CreatePurchaseOrderRequest
@@ -238,6 +346,7 @@ export const purchaseOrderApi = api.injectEndpoints({
 export const {
   useGetPurchaseOrdersQuery,
   useGetPurchaseOrderByIdQuery,
+  useGetPurchaseOrderStructuredByIdQuery,
   useCreatePurchaseOrderMutation,
   useCreateMultiSupplierPurchaseOrderMutation,
   useUpdatePurchaseOrderMutation,
