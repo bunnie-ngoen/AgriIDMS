@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Leaf,
   LayoutDashboard,
@@ -31,6 +31,7 @@ import {
 import { formatVietnamNotificationTime } from "../../lib/vietnamTime";
 
 export default function PublicHeader() {
+  const { pathname } = useLocation();
   const { isLoggedIn, hasDashboard, dashboardPath } = usePublicLayout();
   const auth = useAuth();
   const isCustomer = auth.user?.roles?.[0] === AUTH_ROLE.CUSTOMER;
@@ -178,7 +179,11 @@ export default function PublicHeader() {
 
           <Link
             to={ROUTES.GIOI_THIEU}
-            className="shrink-0 rounded px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-[#1a5f2a]"
+            className={
+              pathname === ROUTES.GIOI_THIEU
+                ? "shrink-0 rounded px-3 py-2 text-sm font-medium text-[#1a5f2a] border-b-2 border-[#1a5f2a]"
+                : "shrink-0 rounded px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-[#1a5f2a]"
+            }
           >
             Giới thiệu
           </Link>
