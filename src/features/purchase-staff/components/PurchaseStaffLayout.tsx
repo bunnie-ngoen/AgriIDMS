@@ -115,6 +115,31 @@ export default function PurchaseStaffLayout() {
             </li>
             <li>
               <NavLink
+                to="/purchase-staff/orders/create-multi-supplier"
+                className={({ isActive }) =>
+                  `w-full flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    isActive
+                      ? "bg-[#1e282c] text-white border-l-4 border-sky-400"
+                      : "text-slate-200 hover:bg-[#1b2225]"
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    <span
+                      className={`inline-flex h-7 w-7 items-center justify-center rounded mr-3 shrink-0 ${
+                        isActive ? "bg-sky-500 text-white" : "bg-[#1f2d3a] text-slate-200"
+                      }`}
+                    >
+                      <FilePlus size={15} />
+                    </span>
+                    <span className="truncate">Tạo đơn mua đa NCC</span>
+                  </>
+                )}
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
                 to="/purchase-staff/purchase-requests"
                 className={({ isActive }) =>
                   `w-full flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
