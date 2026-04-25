@@ -18,6 +18,7 @@ export type GoodsReceiptSummary = {
 
 export type GoodsReceiptDetailLine = {
   id: number;
+  supplierPlanDetailId?: number | null;
   productId: number;
   productVariantId?: number | null;
   productName: string;

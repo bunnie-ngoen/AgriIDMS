@@ -465,11 +465,27 @@ export default function GoodsReceiptQC() {
     canViewPrice && receiptForApproval?.details?.length
       ? receiptForApproval.details
       : receipt.details;
+  const selectedDetailForQc = selectedDetailIdForQc
+    ? detailsForTable.find((d) => d.id === selectedDetailIdForQc) ?? null
+    : null;
+  const productVariantsForSelectedDetail = useMemo(() => {
+    if (!selectedDetailForQc) return [];
+    return productVariants
+      .filter(
+        (v) => v.isActive && Number(v.productId) === Number(selectedDetailForQc.productId),
+      )
+      .sort((a, b) => Number(a.grade) - Number(b.grade));
+  }, [productVariants, selectedDetailForQc]);
 
   const handleOpenQcForDetail = (detailId: number, currentUsable: number) => {
+    const targetDetail = detailsForTable.find((d) => d.id === detailId);
+    const defaultVariantId =
+      targetDetail?.productVariantId && targetDetail.productVariantId > 0
+        ? targetDetail.productVariantId
+        : 0;
     setSelectedDetailIdForQc(detailId);
     qcForm.reset({
-      productVariantId: 0,
+      productVariantId: defaultVariantId,
       usableWeight: currentUsable,
     });
     // Reset AI QC state per line
@@ -1089,7 +1105,7 @@ export default function GoodsReceiptQC() {
               >
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Product variant sau QC
+                    Biến thể sản phẩm sau QC
                   </label>
                   <select
                     {...qcForm.register("productVariantId", {
@@ -1097,15 +1113,23 @@ export default function GoodsReceiptQC() {
                     })}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
                   >
-                    <option value={0}>Chọn product variant</option>
-                    {productVariants
-                      .filter((v) => v.isActive)
-                      .map((v) => (
+                    <option value={0}>
+                      {selectedDetailForQc
+                        ? `Chọn biến thể của ${selectedDetailForQc.productName}`
+                        : "Chọn biến thể"}
+                    </option>
+                    {productVariantsForSelectedDetail.map((v) => (
                         <option key={v.id} value={v.id}>
                           {v.productName} (Grade {v.grade})
                         </option>
                       ))}
                   </select>
+                  {selectedDetailForQc &&
+                    productVariantsForSelectedDetail.length === 0 && (
+                      <p className="mt-1 text-[11px] text-amber-600">
+                        Chưa có biến thể đang hoạt động cho sản phẩm này.
+                      </p>
+                    )}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">

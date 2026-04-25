@@ -5,6 +5,7 @@ import {
   useGetGoodsReceiptForApprovalByIdQuery,
   useApproveGoodsReceiptMutation,
 } from "../api/goods-receipt.api";
+import { useGetPurchaseOrderStructuredByIdQuery } from "../../purchase-order/api/purchase-order.api";
 import { ArrowLeft, Loader2, FileDown, Package } from "lucide-react";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 import toast from "react-hot-toast";
@@ -61,6 +62,16 @@ export default function GoodsReceiptDetail() {
   } = useGetGoodsReceiptForApprovalByIdQuery(receiptId, {
     skip: !canViewPrice || !receiptId || Number.isNaN(receiptId),
   });
+  const { data: purchaseOrderStructured } = useGetPurchaseOrderStructuredByIdQuery(
+    receipt?.purchaseOrderId ?? 0,
+    {
+      skip:
+        !receipt?.purchaseOrderId ||
+        !canViewPrice ||
+        !receiptId ||
+        Number.isNaN(receiptId),
+    },
+  );
 
   const detailsForTable =
     canViewPrice && receiptForApproval?.details?.length
@@ -71,6 +82,59 @@ export default function GoodsReceiptDetail() {
     () => new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }),
     [],
   );
+  const supplierSections = useMemo(() => {
+    if (!purchaseOrderStructured?.supplierPlans?.length || !detailsForTable.length) {
+      return [];
+    }
+
+    const detailBySupplierPlanDetailId = new Map(
+      detailsForTable
+        .filter((d) => d.supplierPlanDetailId != null)
+        .map((d) => [d.supplierPlanDetailId as number, d]),
+    );
+    const matchedDetailIds = new Set<number>();
+
+    const sections = purchaseOrderStructured.supplierPlans
+      .map((plan) => {
+        const lines = plan.details
+          .map((planLine) => {
+            if (planLine.supplierPlanDetailId == null) return null;
+            const matched = detailBySupplierPlanDetailId.get(planLine.supplierPlanDetailId);
+            if (!matched) return null;
+            matchedDetailIds.add(matched.id);
+            return matched;
+          })
+          .filter((x): x is (typeof detailsForTable)[number] => x != null);
+
+        if (!lines.length) return null;
+
+        return {
+          supplierPlanId: plan.supplierPlanId,
+          supplierName: plan.supplier.supplierName,
+          lines,
+        };
+      })
+      .filter(
+        (
+          section,
+        ): section is {
+          supplierPlanId: number;
+          supplierName: string;
+          lines: (typeof detailsForTable)[number][];
+        } => section != null,
+      );
+
+    const unassignedLines = detailsForTable.filter((d) => !matchedDetailIds.has(d.id));
+    if (unassignedLines.length > 0) {
+      sections.push({
+        supplierPlanId: -1,
+        supplierName: "Dòng chưa ghép NCC",
+        lines: unassignedLines,
+      });
+    }
+
+    return sections;
+  }, [detailsForTable, purchaseOrderStructured]);
 
   if (Number.isNaN(receiptId) || receiptId < 1) {
     navigate(basePath);
@@ -279,6 +343,43 @@ export default function GoodsReceiptDetail() {
               Dòng chi tiết phiếu nhập
             </h2>
           </div>
+          {canViewPrice && supplierSections.length > 0 && (
+            <div className="px-6 py-4 border-b border-slate-100 space-y-3 bg-slate-50/40">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Nhóm theo nhà cung cấp
+              </h3>
+              <div className="space-y-2">
+                {supplierSections.map((section) => (
+                  <div
+                    key={`${section.supplierPlanId}-${section.supplierName}`}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                  >
+                    <p className="text-sm font-semibold text-slate-800">
+                      {section.supplierName}
+                    </p>
+                    <div className="mt-2 space-y-1">
+                      {section.lines.map((line) => (
+                        <div
+                          key={line.id}
+                          className="flex items-center justify-between gap-3 text-xs text-slate-600"
+                        >
+                          <span className="text-slate-700">{line.productName}</span>
+                          <span className="tabular-nums">
+                            {line.receivedWeight} kg
+                            {line.unitPrice != null
+                              ? ` · ${moneyFmt.format(
+                                  Number(line.unitPrice) * Number(line.receivedWeight),
+                                )} đ`
+                              : ""}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
