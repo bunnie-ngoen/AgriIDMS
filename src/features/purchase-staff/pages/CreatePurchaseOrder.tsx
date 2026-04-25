@@ -98,7 +98,7 @@ export default function CreatePurchaseOrder() {
     }
 
     try {
-      const res = await createPo({
+      const payload = {
         supplierId: values.supplierId,
         details: values.details.map((d) => ({
           productId: d.productId,
@@ -107,7 +107,15 @@ export default function CreatePurchaseOrder() {
           tolerancePercent: Number(d.tolerancePercent),
           harvestDate: new Date(d.harvestDate).toISOString(),
         })),
-      }).unwrap();
+      };
+
+      if (import.meta.env.DEV) {
+        // Debug payload shape to identify any unexpected serialization in runtime.
+        console.debug("[CreatePurchaseOrder] payload", payload);
+        console.debug("[CreatePurchaseOrder] typeof details", typeof payload.details, Array.isArray(payload.details));
+      }
+
+      const res = await createPo(payload).unwrap();
 
       const successMessage = res.message ?? "Tạo đơn mua thành công.";
       toast.success(successMessage);

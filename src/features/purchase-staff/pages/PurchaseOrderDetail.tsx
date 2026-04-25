@@ -24,6 +24,12 @@ function toVietnamesePoStatus(status: string): string {
   }
 }
 
+function toVietnameseProcurementMode(mode?: string): string {
+  if (mode === "MultiSupplierStrictReceipt") return "Đa NCC - nhận đủ";
+  if (mode === "LegacySingleSupplier") return "1 NCC - luồng cũ";
+  return "Không xác định";
+}
+
 export default function PurchaseOrderDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -108,6 +114,10 @@ export default function PurchaseOrderDetail() {
 
   const canEdit = !showApprove && order.status === "Pending";
   const canApprove = showApprove && order.status === "Pending";
+  const suppliers = (order.supplierName || "")
+    .split("|")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-5 py-6">
@@ -126,20 +136,22 @@ export default function PurchaseOrderDetail() {
               <h1 className="text-xl font-bold text-slate-900 tracking-tight">
                 Đơn mua · {order.orderCode}
               </h1>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {order.supplierName} ·{" "}
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
+                  {toVietnameseProcurementMode(order.procurementMode)}
+                </span>
                 <span
-                  className={
+                  className={`rounded-full px-2.5 py-1 ${
                     order.status === "Approved"
-                      ? "text-emerald-600"
+                      ? "bg-emerald-100 text-emerald-700"
                       : order.status === "Pending"
-                        ? "text-amber-600"
-                        : "text-rose-600"
-                  }
+                        ? "bg-amber-100 text-amber-700"
+                        : "bg-rose-100 text-rose-700"
+                  }`}
                 >
                   {toVietnamesePoStatus(order.status)}
                 </span>
-              </p>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -199,19 +211,36 @@ export default function PurchaseOrderDetail() {
 
         {/* Summary card */}
         <div className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
-          <div className="px-6 py-5 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div className="px-6 py-5 space-y-5">
             <div>
-              <span className="text-slate-500 block text-xs font-medium">
-                Nhà cung cấp
+              <span className="text-slate-500 block text-xs font-medium mb-2">
+                Nhà cung cấp tham gia
               </span>
+              {suppliers.length > 1 ? (
+                <div className="flex flex-wrap gap-2">
+                  {suppliers.map((name) => (
+                    <span
+                      key={name}
+                      className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700"
+                    >
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="font-medium text-slate-900">{suppliers[0] ?? "-"}</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm border-t border-slate-100 pt-4">
+            <div>
+              <span className="text-slate-500 block text-xs font-medium">Kiểu đơn</span>
               <p className="font-medium text-slate-900 mt-1">
-                {order.supplierName}
+                {toVietnameseProcurementMode(order.procurementMode)}
               </p>
             </div>
             <div>
-              <span className="text-slate-500 block text-xs font-medium">
-                Trạng thái
-              </span>
+              <span className="text-slate-500 block text-xs font-medium">Trạng thái</span>
               <p className="font-medium mt-1">
                 <span
                   className={
@@ -227,9 +256,7 @@ export default function PurchaseOrderDetail() {
               </p>
             </div>
             <div>
-              <span className="text-slate-500 block text-xs font-medium">
-                Người tạo
-              </span>
+              <span className="text-slate-500 block text-xs font-medium">Người tạo</span>
               <p className="font-medium text-slate-900 mt-1">
                 {order.createdByName && order.createdByName.trim().length > 0
                   ? order.createdByName
@@ -237,14 +264,13 @@ export default function PurchaseOrderDetail() {
               </p>
             </div>
             <div>
-              <span className="text-slate-500 block text-xs font-medium">
-                Ngày đặt
-              </span>
+              <span className="text-slate-500 block text-xs font-medium">Ngày đặt</span>
               <p className="font-medium text-slate-900 mt-1">
                 {order.orderDate
                   ? new Date(order.orderDate).toLocaleDateString("vi-VN")
                   : "-"}
               </p>
+            </div>
             </div>
           </div>
         </div>
