@@ -5,6 +5,7 @@ export type PurchaseOrderListItem = {
   supplierId: number;
   supplierName: string;
   status: string;
+  procurementMode?: string;
   orderDate: string;
   /**
    * Tên người tạo đơn (nếu BE trả về trong list).
@@ -25,6 +26,25 @@ export type CreatePurchaseOrderDetailRequest = {
 export type CreatePurchaseOrderRequest = {
   supplierId: number;
   details: CreatePurchaseOrderDetailRequest[];
+};
+
+export type CreateSupplierPlanDetailRequest = {
+  productId: number;
+  orderedWeight: number;
+  unitPriceAtOrder: number;
+  priceDate: string;
+  tolerancePercent: number;
+};
+
+export type CreateSupplierPlanRequest = {
+  supplierId: number;
+  orderDate: string;
+  notes?: string;
+  details: CreateSupplierPlanDetailRequest[];
+};
+
+export type CreateMultiSupplierPurchaseOrderRequest = {
+  supplierPlans: CreateSupplierPlanRequest[];
 };
 
 /** Match BE UpdatePurchaseOrderRequest / UpdatePurchaseOrderDetailRequest */
@@ -66,6 +86,7 @@ export type PurchaseOrderResponse = {
   supplierId: number;
   supplierName: string;
   status: string;
+  procurementMode?: string;
   orderDate: string;
   /**
    * Tên người tạo đơn (nếu BE trả về).

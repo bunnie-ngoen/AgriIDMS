@@ -193,14 +193,24 @@ export default function PurchaseOrderList() {
             </div>
           </div>
           {!isReviewer && (
-            <button
-              type="button"
-              onClick={() => navigate(createLink)}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl py-3 px-5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
-            >
-              <FilePlus size={18} />
-              Tạo đơn mua
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => navigate(createLink)}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl py-3 px-5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+              >
+                <FilePlus size={18} />
+                Tạo đơn mua
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate("/purchase-staff/orders/create-multi-supplier")}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl py-3 px-5 text-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 shadow-sm"
+              >
+                <FilePlus size={18} />
+                Tạo đơn mua đa NCC
+              </button>
+            </div>
           )}
         </div>
 

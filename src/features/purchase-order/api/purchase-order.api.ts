@@ -1,6 +1,7 @@
 import { api } from "../../../shared/api";
 import type {
   CreatePurchaseOrderRequest,
+  CreateMultiSupplierPurchaseOrderRequest,
   UpdatePurchaseOrderRequest,
   PurchaseOrderResponse,
   PurchaseOrderListItem,
@@ -95,6 +96,10 @@ export const purchaseOrderApi = api.injectEndpoints({
               (row.SupplierName as string) ??
               "",
             status: (row.status as string) ?? (row.Status as string) ?? "",
+            procurementMode:
+              (row.procurementMode as string) ??
+              (row.ProcurementMode as string) ??
+              undefined,
             orderDate:
               orderDate != null
                 ? typeof orderDate === "string"
@@ -148,6 +153,10 @@ export const purchaseOrderApi = api.injectEndpoints({
           supplierName:
             (row.supplierName as string) ?? (row.SupplierName as string) ?? "",
           status: (row.status as string) ?? (row.Status as string) ?? "",
+          procurementMode:
+            (row.procurementMode as string) ??
+            (row.ProcurementMode as string) ??
+            undefined,
           orderDate:
             orderDate != null
               ? typeof orderDate === "string"
@@ -169,6 +178,18 @@ export const purchaseOrderApi = api.injectEndpoints({
     >({
       query: (body) => ({
         url: "PurchaseOrder",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: [{ type: "PurchaseOrder" as const, id: "LIST" }],
+    }),
+
+    createMultiSupplierPurchaseOrder: builder.mutation<
+      { message: string; purchaseOrderId: number },
+      CreateMultiSupplierPurchaseOrderRequest
+    >({
+      query: (body) => ({
+        url: "PurchaseOrder/multi-supplier",
         method: "POST",
         body,
       }),
@@ -218,6 +239,7 @@ export const {
   useGetPurchaseOrdersQuery,
   useGetPurchaseOrderByIdQuery,
   useCreatePurchaseOrderMutation,
+  useCreateMultiSupplierPurchaseOrderMutation,
   useUpdatePurchaseOrderMutation,
   useDeletePurchaseOrderMutation,
   useApprovePurchaseOrderMutation,
