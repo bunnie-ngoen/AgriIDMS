@@ -54,6 +54,23 @@ export default function PurchaseStaffDashboard() {
             </div>
             <ChevronRight size={18} className="text-slate-400 shrink-0" />
           </button>
+
+          <button
+            type="button"
+            onClick={() => navigate("/purchase-staff/orders/create-multi-supplier")}
+            className={CARD_CLASS}
+          >
+            <div className="h-12 w-12 rounded-xl bg-violet-50 flex items-center justify-center shrink-0 text-violet-600">
+              <FilePlus size={22} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="font-semibold text-slate-800">Tạo đơn mua đa NCC</h2>
+              <p className="text-sm text-slate-500">
+                Tạo một đơn mua với nhiều nhà cung cấp
+              </p>
+            </div>
+            <ChevronRight size={18} className="text-slate-400 shrink-0" />
+          </button>
         </div>
       </div>
     </div>
