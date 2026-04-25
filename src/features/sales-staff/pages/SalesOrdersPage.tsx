@@ -42,6 +42,14 @@ const SALES_CLEAR_BTN =
 const STATUS_PILL =
   "inline-flex items-center rounded-full border px-2 py-1 text-xs font-semibold";
 
+function getApiErrorMessage(err: unknown, fallback: string) {
+  const e = err as {
+    data?: { message?: string; error?: string; detail?: string };
+    message?: string;
+  };
+  return e?.data?.message || e?.data?.error || e?.data?.detail || e?.message || fallback;
+}
+
 function isShippingPendingPickupList(o: OrderListItem): boolean {
   const s = o.shippingStatus;
   return s === "ShippingPendingPickup" || s == null || s === "";
@@ -425,8 +433,9 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
       }
       await refetchPendingSaleConfirm();
       await refetchPendingWarehouseConfirm();
-    } catch {
-      toast.error(`Sale-confirm đơn #${id} thất bại`, { id: t });
+    } catch (err: unknown) {
+      const msg = getApiErrorMessage(err, `Sale-confirm đơn #${id} thất bại`);
+      toast.error(msg, { id: t });
     }
   };
 
