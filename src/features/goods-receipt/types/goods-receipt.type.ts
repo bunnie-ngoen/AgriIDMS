@@ -166,6 +166,7 @@ export type CreateGoodsReceiptRequest = {
   purchaseOrderId: number;
   details?: {
     purchaseOrderDetailId: number;
+    supplierPlanDetailId?: number;
     receivedWeight: number;
   }[];
 };

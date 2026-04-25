@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import { useGetWarehousesQuery } from "../../admin/api/create-user.api";
 import { useGetPurchaseOrdersQuery } from "../../purchase-order/api/purchase-order.api";
 import { useGetPurchaseOrderByIdQuery } from "../../purchase-order/api/purchase-order.api";
+import { useGetPurchaseOrderStructuredByIdQuery } from "../../purchase-order/api/purchase-order.api";
 import { useCreateGoodsReceiptMutation } from "../api/goods-receipt.api";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
@@ -74,6 +75,9 @@ export default function CreateGoodsReceipt() {
 
   type DetailLine = {
     purchaseOrderDetailId: number;
+    supplierPlanDetailId?: number;
+    supplierId: number;
+    supplierName: string;
     productName: string;
     orderedWeight: number;
     remainingWeight: number;
@@ -96,6 +100,12 @@ export default function CreateGoodsReceipt() {
   } = useGetPurchaseOrderByIdQuery(watchedPurchaseOrderId, {
     skip: !watchedPurchaseOrderId || Number.isNaN(watchedPurchaseOrderId),
   });
+  const { data: purchaseOrderStructuredForDetails } = useGetPurchaseOrderStructuredByIdQuery(
+    watchedPurchaseOrderId,
+    {
+      skip: !watchedPurchaseOrderId || Number.isNaN(watchedPurchaseOrderId),
+    },
+  );
 
   useEffect(() => {
     // Khi đổi PO thì reset các dòng chi tiết đã thêm
@@ -106,8 +116,34 @@ export default function CreateGoodsReceipt() {
   }, [watchedPurchaseOrderId]);
 
   const poDetailOptions = useMemo(() => {
-    return purchaseOrderForDetails?.details ?? [];
-  }, [purchaseOrderForDetails]);
+    const structuredPlans = purchaseOrderStructuredForDetails?.supplierPlans ?? [];
+    const structuredRows = structuredPlans.flatMap((plan) =>
+      (plan.details ?? []).map((line) => {
+        const oldDetail = purchaseOrderForDetails?.details?.find((d) => d.id === line.lineId);
+        return {
+          id: line.lineId,
+          supplierPlanDetailId: plan.supplierPlanId > 0 ? line.lineId : undefined,
+          supplierId: plan.supplier.supplierId,
+          supplierName: plan.supplier.supplierName,
+          productName: line.productName,
+          orderedWeight: line.orderedWeight,
+          remainingWeight: oldDetail?.remainingWeight ?? line.orderedWeight,
+        };
+      }),
+    );
+
+    if (structuredRows.length > 0) return structuredRows;
+
+    return (purchaseOrderForDetails?.details ?? []).map((d) => ({
+      id: d.id,
+      supplierPlanDetailId: undefined,
+      supplierId: selectedPo?.supplierId ?? 0,
+      supplierName: selectedPo?.supplierName ?? "",
+      productName: d.productName,
+      orderedWeight: d.orderedWeight,
+      remainingWeight: d.remainingWeight,
+    }));
+  }, [purchaseOrderStructuredForDetails, purchaseOrderForDetails, selectedPo]);
 
   const selectedWarehouse = useMemo(
     () => warehouses.find((w) => w.id === watchedWarehouseId),
@@ -152,6 +188,7 @@ export default function CreateGoodsReceipt() {
         purchaseOrderId: values.purchaseOrderId,
         details: detailLines.map((d) => ({
           purchaseOrderDetailId: d.purchaseOrderDetailId,
+          supplierPlanDetailId: d.supplierPlanDetailId,
           receivedWeight: d.receivedWeight,
         })),
       }).unwrap();
@@ -210,6 +247,18 @@ export default function CreateGoodsReceipt() {
       return;
     }
 
+    const supplierIdsInCart = Array.from(
+      new Set(detailLines.map((x) => x.supplierId).filter((id) => id > 0)),
+    );
+    if (
+      supplierIdsInCart.length > 0 &&
+      matched.supplierId > 0 &&
+      !supplierIdsInCart.includes(matched.supplierId)
+    ) {
+      toast.error("Phiếu nhập đa NCC chỉ nhận từ một NCC nguồn. Vui lòng tách phiếu theo từng NCC.");
+      return;
+    }
+
     if (receivedWeight > matched.remainingWeight) {
       toast.error(
         `Khối lượng nhận không được vượt quá còn lại của dòng PO (còn lại ${matched.remainingWeight} kg).`,
@@ -235,6 +284,9 @@ export default function CreateGoodsReceipt() {
         ...prev,
         {
           purchaseOrderDetailId: matched.id,
+          supplierPlanDetailId: matched.supplierPlanDetailId,
+          supplierId: matched.supplierId,
+          supplierName: matched.supplierName,
           productName: matched.productName,
           orderedWeight: matched.orderedWeight,
           remainingWeight: matched.remainingWeight,
@@ -255,6 +307,11 @@ export default function CreateGoodsReceipt() {
     );
     toast.success("Đã xoá dòng chi tiết.");
   };
+  const selectedSupplierNameForReceipt = useMemo(() => {
+    const names = Array.from(new Set(detailLines.map((x) => x.supplierName).filter(Boolean)));
+    if (names.length > 0) return names[0];
+    return selectedSupplierName;
+  }, [detailLines, selectedSupplierName]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-5 py-6">
@@ -390,8 +447,8 @@ export default function CreateGoodsReceipt() {
                         </option>
                         {poDetailOptions.map((d) => (
                           <option key={d.id} value={d.id}>
-                            {d.productName} — KL đặt: {d.orderedWeight} kg, còn lại:{" "}
-                            {d.remainingWeight} kg
+                            {d.supplierName ? `[${d.supplierName}] ` : ""}
+                            {d.productName} — KL đặt: {d.orderedWeight} kg, còn lại: {d.remainingWeight} kg
                           </option>
                         ))}
                       </select>
@@ -544,7 +601,7 @@ export default function CreateGoodsReceipt() {
                     Nhà cung cấp *
                   </label>
                   <input
-                    value={selectedSupplierName || ""}
+                    value={selectedSupplierNameForReceipt || ""}
                     readOnly
                     placeholder="Chọn đơn mua để tự điền nhà cung cấp"
                     className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 text-slate-700 focus:outline-none"
