@@ -60,10 +60,10 @@ export default function CreatePurchaseRequest() {
           targetUnitPrice: Number(d.targetUnitPrice ?? 0),
         })),
       }).unwrap();
-      toast.success("Tạo purchase request thành công.");
+      toast.success("Tạo phiếu đề xuất mua thành công.");
       navigate("/purchase-staff/purchase-requests");
     } catch (err: any) {
-      toast.error(err?.data?.message || err?.data?.error || "Tạo purchase request thất bại.");
+      toast.error(err?.data?.message || err?.data?.error || "Tạo phiếu đề xuất mua thất bại.");
     }
   };
 
@@ -78,7 +78,7 @@ export default function CreatePurchaseRequest() {
           <ArrowLeft size={16} />
         </button>
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Tạo Purchase Request</h1>
+          <h1 className="text-xl font-bold text-slate-900">Tạo phiếu đề xuất mua</h1>
           <p className="text-sm text-slate-500">Gom nhu cầu mua sản phẩm gốc trước khi tách PO theo supplier.</p>
         </div>
       </div>
@@ -178,7 +178,7 @@ export default function CreatePurchaseRequest() {
                 <Loader2 size={16} className="animate-spin" /> Đang tạo...
               </>
             ) : (
-              "Tạo Purchase Request"
+              "Tạo phiếu đề xuất mua"
             )}
           </button>
         </div>
