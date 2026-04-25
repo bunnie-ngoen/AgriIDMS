@@ -247,6 +247,10 @@ export const purchaseOrderApi = api.injectEndpoints({
                 const line = (d ?? {}) as RawObject;
                 return {
                   lineId: (line.lineId as number) ?? (line.LineId as number) ?? 0,
+                  supplierPlanDetailId:
+                    (line.supplierPlanDetailId as number | null | undefined) ??
+                    (line.SupplierPlanDetailId as number | null | undefined) ??
+                    null,
                   productId:
                     (line.productId as number) ??
                     (line.ProductId as number) ??
