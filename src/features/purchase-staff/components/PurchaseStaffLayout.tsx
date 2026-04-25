@@ -133,7 +133,7 @@ export default function PurchaseStaffLayout() {
                     >
                       <List size={15} />
                     </span>
-                    <span className="truncate">Purchase request</span>
+                    <span className="truncate">Phiếu đề xuất mua</span>
                   </>
                 )}
               </NavLink>
@@ -158,7 +158,7 @@ export default function PurchaseStaffLayout() {
                     >
                       <FilePlus size={15} />
                     </span>
-                    <span className="truncate">Tạo purchase request</span>
+                    <span className="truncate">Tạo phiếu đề xuất mua</span>
                   </>
                 )}
               </NavLink>
