@@ -131,6 +131,7 @@ export type PurchaseOrderStructuredSupplierPlanSummary = {
 
 export type PurchaseOrderStructuredLine = {
   lineId: number;
+  supplierPlanDetailId?: number | null;
   productId: number;
   productName: string;
   orderedWeight: number;

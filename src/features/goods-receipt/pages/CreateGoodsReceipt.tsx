@@ -35,6 +35,25 @@ const Schema = z
 
 type FormValues = z.infer<typeof Schema>;
 
+type ReceiptLine = {
+  purchaseOrderDetailId: number;
+  supplierPlanDetailId?: number;
+  productName: string;
+  orderedWeight: number;
+  remainingWeight: number;
+  unitPriceAtOrder?: number;
+  priceDate?: string;
+  receivedWeight: number;
+};
+
+type SupplierCard = {
+  supplierId: number;
+  supplierName: string;
+  orderDate?: string;
+  supplierPlanId?: number;
+  lines: ReceiptLine[];
+};
+
 export default function CreateGoodsReceipt() {
   const navigate = useNavigate();
   const { isAdmin, isManager, isWarehouseStaff } = useRoleGuard();
@@ -48,7 +67,6 @@ export default function CreateGoodsReceipt() {
     data: warehouses = [],
     isLoading: isLoadingWarehouses,
     isError: isWarehousesError,
-    error: warehousesError,
   } = useGetWarehousesQuery();
   const { data: purchaseOrders = [] } = useGetPurchaseOrdersQuery();
   const [createReceipt, { isLoading }] = useCreateGoodsReceiptMutation();
@@ -70,29 +88,8 @@ export default function CreateGoodsReceipt() {
   const watchedWarehouseId = form.watch("warehouseId");
 
   const selectedPo = purchaseOrders.find((po) => po.id === watchedPurchaseOrderId);
-  const selectedSupplierName =
-    selectedPo?.supplierName || "";
 
-  type DetailLine = {
-    purchaseOrderDetailId: number;
-    supplierPlanDetailId?: number;
-    supplierId: number;
-    supplierName: string;
-    productName: string;
-    orderedWeight: number;
-    remainingWeight: number;
-    receivedWeight: number;
-  };
-
-  const [detailLines, setDetailLines] = useState<DetailLine[]>([]);
-  const [selectedPoDetailId, setSelectedPoDetailId] = useState<number>(0);
-  // Dùng string để tránh ô input luôn hiển thị "0" khi mới vào form
-  const [receivedWeightInput, setReceivedWeightInput] = useState<string>("");
-  const [detailInputErrors, setDetailInputErrors] = useState<{
-    poDetail?: string;
-    receivedWeight?: string;
-    details?: string;
-  }>({});
+  const [supplierCards, setSupplierCards] = useState<SupplierCard[]>([]);
 
   const {
     data: purchaseOrderForDetails,
@@ -108,42 +105,70 @@ export default function CreateGoodsReceipt() {
   );
 
   useEffect(() => {
-    // Khi đổi PO thì reset các dòng chi tiết đã thêm
-    setDetailLines([]);
-    setSelectedPoDetailId(0);
-    setReceivedWeightInput("");
-    setDetailInputErrors({});
+    setSupplierCards([]);
   }, [watchedPurchaseOrderId]);
 
-  const poDetailOptions = useMemo(() => {
+  const procurementMode = purchaseOrderStructuredForDetails?.procurement?.mode ?? selectedPo?.procurementMode;
+  const isMultiSupplier = procurementMode === "MultiSupplierStrictReceipt";
+
+  useEffect(() => {
+    if (!watchedPurchaseOrderId || watchedPurchaseOrderId <= 0) return;
     const structuredPlans = purchaseOrderStructuredForDetails?.supplierPlans ?? [];
-    const structuredRows = structuredPlans.flatMap((plan) =>
-      (plan.details ?? []).map((line) => {
-        const oldDetail = purchaseOrderForDetails?.details?.find((d) => d.id === line.lineId);
-        return {
-          id: line.lineId,
-          supplierPlanDetailId: plan.supplierPlanId > 0 ? line.lineId : undefined,
-          supplierId: plan.supplier.supplierId,
-          supplierName: plan.supplier.supplierName,
-          productName: line.productName,
-          orderedWeight: line.orderedWeight,
-          remainingWeight: oldDetail?.remainingWeight ?? line.orderedWeight,
-        };
-      }),
-    );
+    if (structuredPlans.length > 0) {
+      const mapped: SupplierCard[] = structuredPlans.map((plan) => ({
+        supplierId: plan.supplier.supplierId,
+        supplierName: plan.supplier.supplierName,
+        orderDate: plan.orderDate,
+        supplierPlanId: plan.supplierPlanId,
+        lines: (plan.details ?? []).map((line) => {
+          const oldDetail = purchaseOrderForDetails?.details?.find((d) => d.id === line.lineId);
+          const ordered = Number(line.orderedWeight ?? 0);
+          return {
+            purchaseOrderDetailId: line.lineId,
+            supplierPlanDetailId:
+              plan.supplierPlanId > 0
+                ? (line.supplierPlanDetailId ?? undefined)
+                : undefined,
+            productName: line.productName,
+            orderedWeight: ordered,
+            remainingWeight: Number(oldDetail?.remainingWeight ?? ordered),
+            unitPriceAtOrder: Number(line.unitPriceAtOrder ?? 0),
+            priceDate: line.priceDate,
+            receivedWeight: isMultiSupplier ? ordered : Number(oldDetail?.remainingWeight ?? 0),
+          };
+        }),
+      }));
+      setSupplierCards(mapped);
+      return;
+    }
 
-    if (structuredRows.length > 0) return structuredRows;
-
-    return (purchaseOrderForDetails?.details ?? []).map((d) => ({
-      id: d.id,
-      supplierPlanDetailId: undefined,
-      supplierId: selectedPo?.supplierId ?? 0,
-      supplierName: selectedPo?.supplierName ?? "",
-      productName: d.productName,
-      orderedWeight: d.orderedWeight,
-      remainingWeight: d.remainingWeight,
-    }));
-  }, [purchaseOrderStructuredForDetails, purchaseOrderForDetails, selectedPo]);
+    const legacyDetails = purchaseOrderForDetails?.details ?? [];
+    if (legacyDetails.length > 0) {
+      setSupplierCards([
+        {
+          supplierId: selectedPo?.supplierId ?? 0,
+          supplierName: selectedPo?.supplierName ?? "Không xác định",
+          orderDate: selectedPo?.orderDate,
+          lines: legacyDetails.map((d) => ({
+            purchaseOrderDetailId: d.id,
+            supplierPlanDetailId: undefined,
+            productName: d.productName,
+            orderedWeight: Number(d.orderedWeight ?? 0),
+            remainingWeight: Number(d.remainingWeight ?? d.orderedWeight ?? 0),
+            unitPriceAtOrder: Number(d.unitPrice ?? 0),
+            priceDate: selectedPo?.orderDate,
+            receivedWeight: Number(d.remainingWeight ?? 0),
+          })),
+        },
+      ]);
+    }
+  }, [
+    watchedPurchaseOrderId,
+    purchaseOrderStructuredForDetails,
+    purchaseOrderForDetails,
+    selectedPo,
+    isMultiSupplier,
+  ]);
 
   const selectedWarehouse = useMemo(
     () => warehouses.find((w) => w.id === watchedWarehouseId),
@@ -165,19 +190,69 @@ export default function CreateGoodsReceipt() {
   );
 
   const totalIncomingWeight = useMemo(
-    () => detailLines.reduce((sum, line) => sum + Number(line.receivedWeight ?? 0), 0),
-    [detailLines],
+    () =>
+      supplierCards
+        .flatMap((card) => card.lines)
+        .reduce((sum, line) => sum + Number(line.receivedWeight ?? 0), 0),
+    [supplierCards],
   );
+
+  const cardSummaries = useMemo(() => {
+    return supplierCards.map((card) => {
+      const totalOrdered = card.lines.reduce((sum, x) => sum + Number(x.orderedWeight ?? 0), 0);
+      const totalReceived = card.lines.reduce((sum, x) => sum + Number(x.receivedWeight ?? 0), 0);
+      const validLines = card.lines.filter((line) => {
+        if (isMultiSupplier) return Math.abs(line.receivedWeight - line.orderedWeight) <= 0.0001;
+        return line.receivedWeight > 0 && line.receivedWeight <= line.remainingWeight;
+      }).length;
+      const isValidCard = validLines === card.lines.length && card.lines.length > 0;
+      return { ...card, totalOrdered, totalReceived, validLines, isValidCard };
+    });
+  }, [supplierCards, isMultiSupplier]);
+
+  const isMultiFormValid = useMemo(
+    () =>
+      cardSummaries.length > 0 &&
+      cardSummaries.every((c) => c.isValidCard) &&
+      cardSummaries.every((c) => c.lines.every((l) => l.supplierPlanDetailId != null)),
+    [cardSummaries],
+  );
+
+  const hasLegacyAtLeastOneLine = useMemo(
+    () => cardSummaries.some((c) => c.lines.some((l) => l.receivedWeight > 0)),
+    [cardSummaries],
+  );
+
+  const canSubmit = isMultiSupplier ? isMultiFormValid : hasLegacyAtLeastOneLine;
+
+  const updateLineWeight = (supplierId: number, purchaseOrderDetailId: number, value: number) => {
+    setSupplierCards((prev) =>
+      prev.map((card) =>
+        card.supplierId !== supplierId
+          ? card
+          : {
+              ...card,
+              lines: card.lines.map((line) =>
+                line.purchaseOrderDetailId === purchaseOrderDetailId
+                  ? { ...line, receivedWeight: Number.isNaN(value) ? 0 : value }
+                  : line,
+              ),
+            },
+      ),
+    );
+  };
 
   const onSubmit = async (values: FormValues) => {
     setServerMessage(null);
     const toastId = toast.loading("Đang tạo phiếu nhập kho...");
     try {
-      if (detailLines.length === 0) {
-        const msg = "Vui lòng thêm ít nhất 1 dòng chi tiết sản phẩm trước khi lưu phiếu.";
-        setDetailInputErrors((prev) => ({ ...prev, details: msg }));
-        toast.error(msg);
-        return;
+      const allLines = supplierCards.flatMap((c) => c.lines.map((l) => ({ ...l, supplierId: c.supplierId })));
+      const submitLines = isMultiSupplier
+        ? allLines
+        : allLines.filter((l) => l.receivedWeight > 0);
+      if (submitLines.length === 0) throw new Error("Vui lòng nhập khối lượng nhận cho ít nhất 1 dòng.");
+      if (isMultiSupplier && !isMultiFormValid) {
+        throw new Error("Đơn đa NCC chưa hợp lệ. Vui lòng kiểm tra tất cả card NCC và các dòng nhận đủ.");
       }
 
       const result = await createReceipt({
@@ -186,7 +261,7 @@ export default function CreateGoodsReceipt() {
         driverName: values.driverName.trim(),
         transportCompany: values.transportCompany?.trim() || undefined,
         purchaseOrderId: values.purchaseOrderId,
-        details: detailLines.map((d) => ({
+        details: submitLines.map((d) => ({
           purchaseOrderDetailId: d.purchaseOrderDetailId,
           supplierPlanDetailId: d.supplierPlanDetailId,
           receivedWeight: d.receivedWeight,
@@ -220,98 +295,6 @@ export default function CreateGoodsReceipt() {
     if (po.status !== "Approved") return false;
     return true;
   });
-
-  const handleAddDetailLine = () => {
-    setDetailInputErrors({});
-    if (!selectedPoDetailId || selectedPoDetailId <= 0) {
-      const msg = "Vui lòng chọn chi tiết sản phẩm từ đơn mua.";
-      setDetailInputErrors((prev) => ({ ...prev, poDetail: msg }));
-      toast.error(msg);
-      return;
-    }
-    const receivedWeight = Number(receivedWeightInput);
-    if (Number.isNaN(receivedWeight) || receivedWeight <= 0) {
-      const msg = "Vui lòng nhập khối lượng nhận hợp lệ và lớn hơn 0.";
-      setDetailInputErrors((prev) => ({ ...prev, receivedWeight: msg }));
-      toast.error(msg);
-      return;
-    }
-    if (receivedWeight < 0) {
-      toast.error("Khối lượng nhận không được âm.");
-      return;
-    }
-
-    const matched = poDetailOptions.find((d) => d.id === selectedPoDetailId);
-    if (!matched) {
-      toast.error("Không tìm thấy dòng đơn mua hợp lệ.");
-      return;
-    }
-
-    const supplierIdsInCart = Array.from(
-      new Set(detailLines.map((x) => x.supplierId).filter((id) => id > 0)),
-    );
-    if (
-      supplierIdsInCart.length > 0 &&
-      matched.supplierId > 0 &&
-      !supplierIdsInCart.includes(matched.supplierId)
-    ) {
-      toast.error("Phiếu nhập đa NCC chỉ nhận từ một NCC nguồn. Vui lòng tách phiếu theo từng NCC.");
-      return;
-    }
-
-    if (receivedWeight > matched.remainingWeight) {
-      toast.error(
-        `Khối lượng nhận không được vượt quá còn lại của dòng PO (còn lại ${matched.remainingWeight} kg).`,
-      );
-      return;
-    }
-
-    setDetailLines((prev) => {
-      // nếu đã thêm line cùng PO detail -> update receivedWeight
-      const exists = prev.find((x) => x.purchaseOrderDetailId === matched.id);
-      if (exists) {
-        return prev.map((x) =>
-          x.purchaseOrderDetailId === matched.id
-            ? {
-                ...x,
-                receivedWeight,
-                remainingWeight: matched.remainingWeight,
-              }
-            : x,
-        );
-      }
-      return [
-        ...prev,
-        {
-          purchaseOrderDetailId: matched.id,
-          supplierPlanDetailId: matched.supplierPlanDetailId,
-          supplierId: matched.supplierId,
-          supplierName: matched.supplierName,
-          productName: matched.productName,
-          orderedWeight: matched.orderedWeight,
-          remainingWeight: matched.remainingWeight,
-          receivedWeight,
-        },
-      ];
-    });
-
-    setSelectedPoDetailId(0);
-    setReceivedWeightInput("");
-    setDetailInputErrors((prev) => ({ ...prev, details: undefined }));
-    toast.success("Đã thêm dòng chi tiết.");
-  };
-
-  const handleRemoveDetailLine = (purchaseOrderDetailId: number) => {
-    setDetailLines((prev) =>
-      prev.filter((x) => x.purchaseOrderDetailId !== purchaseOrderDetailId),
-    );
-    toast.success("Đã xoá dòng chi tiết.");
-  };
-  const selectedSupplierNameForReceipt = useMemo(() => {
-    const names = Array.from(new Set(detailLines.map((x) => x.supplierName).filter(Boolean)));
-    if (names.length > 0) return names[0];
-    return selectedSupplierName;
-  }, [detailLines, selectedSupplierName]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-5 py-6">
@@ -401,20 +384,21 @@ export default function CreateGoodsReceipt() {
             </div>
           </div>
 
-          {/* Nhập chi tiết sản phẩm */}
+          {/* Nhà cung cấp & chi tiết hàng nhập */}
           <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-50 flex items-center gap-3">
               <div className="h-7 w-7 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-sm">
                 <FileText size={13} className="text-white" />
               </div>
               <span className="text-sm font-semibold text-slate-700">
-                Nhập chi tiết sản phẩm
+                Nhà cung cấp & chi tiết hàng nhập
               </span>
             </div>
             <div className="p-6 space-y-4 text-sm">
               <p className="text-xs text-slate-500">
-                Chọn chi tiết sản phẩm từ đơn mua đã chọn và nhập khối lượng nhận.
-                Bạn có thể thêm nhiều chi tiết.
+                {isMultiSupplier
+                  ? "PO đa NCC: mỗi NCC là một card riêng, các dòng nhận phải theo đúng kế hoạch NCC."
+                  : "PO 1 NCC: hiển thị 1 card NCC, bạn có thể điều chỉnh khối lượng nhận theo rule luồng cũ."}
               </p>
 
               {watchedPurchaseOrderId <= 0 && (
@@ -428,242 +412,154 @@ export default function CreateGoodsReceipt() {
               )}
 
               {watchedPurchaseOrderId > 0 && !isLoadingPoDetails && (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">
-                        Chi tiết sản phẩm từ đơn mua *
-                      </label>
-                      <select
-                        value={selectedPoDetailId}
-                        onChange={(e) => {
-                          setSelectedPoDetailId(Number(e.target.value));
-                          setDetailInputErrors((prev) => ({ ...prev, poDetail: undefined }));
-                        }}
-                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
-                      >
-                        <option value={0}>
-                          Chọn chi tiết sản phẩm trong đơn mua
-                        </option>
-                        {poDetailOptions.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.supplierName ? `[${d.supplierName}] ` : ""}
-                            {d.productName} — KL đặt: {d.orderedWeight} kg, còn lại: {d.remainingWeight} kg
-                          </option>
-                        ))}
-                      </select>
-                      {detailInputErrors.poDetail && (
-                        <p className="text-[11px] text-red-500 mt-1">
-                          {detailInputErrors.poDetail}
+                <div className="space-y-4">
+                  {cardSummaries.map((card) => (
+                    <div key={`${card.supplierId}-${card.supplierPlanId ?? "legacy"}`} className="rounded-2xl border border-slate-200 overflow-hidden">
+                      <div className="bg-slate-50 border-b border-slate-100 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-slate-900">{card.supplierName}</p>
+                          <p className="text-xs text-slate-500">
+                            Ngày đặt: {card.orderDate ? new Date(card.orderDate).toLocaleDateString("vi-VN") : "-"} ·
+                            Số dòng: {card.lines.length} ·
+                            Tổng KL đặt: {card.totalOrdered.toLocaleString("vi-VN")} kg
+                          </p>
+                        </div>
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                            card.isValidCard ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                          }`}
+                        >
+                          {card.isValidCard ? "Hợp lệ" : "Chưa đủ điều kiện"}
+                        </span>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-slate-100">
+                              <th className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Sản phẩm</th>
+                              <th className="px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">KL đặt</th>
+                              <th className="px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">Đơn giá</th>
+                              <th className="px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">Ngày giá</th>
+                              <th className="px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">KL nhận</th>
+                              <th className="px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">Trạng thái</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {card.lines.map((line) => {
+                              const lineValid = isMultiSupplier
+                                ? Math.abs(line.receivedWeight - line.orderedWeight) <= 0.0001
+                                : line.receivedWeight > 0 && line.receivedWeight <= line.remainingWeight;
+                              return (
+                                <tr key={line.purchaseOrderDetailId} className="border-b border-slate-100">
+                                  <td className="px-3 py-2.5 text-slate-800">{line.productName}</td>
+                                  <td className="px-3 py-2.5 text-right text-slate-700">{line.orderedWeight}</td>
+                                  <td className="px-3 py-2.5 text-right text-slate-700">
+                                    {(line.unitPriceAtOrder ?? 0).toLocaleString("vi-VN")}
+                                  </td>
+                                  <td className="px-3 py-2.5 text-right text-slate-600">
+                                    {line.priceDate ? new Date(line.priceDate).toLocaleDateString("vi-VN") : "-"}
+                                  </td>
+                                  <td className="px-3 py-2.5 text-right">
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min={0}
+                                      value={line.receivedWeight}
+                                      onChange={(e) =>
+                                        updateLineWeight(
+                                          card.supplierId,
+                                          line.purchaseOrderDetailId,
+                                          Number(e.target.value),
+                                        )
+                                      }
+                                      className="w-28 rounded-lg border border-slate-200 px-2 py-1 text-right text-sm"
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2.5 text-right">
+                                    <span className={`text-xs font-medium ${lineValid ? "text-emerald-700" : "text-amber-700"}`}>
+                                      {lineValid ? "Đủ điều kiện" : isMultiSupplier ? "Phải nhận đủ" : "Chưa hợp lệ"}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="border-t border-slate-100 bg-slate-50 px-4 py-3 flex items-center justify-between text-xs">
+                        <p className="text-slate-600">
+                          Tổng KL đặt: <span className="font-semibold text-slate-900">{card.totalOrdered.toLocaleString("vi-VN")} kg</span>
                         </p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">
-                        Khối lượng nhận (kg) *
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min={0.01}
-                        value={receivedWeightInput}
-                        onChange={(e) => {
-                          setReceivedWeightInput(e.target.value);
-                          setDetailInputErrors((prev) => ({ ...prev, receivedWeight: undefined }));
-                        }}
-                        placeholder="Ví dụ: 1000"
-                        onBlur={() => {
-                          // Chuẩn hoá input rỗng -> ""
-                          if (receivedWeightInput.trim() === "") {
-                            setReceivedWeightInput("");
-                            return;
-                          }
-                          const n = Number(receivedWeightInput);
-                          if (Number.isNaN(n)) return;
-                          if (n < 0) setReceivedWeightInput(String(0));
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            handleAddDetailLine();
-                          }
-                        }}
-                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
-                      />
-                      {detailInputErrors.receivedWeight && (
-                        <p className="text-[11px] text-red-500 mt-1">
-                          {detailInputErrors.receivedWeight}
+                        <p className="text-slate-600">
+                          Tổng KL nhận: <span className="font-semibold text-slate-900">{card.totalReceived.toLocaleString("vi-VN")} kg</span>
                         </p>
-                      )}
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={handleAddDetailLine}
-                      disabled={
-                        !selectedPoDetailId ||
-                        selectedPoDetailId <= 0 ||
-                          Number.isNaN(Number(receivedWeightInput)) ||
-                          Number(receivedWeightInput) <= 0 ||
-                        isLoadingPoDetails
-                      }
-                      className="flex-1 rounded-xl py-2.5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 disabled:opacity-50 flex items-center justify-center gap-2"
-                    >
-                      Thêm chi tiết sản phẩm
-                    </button>
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200">
-                          <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                            Sản phẩm
-                          </th>
-                          <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                            KL nhận
-                          </th>
-                          <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                            Hành động
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {detailLines.length === 0 ? (
-                          <tr>
-                            <td
-                              colSpan={3}
-                              className="px-4 py-5 text-center text-slate-500"
-                            >
-                              Chưa có chi tiết sản phẩm nào.
-                            </td>
-                          </tr>
-                        ) : (
-                          detailLines.map((d) => {
-                            return (
-                              <tr
-                                key={d.purchaseOrderDetailId}
-                                className="border-t border-slate-100 hover:bg-slate-50/50"
-                              >
-                                <td className="px-4 py-3 text-slate-800">
-                                  {d.productName}
-                                </td>
-                                <td className="px-4 py-3 text-right text-slate-700">
-                                  {d.receivedWeight} kg
-                                </td>
-                                <td className="px-4 py-3 text-right">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleRemoveDetailLine(
-                                        d.purchaseOrderDetailId,
-                                      )
-                                    }
-                                    className="text-[11px] font-semibold text-red-600 hover:text-red-700"
-                                  >
-                                    Xoá
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                  {detailInputErrors.details && (
-                    <p className="text-[11px] text-red-500 -mt-1">
-                      {detailInputErrors.details}
-                    </p>
-                  )}
-                </>
+                  ))}
+                </div>
               )}
             </div>
           </div>
 
-          {/* Thông tin chung */}
+          {/* Kho nhập */}
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-50 flex items-center gap-3">
+              <div className="h-7 w-7 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-sm">
+                <Truck size={13} className="text-white" />
+              </div>
+              <span className="text-sm font-semibold text-slate-700">Kho nhập</span>
+            </div>
+            <div className="p-6 text-sm">
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Kho nhập *
+              </label>
+              <select
+                {...form.register("warehouseId", { valueAsNumber: true })}
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
+                disabled={isLoadingWarehouses || isWarehousesError}
+              >
+                <option value={0}>
+                  {isLoadingWarehouses
+                    ? "Đang tải danh sách kho..."
+                    : "Chọn kho"}
+                </option>
+                {warehouses.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+              {form.formState.errors.warehouseId && (
+                <p className="text-[11px] text-red-500 mt-1">
+                  {form.formState.errors.warehouseId.message}
+                </p>
+              )}
+              {!isWarehousesError && selectedWarehouse && (
+                <div className="mt-2 space-y-1">
+                  <p className="text-[11px] text-slate-500">
+                    Đang chứa: {occupiedWeightOfWarehouse.toLocaleString("vi-VN")} /{" "}
+                    {totalCapacityOfWarehouse.toLocaleString("vi-VN")} m³ (80%)
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    Còn trống: {remainingCapacityOfWarehouse.toLocaleString("vi-VN")} m³ ·
+                    Phiếu này (tổng khối lượng nhận): {totalIncomingWeight.toLocaleString("vi-VN")} kg
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Thông tin vận chuyển */}
           <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-50 flex items-center gap-3">
               <div className="h-7 w-7 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-sm">
                 <Truck size={13} className="text-white" />
               </div>
               <span className="text-sm font-semibold text-slate-700">
-                Thông tin xe & nhà cung cấp
+                Thông tin vận chuyển
               </span>
             </div>
             <div className="p-6 space-y-4 text-sm">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Nhà cung cấp *
-                  </label>
-                  <input
-                    value={selectedSupplierNameForReceipt || ""}
-                    readOnly
-                    placeholder="Chọn đơn mua để tự điền nhà cung cấp"
-                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 text-slate-700 focus:outline-none"
-                  />
-                  {watchedPurchaseOrderId > 0 && (
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      Nhà cung cấp được tự động lấy theo đơn mua đã chọn.
-                    </p>
-                  )}
-                  {watchedPurchaseOrderId <= 0 && (
-                    <p className="text-[11px] text-slate-400 mt-1">
-                      Vui lòng chọn đơn mua để hệ thống tự điền nhà cung cấp.
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Kho nhập *
-                  </label>
-                  <select
-                    {...form.register("warehouseId", { valueAsNumber: true })}
-                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
-                    disabled={isLoadingWarehouses || isWarehousesError}
-                  >
-                    <option value={0}>
-                      {isLoadingWarehouses
-                        ? "Đang tải danh sách kho..."
-                        : "Chọn kho"}
-                    </option>
-                    {warehouses.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name}
-                      </option>
-                    ))}
-                  </select>
-                  {form.formState.errors.warehouseId && (
-                    <p className="text-[11px] text-red-500 mt-1">
-                      {form.formState.errors.warehouseId.message}
-                    </p>
-                  )}
-                  {isWarehousesError && !form.formState.errors.warehouseId && (
-                    <p className="text-[11px] text-red-500 mt-1">
-                      Không tải được danh sách kho.{" "}
-                      {(warehousesError as { status?: number })?.status === 401 &&
-                        "Vui lòng đăng nhập lại với tài khoản Admin/Quản lí."}
-                    </p>
-                  )}
-                  {!isWarehousesError && selectedWarehouse && (
-                    <div className="mt-2 space-y-1">
-                      <p className="text-[11px] text-slate-500">
-                        Đang chứa: {occupiedWeightOfWarehouse.toLocaleString("vi-VN")} /{" "}
-                        {totalCapacityOfWarehouse.toLocaleString("vi-VN")} m³ (80%)
-                      </p>
-                      <p className="text-[11px] text-slate-500">
-                        Còn trống: {remainingCapacityOfWarehouse.toLocaleString("vi-VN")} m³ ·
-                        Phiếu này (tổng khối lượng nhận): {totalIncomingWeight.toLocaleString("vi-VN")} kg
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">
@@ -739,7 +635,7 @@ export default function CreateGoodsReceipt() {
               type="submit"
               disabled={
                 isLoading ||
-                detailLines.length === 0 ||
+                !canSubmit ||
                 !form.formState.isValid
               }
               className="flex-[2] rounded-2xl py-3.5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 disabled:opacity-50 flex items-center justify-center gap-2.5 transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:translate-y-0"
