@@ -82,6 +82,10 @@ const mapSummary = (row: RawObject): GoodsReceiptSummary => {
 
 const mapDetail = (row: RawObject) => ({
   id: (row.id as number) ?? (row.Id as number) ?? 0,
+  supplierPlanDetailId:
+    (row.supplierPlanDetailId as number | null | undefined) ??
+    (row.SupplierPlanDetailId as number | null | undefined) ??
+    null,
   productId:
     (row.productId as number) ??
     (row.ProductId as number) ??
@@ -1664,8 +1668,10 @@ export const goodsReceiptApi = api.injectEndpoints({
 
     managerAllowQc: builder.mutation<{ message: string }, number>({
       query: (receiptId) => ({
-        url: `GoodsReceipts/${receiptId}/manager-allow-qc`,
+        // Backend exposes manager-review-min for this action.
+        url: `GoodsReceipts/${receiptId}/manager-review-min`,
         method: "POST",
+        body: { approve: true },
       }),
       invalidatesTags: (_res, _err, receiptId) => [
         { type: "GoodsReceipt" as const, id: receiptId },
