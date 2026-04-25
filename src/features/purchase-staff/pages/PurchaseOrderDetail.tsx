@@ -1,6 +1,6 @@
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
-  useGetPurchaseOrderByIdQuery,
+  useGetPurchaseOrderStructuredByIdQuery,
   useDeletePurchaseOrderMutation,
   useApprovePurchaseOrderMutation,
 } from "../../purchase-order/api/purchase-order.api";
@@ -49,7 +49,7 @@ export default function PurchaseOrderDetail() {
   const showApprove = isAdmin || isManager; // Admin/Manager only (BE kiểm tra role)
 
   const poId = id ? parseInt(id, 10) : 0;
-  const { data: order, isLoading, error } = useGetPurchaseOrderByIdQuery(poId, {
+  const { data: order, isLoading, error } = useGetPurchaseOrderStructuredByIdQuery(poId, {
     skip: !poId || Number.isNaN(poId),
   });
   const [deletePo, { isLoading: isDeleting }] = useDeletePurchaseOrderMutation();
@@ -67,7 +67,7 @@ export default function PurchaseOrderDetail() {
   };
 
   const handleApprove = async () => {
-    if (!order || order.status !== "Pending") return;
+    if (!order || order.status?.code !== "Pending") return;
     try {
       await approvePo(order.id).unwrap();
       // Refetch via invalidatesTags
@@ -112,12 +112,10 @@ export default function PurchaseOrderDetail() {
     );
   }
 
-  const canEdit = !showApprove && order.status === "Pending";
-  const canApprove = showApprove && order.status === "Pending";
-  const suppliers = (order.supplierName || "")
-    .split("|")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const statusCode = order.status?.code ?? "";
+  const canEdit = !showApprove && statusCode === "Pending";
+  const canApprove = showApprove && statusCode === "Pending";
+  const suppliers = order.supplierPlans.map((p) => p.supplier.supplierName).filter(Boolean);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-5 py-6">
@@ -138,18 +136,18 @@ export default function PurchaseOrderDetail() {
               </h1>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
                 <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
-                  {toVietnameseProcurementMode(order.procurementMode)}
+                  {toVietnameseProcurementMode(order.procurement?.mode)}
                 </span>
                 <span
                   className={`rounded-full px-2.5 py-1 ${
-                    order.status === "Approved"
+                    statusCode === "Approved"
                       ? "bg-emerald-100 text-emerald-700"
-                      : order.status === "Pending"
+                      : statusCode === "Pending"
                         ? "bg-amber-100 text-amber-700"
                         : "bg-rose-100 text-rose-700"
                   }`}
                 >
-                  {toVietnamesePoStatus(order.status)}
+                  {order.status?.label || toVietnamesePoStatus(statusCode)}
                 </span>
               </div>
             </div>
@@ -236,7 +234,7 @@ export default function PurchaseOrderDetail() {
             <div>
               <span className="text-slate-500 block text-xs font-medium">Kiểu đơn</span>
               <p className="font-medium text-slate-900 mt-1">
-                {toVietnameseProcurementMode(order.procurementMode)}
+                {order.procurement?.label || toVietnameseProcurementMode(order.procurement?.mode)}
               </p>
             </div>
             <div>
@@ -244,22 +242,22 @@ export default function PurchaseOrderDetail() {
               <p className="font-medium mt-1">
                 <span
                   className={
-                    order.status === "Approved"
+                    statusCode === "Approved"
                       ? "text-emerald-600"
-                      : order.status === "Pending"
+                      : statusCode === "Pending"
                         ? "text-amber-600"
                         : "text-rose-600"
                   }
                 >
-                  {toVietnamesePoStatus(order.status)}
+                  {order.status?.label || toVietnamesePoStatus(statusCode)}
                 </span>
               </p>
             </div>
             <div>
               <span className="text-slate-500 block text-xs font-medium">Người tạo</span>
               <p className="font-medium text-slate-900 mt-1">
-                {order.createdByName && order.createdByName.trim().length > 0
-                  ? order.createdByName
+                {order.createdBy?.name && order.createdBy.name.trim().length > 0
+                  ? order.createdBy.name
                   : "-"}
               </p>
             </div>
@@ -275,75 +273,86 @@ export default function PurchaseOrderDetail() {
           </div>
         </div>
 
-        {/* Details table */}
+        {/* Summary */}
+        <div className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h2 className="text-sm font-semibold text-slate-800">Tổng quan đơn mua</h2>
+          </div>
+          <div className="px-6 py-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <span className="text-slate-500 block text-xs font-medium">Số NCC</span>
+              <p className="font-semibold text-slate-900 mt-1">{order.summary.totalSuppliers}</p>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-xs font-medium">Số sản phẩm</span>
+              <p className="font-semibold text-slate-900 mt-1">{order.summary.totalProducts}</p>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-xs font-medium">Tổng KL đặt (kg)</span>
+              <p className="font-semibold text-slate-900 mt-1">{order.summary.totalOrderedWeight}</p>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-xs font-medium">Tổng tiền dự kiến (VND)</span>
+              <p className="font-semibold text-slate-900 mt-1">
+                {order.summary.totalEstimatedAmount.toLocaleString("vi-VN")}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Supplier plans */}
         <div className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100">
             <h2 className="text-sm font-semibold text-slate-800">
-              Dòng chi tiết đơn mua
+              Kế hoạch theo nhà cung cấp
             </h2>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="text-left py-3 px-4 font-semibold text-slate-700">
-                    Sản phẩm
-                  </th>
-                  <th className="text-right py-3 px-4 font-semibold text-slate-700">
-                    KL đặt
-                  </th>
-                  <th className="text-right py-3 px-4 font-semibold text-slate-700">
-                    Đã nhận
-                  </th>
-                  <th className="text-right py-3 px-4 font-semibold text-slate-700">
-                    Còn lại
-                  </th>
-                  <th className="text-right py-3 px-4 font-semibold text-slate-700">
-                    Đơn giá (VNĐ)
-                  </th>
-                  <th className="text-right py-3 px-4 font-semibold text-slate-700">
-                    Người duyệt
-                  </th>
-                  <th className="text-right py-3 px-4 font-semibold text-slate-700">
-                    Thu hoạch
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {order.details?.map((d) => (
-                  <tr
-                    key={d.id}
-                    className="border-b border-slate-100 hover:bg-slate-50/60"
-                  >
-                    <td className="py-3 px-4 text-slate-800">
-                      {d.productName}
-                    </td>
-                    <td className="py-3 px-4 text-right text-slate-700">
-                      {d.orderedWeight}
-                    </td>
-                    <td className="py-3 px-4 text-right text-slate-700">
-                      {d.receivedWeight}
-                    </td>
-                    <td className="py-3 px-4 text-right text-slate-700">
-                      {d.remainingWeight}
-                    </td>
-                    <td className="py-3 px-4 text-right text-slate-700">
-                      {d.unitPrice.toLocaleString("vi-VN")}
-                    </td>
-                    <td className="py-3 px-4 text-right text-slate-700">
-                      {d.approverName && d.approverName.trim().length > 0
-                        ? d.approverName
-                        : "—"}
-                    </td>
-                    <td className="py-3 px-4 text-right text-slate-600">
-                      {d.harvestDate
-                        ? new Date(d.harvestDate).toLocaleDateString("vi-VN")
-                        : "-"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-4 p-4">
+            {order.supplierPlans.map((plan) => (
+              <div key={`${plan.supplierPlanId}-${plan.supplier.supplierId}`} className="rounded-2xl border border-slate-200">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{plan.supplier.supplierName}</p>
+                    <p className="text-xs text-slate-500">
+                      Ngày đặt: {plan.orderDate ? new Date(plan.orderDate).toLocaleDateString("vi-VN") : "-"}
+                      {plan.notes ? ` · Ghi chú: ${plan.notes}` : ""}
+                    </p>
+                  </div>
+                  <div className="text-right text-xs text-slate-600">
+                    <p>Tổng KL: <span className="font-semibold text-slate-900">{plan.summary.totalOrderedWeight}</span> kg</p>
+                    <p>Tổng tiền: <span className="font-semibold text-slate-900">{plan.summary.totalEstimatedAmount.toLocaleString("vi-VN")}</span> VND</p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100 bg-white">
+                        <th className="text-left py-2.5 px-4 font-semibold text-slate-700">Sản phẩm</th>
+                        <th className="text-right py-2.5 px-4 font-semibold text-slate-700">KL đặt (kg)</th>
+                        <th className="text-right py-2.5 px-4 font-semibold text-slate-700">Đơn giá (VND)</th>
+                        <th className="text-right py-2.5 px-4 font-semibold text-slate-700">Ngày áp giá</th>
+                        <th className="text-right py-2.5 px-4 font-semibold text-slate-700">Thành tiền (VND)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {plan.details.map((line) => (
+                        <tr key={line.lineId} className="border-b border-slate-100 hover:bg-slate-50/60">
+                          <td className="py-2.5 px-4 text-slate-800">{line.productName}</td>
+                          <td className="py-2.5 px-4 text-right text-slate-700">{line.orderedWeight}</td>
+                          <td className="py-2.5 px-4 text-right text-slate-700">{line.unitPriceAtOrder.toLocaleString("vi-VN")}</td>
+                          <td className="py-2.5 px-4 text-right text-slate-600">
+                            {line.priceDate ? new Date(line.priceDate).toLocaleDateString("vi-VN") : "-"}
+                          </td>
+                          <td className="py-2.5 px-4 text-right font-medium text-slate-800">
+                            {line.lineAmount.toLocaleString("vi-VN")}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>

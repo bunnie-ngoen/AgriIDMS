@@ -26,6 +26,40 @@ function toVietnamesePoStatus(status: string): string {
   }
 }
 
+function renderSupplierCell(supplierName: string) {
+  const suppliers = supplierName
+    .split("|")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (suppliers.length <= 1) {
+    return <span>{supplierName}</span>;
+  }
+
+  return (
+    <details className="group">
+      <summary className="cursor-pointer list-none inline-flex items-center gap-2 text-slate-700">
+        <span className="truncate max-w-[360px]">{suppliers[0]}</span>
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
+          +{suppliers.length - 1} NCC
+        </span>
+      </summary>
+      <div className="mt-2 w-[420px] max-w-[80vw] rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+        <ul className="space-y-1">
+          {suppliers.map((name) => (
+            <li
+              key={name}
+              className="rounded-lg bg-slate-50 px-2 py-1.5 text-xs text-slate-700"
+            >
+              {name}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </details>
+  );
+}
+
 export default function PurchaseOrderList() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -339,7 +373,7 @@ export default function PurchaseOrderList() {
                     className="border-t border-slate-100 hover:bg-slate-50/50 transition-colors"
                   >
                     <td className="px-5 py-3.5 font-medium text-slate-900">{po.orderCode}</td>
-                    <td className="px-5 py-3.5 text-slate-700">{po.supplierName}</td>
+                    <td className="px-5 py-3.5 text-slate-700">{renderSupplierCell(po.supplierName)}</td>
                     <td className="px-5 py-3.5 text-slate-700">
                       {po.createdByName && po.createdByName.trim().length > 0
                         ? po.createdByName
