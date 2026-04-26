@@ -1668,10 +1668,8 @@ export const goodsReceiptApi = api.injectEndpoints({
 
     managerAllowQc: builder.mutation<{ message: string }, number>({
       query: (receiptId) => ({
-        // Backend exposes manager-review-min for this action.
-        url: `GoodsReceipts/${receiptId}/manager-review-min`,
+        url: `GoodsReceipts/${receiptId}/manager-allow-qc`,
         method: "POST",
-        body: { approve: true },
       }),
       invalidatesTags: (_res, _err, receiptId) => [
         { type: "GoodsReceipt" as const, id: receiptId },
