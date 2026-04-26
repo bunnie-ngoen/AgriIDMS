@@ -133,6 +133,9 @@ const ManagerDamageReportListPage = lazy(
 const ManagerDamageReportDetailPage = lazy(
   () => import("../manager/pages/damage-reports/ManagerDamageReportDetailPage"),
 );
+const RevenueProfitReportPage = lazy(
+  () => import("../admin/pages/RevenueProfitReportPage"),
+);
 
 export const adminRoutes = [
   {
@@ -196,6 +199,7 @@ export const adminRoutes = [
       { path: "damage-discount-approvals", element: <ManagerDamageReportListPage /> },
       { path: "damage-reports", element: <ManagerDamageReportListPage /> },
       { path: "damage-reports/:id", element: <ManagerDamageReportDetailPage /> },
+      { path: "reports/revenue-profit-specific", element: <RevenueProfitReportPage /> },
     ],
   },
 ];

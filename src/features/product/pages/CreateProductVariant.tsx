@@ -12,6 +12,7 @@ import {
 import { ImagePlus, Loader2, X, ArrowLeft, ChevronDown, Sparkles, Tag, Clock, BadgeDollarSign } from "lucide-react";
 import toast from "react-hot-toast";
 import { uploadFileToCloudinary } from "../../../shared/lib/cloudinaryUpload";
+import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 const Field = ({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) => (
   <div className="space-y-1.5">
@@ -30,6 +31,10 @@ const inputCls = (hasError?: boolean) =>
 
 const CreateProductVariant = () => {
   const navigate = useNavigate();
+  const { isManager } = useRoleGuard();
+  const productVariantBasePath = isManager()
+    ? "/manager/product-variants"
+    : "/admin/product-variants";
   const [createVariant, { isLoading: isCreating }] = useCreateProductVariantMutation();
   const { data: products, isLoading: isLoadingProducts } = useGetProductsQuery();
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -57,7 +62,7 @@ const CreateProductVariant = () => {
   };
 
   const onSubmit = async (values: ProductVariantDto) => {
-    const toastId = toast.loading("Đang tạo variant...");
+    const toastId = toast.loading("Đang tạo biến thể...");
     try {
       let imageUrl = values.imageUrl;
       if (imageFile) {
@@ -66,8 +71,8 @@ const CreateProductVariant = () => {
         setIsUploading(false);
       }
       await createVariant({ ...values, imageUrl }).unwrap();
-      toast.success("Tạo variant thành công!", { id: toastId });
-      navigate("/admin/product-variants");
+      toast.success("Tạo biến thể thành công!", { id: toastId });
+      navigate(productVariantBasePath);
     } catch (err: any) {
       setIsUploading(false);
       toast.error(err?.message ?? err?.data?.message ?? "Có lỗi xảy ra", { id: toastId });
@@ -91,13 +96,13 @@ const CreateProductVariant = () => {
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <Sparkles size={16} className="text-emerald-500" />
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight">Tạo Product Variant</h1>
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight">Tạo biến thể sản phẩm</h1>
             </div>
             <p className="text-xs text-slate-400 mt-0.5 ml-6">Thêm biến thể mới cho sản phẩm trong hệ thống</p>
           </div>
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200">
             <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[11px] font-semibold text-emerald-600">New</span>
+            <span className="text-[11px] font-semibold text-emerald-600">Mới</span>
           </div>
         </div>
 
@@ -135,8 +140,8 @@ const CreateProductVariant = () => {
                 )}
                 <div className="flex-1 pt-2 space-y-3">
                   <div className="space-y-1">
-                    <p className="text-xs font-semibold text-slate-600">Upload ảnh sản phẩm</p>
-                    <p className="text-[11px] text-slate-400 leading-relaxed">Ảnh đại diện sẽ hiển thị trong danh sách và được lưu trên Cloudinary CDN.</p>
+                    <p className="text-xs font-semibold text-slate-600">Tải ảnh sản phẩm</p>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">Ảnh đại diện sẽ hiển thị trong danh sách và được lưu trên Cloudinary.</p>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {[["Kích thước", "800 × 800px"], ["Dung lượng", "Tối đa 5MB"], ["Định dạng", "PNG, JPG, WEBP"], ["Tỉ lệ", "1:1 (vuông)"]].map(([k, v]) => (
@@ -309,7 +314,7 @@ const CreateProductVariant = () => {
               className="flex-[2] rounded-2xl py-3.5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 disabled:opacity-50 flex items-center justify-center gap-2.5 transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:translate-y-0">
               {isLoading
                 ? <><Loader2 size={15} className="animate-spin" />{isUploading ? "Đang upload ảnh..." : "Đang tạo..."}</>
-                : <><Sparkles size={14} />Tạo Variant</>
+                : <><Sparkles size={14} />Tạo biến thể</>
               }
             </button>
           </div>

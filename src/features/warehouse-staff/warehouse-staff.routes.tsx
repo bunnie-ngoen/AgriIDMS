@@ -55,6 +55,9 @@ const PutBoxIntoSlotPage = lazy(
 const InventoryIssueManagementPage = lazy(
   () => import("../manager/pages/InventoryIssueManagementPage"),
 );
+const UnassignedInventoryPage = lazy(
+  () => import("../manager/pages/UnassignedInventoryPage"),
+);
 const WarehouseDamageReportListPage = lazy(
   () => import("./pages/damage-reports/WarehouseDamageReportListPage"),
 );
@@ -93,6 +96,7 @@ export const warehouseStaffRoutes = [
       { path: "warehouses", element: <WarehouseListPage /> },
       { path: "warehouses/:id/map", element: <WarehouseMapPage /> },
       { path: "putaway", element: <PutBoxIntoSlotPage /> },
+      { path: "unassigned-inventory", element: <UnassignedInventoryPage /> },
       { path: "inventory-issues", element: <InventoryIssueManagementPage /> },
       { path: "damage-reports", element: <WarehouseDamageReportListPage /> },
       { path: "damage-reports/new", element: <WarehouseDamageReportCreatePage /> },

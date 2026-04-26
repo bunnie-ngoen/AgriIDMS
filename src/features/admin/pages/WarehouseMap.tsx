@@ -26,11 +26,58 @@ import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 import type { AppDispatch } from "../../../app/store";
 
 const getNowMs = () => Date.now();
+type SlotExpiryFilter = "ALL" | "EXPIRED" | "D1" | "D3" | "D7";
+
+const matchesSlotExpiryFilter = (
+  expiryDate: string | null | undefined,
+  slotExpiryFilter: SlotExpiryFilter,
+  nowMs: number,
+) => {
+  if (!expiryDate || slotExpiryFilter === "ALL") return false;
+  const end = new Date(expiryDate);
+  if (Number.isNaN(end.getTime())) return false;
+
+  const now = new Date(nowMs);
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const endOfExpiryDay = new Date(
+    end.getFullYear(),
+    end.getMonth(),
+    end.getDate(),
+    23,
+    59,
+    59,
+    999,
+  );
+  const daysLeft = Math.ceil(
+    (endOfExpiryDay.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24),
+  );
+
+  if (slotExpiryFilter === "EXPIRED") return daysLeft <= 0;
+  if (slotExpiryFilter === "D1") return daysLeft === 1;
+  if (slotExpiryFilter === "D3") return daysLeft > 0 && daysLeft <= 3;
+  if (slotExpiryFilter === "D7") return daysLeft > 0 && daysLeft <= 7;
+  return false;
+};
+
 const formatM3 = (value: number | null | undefined) =>
   Number(value ?? 0).toLocaleString("vi-VN", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
+
+const translateBoxStatus = (status?: string | null) => {
+  const normalized = String(status ?? "").trim().toLowerCase();
+  if (!normalized) return "—";
+  const statusMap: Record<string, string> = {
+    stored: "Đã lưu kho",
+    unassigned: "Chưa xếp vị trí",
+    pending: "Chờ xử lý",
+    intransit: "Đang vận chuyển",
+    disposed: "Đã tiêu hủy",
+    expired: "Hết hạn",
+  };
+  return statusMap[normalized] || status || "—";
+};
 
 const DisposeReasonModal = ({
   isOpen,
@@ -462,13 +509,19 @@ const SlotDetailPanel = ({
                 <div className="rounded-xl border border-slate-100 px-3 py-2">
                   <dt className="text-[10px] text-slate-500">Trạng thái</dt>
                   <dd className="font-semibold text-slate-900 mt-1">
-                    {selectedBox.status || "—"}
+                    {translateBoxStatus(selectedBox.status)}
                   </dd>
                 </div>
                 <div className="rounded-xl border border-slate-100 px-3 py-2">
                   <dt className="text-[10px] text-slate-500">Sản phẩm</dt>
                   <dd className="font-semibold text-slate-900 mt-1">
                     {contents?.productName || "—"}
+                  </dd>
+                </div>
+                <div className="rounded-xl border border-slate-100 px-3 py-2">
+                  <dt className="text-[10px] text-slate-500">Nhà cung cấp</dt>
+                  <dd className="font-semibold text-slate-900 mt-1">
+                    {selectedBox.supplierName || "—"}
                   </dd>
                 </div>
                 <div className="rounded-xl border border-slate-100 px-3 py-2">
@@ -841,6 +894,7 @@ type RackOverviewProps = {
   name: string;
   onSlotClick?: (slot: SlotItem) => void;
   variantFilterId?: number | null;
+  variantMatchedSlotIds?: number[];
   qrMatchedSlotIds?: number[];
   expiryMatchedSlotIds?: number[];
   hasExpiryFilter?: boolean;
@@ -851,6 +905,7 @@ const RackOverview = ({
   name,
   onSlotClick,
   variantFilterId,
+  variantMatchedSlotIds = [],
   qrMatchedSlotIds = [],
   expiryMatchedSlotIds = [],
   hasExpiryFilter = false,
@@ -898,16 +953,17 @@ const RackOverview = ({
                 : 0;
             const cellStyle = getUsageStyleFromRatio(r);
             const pct = Math.round(r * 100);
-            const hasVariantFilter = !!variantFilterId;
+            const hasVariantHighlight =
+              !!variantFilterId && variantMatchedSlotIds.length > 0;
             const isVariantMatched =
-              hasVariantFilter &&
-              Number(s.productVariantId ?? 0) === Number(variantFilterId);
-            const isVariantDimmed = hasVariantFilter && !isVariantMatched;
+              hasVariantHighlight && variantMatchedSlotIds.includes(s.id);
+            const isVariantDimmed = hasVariantHighlight && !isVariantMatched;
             const hasQrHighlight = qrMatchedSlotIds.length > 0;
             const isQrMatched = hasQrHighlight && qrMatchedSlotIds.includes(s.id);
             const isQrDimmed = hasQrHighlight && !isQrMatched;
-            const isExpiryMatched = hasExpiryFilter && expiryMatchedSlotIds.includes(s.id);
-            const isExpiryDimmed = hasExpiryFilter && !isExpiryMatched;
+            const hasExpiryHighlight = hasExpiryFilter && expiryMatchedSlotIds.length > 0;
+            const isExpiryMatched = hasExpiryHighlight && expiryMatchedSlotIds.includes(s.id);
+            const isExpiryDimmed = hasExpiryHighlight && !isExpiryMatched;
             const isHighlighted = isVariantMatched || isQrMatched || isExpiryMatched;
             const shouldDim = isVariantDimmed || isQrDimmed || isExpiryDimmed;
             return (
@@ -946,6 +1002,7 @@ type ZoneOverviewProps = {
   name: string;
   onSlotClick?: (slot: SlotItem) => void;
   variantFilterId?: number | null;
+  variantMatchedSlotIds?: number[];
   qrMatchedSlotIds?: number[];
   expiryMatchedSlotIds?: number[];
   hasExpiryFilter?: boolean;
@@ -956,6 +1013,7 @@ const ZoneOverview = ({
   name,
   onSlotClick,
   variantFilterId,
+  variantMatchedSlotIds = [],
   qrMatchedSlotIds = [],
   expiryMatchedSlotIds = [],
   hasExpiryFilter = false,
@@ -981,6 +1039,7 @@ const ZoneOverview = ({
               name={r.name}
               onSlotClick={onSlotClick}
               variantFilterId={variantFilterId}
+              variantMatchedSlotIds={variantMatchedSlotIds}
               qrMatchedSlotIds={qrMatchedSlotIds}
               expiryMatchedSlotIds={expiryMatchedSlotIds}
               hasExpiryFilter={hasExpiryFilter}
@@ -1022,9 +1081,10 @@ const WarehouseMap = () => {
   const [qrSearchType, setQrSearchType] = useState<"LOT" | "BOX">("LOT");
   const [qrSearchValue, setQrSearchValue] = useState("");
   const [qrMatchedSlotIds, setQrMatchedSlotIds] = useState<number[]>([]);
+  const [variantMatchedSlotIds, setVariantMatchedSlotIds] = useState<number[]>([]);
   const [isQrCameraOpen, setIsQrCameraOpen] = useState(false);
   const [isAreaDetailModalOpen, setIsAreaDetailModalOpen] = useState(false);
-  const [slotExpiryFilter, setSlotExpiryFilter] = useState<"ALL" | "EXPIRED" | "D1" | "D3" | "D7">("ALL");
+  const [slotExpiryFilter, setSlotExpiryFilter] = useState<SlotExpiryFilter>("ALL");
   const [slotIdsByExpiryFilter, setSlotIdsByExpiryFilter] = useState<number[]>([]);
   const [, setIsLoadingExpiryFilter] = useState(false);
   const [isDisposeModalOpen, setIsDisposeModalOpen] = useState(false);
@@ -1115,21 +1175,78 @@ const WarehouseMap = () => {
     return racks.find((r) => r.id === selectedRackId)?.name ?? "";
   }, [racks, selectedRackId]);
 
-  const variantOptionsInRack = useMemo(() => {
-    if (!slots?.length) return [];
-    const map = new Map<number, { id: number; label: string }>();
-    for (const s of slots) {
-      if (!s.productVariantId || s.productVariantId <= 0) continue;
-      if (map.has(s.productVariantId)) continue;
-      const label = s.productName
-        ? `${s.productName}${s.productVariantName ? ` · ${s.productVariantName}` : ""}`
-        : s.productVariantName || `Variant #${s.productVariantId}`;
-      map.set(s.productVariantId, { id: s.productVariantId, label });
-    }
-    return Array.from(map.values()).sort((a, b) =>
-      a.label.localeCompare(b.label, "vi"),
-    );
-  }, [slots]);
+  const [variantOptionsInRack, setVariantOptionsInRack] = useState<
+    Array<{ id: number; label: string }>
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (!slots?.length) {
+        if (!cancelled) setVariantOptionsInRack([]);
+        return;
+      }
+
+      const map = new Map<number, { id: number; label: string }>();
+      const makeLabel = (
+        variantId: number,
+        productName?: string | null,
+        variantName?: string | null,
+      ) =>
+        productName
+          ? `${productName}${variantName ? ` · ${variantName}` : ""}`
+          : variantName || `Variant #${variantId}`;
+
+      const slotsNeedFallback: SlotItem[] = [];
+      for (const s of slots) {
+        if (s.productVariantId && s.productVariantId > 0) {
+          if (!map.has(s.productVariantId)) {
+            map.set(s.productVariantId, {
+              id: s.productVariantId,
+              label: makeLabel(s.productVariantId, s.productName, s.productVariantName),
+            });
+          }
+          continue;
+        }
+        slotsNeedFallback.push(s);
+      }
+
+      await Promise.all(
+        slotsNeedFallback.map(async (slot) => {
+          try {
+            const contents = await dispatch(
+              userApi.endpoints.getSlotContents.initiate(slot.id, {
+                forceRefetch: true,
+                subscribe: false,
+              }),
+            ).unwrap();
+            const variantId = Number(contents.productVariantId ?? 0);
+            if (variantId > 0 && !map.has(variantId)) {
+              map.set(variantId, {
+                id: variantId,
+                label: makeLabel(variantId, contents.productName, contents.variantName),
+              });
+            }
+          } catch {
+            // skip slot errors
+          }
+        }),
+      );
+
+      if (!cancelled) {
+        const options = Array.from(map.values()).sort((a, b) =>
+          a.label.localeCompare(b.label, "vi"),
+        );
+        setVariantOptionsInRack(options);
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [dispatch, slots]);
 
   useEffect(() => {
     if (!selectedVariantFilterId) return;
@@ -1140,6 +1257,78 @@ const WarehouseMap = () => {
       setSelectedVariantFilterId(null);
     }
   }, [variantOptionsInRack, selectedVariantFilterId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      if (!selectedVariantFilterId || !zones?.length) {
+        if (!cancelled) setVariantMatchedSlotIds([]);
+        return;
+      }
+
+      const matchedSet = new Set<number>();
+      for (const zone of zones) {
+        let racksInZone: Array<{ id: number }> = [];
+        try {
+          racksInZone = await dispatch(
+            userApi.endpoints.getRacks.initiate(zone.id, {
+              forceRefetch: true,
+              subscribe: false,
+            }),
+          ).unwrap();
+        } catch {
+          continue;
+        }
+        for (const rack of racksInZone ?? []) {
+          let slotsInRack: SlotItem[] = [];
+          try {
+            slotsInRack = await dispatch(
+              userApi.endpoints.getSlots.initiate(rack.id, {
+                forceRefetch: true,
+                subscribe: false,
+              }),
+            ).unwrap();
+          } catch {
+            continue;
+          }
+
+          await Promise.all(
+            (slotsInRack ?? []).map(async (slot) => {
+              const slotVariantId = Number(slot.productVariantId ?? 0);
+              if (slotVariantId === Number(selectedVariantFilterId)) {
+                matchedSet.add(slot.id);
+                return;
+              }
+              try {
+                const contents = await dispatch(
+                  userApi.endpoints.getSlotContents.initiate(slot.id, {
+                    forceRefetch: true,
+                    subscribe: false,
+                  }),
+                ).unwrap();
+                const contentsVariantId = Number(contents.productVariantId ?? 0);
+                if (contentsVariantId === Number(selectedVariantFilterId)) {
+                  matchedSet.add(slot.id);
+                }
+              } catch {
+                // skip slot errors
+              }
+            }),
+          );
+        }
+      }
+
+      if (!cancelled) {
+        setVariantMatchedSlotIds(Array.from(matchedSet));
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [dispatch, zones, selectedVariantFilterId]);
 
   const clearSearchFilters = () => {
     setSelectedVariantFilterId(null);
@@ -1282,6 +1471,7 @@ const WarehouseMap = () => {
         setIsLoadingExpiryFilter(true);
       }
       const matchedSet = new Set<number>();
+      const nowMs = getNowMs();
       for (const zone of zones) {
         let racksInZone: Array<{ id: number }> = [];
         try {
@@ -1315,35 +1505,9 @@ const WarehouseMap = () => {
                     subscribe: false,
                   }),
                 ).unwrap();
-                const hasMatch = (contents.boxes ?? []).some((b) => {
-                  if (!b.expiryDate) return false;
-                  const end = new Date(b.expiryDate);
-                  if (Number.isNaN(end.getTime())) return false;
-                  const now = new Date();
-                  const startOfToday = new Date(
-                    now.getFullYear(),
-                    now.getMonth(),
-                    now.getDate(),
-                  );
-                  const endOfExpiryDay = new Date(
-                    end.getFullYear(),
-                    end.getMonth(),
-                    end.getDate(),
-                    23,
-                    59,
-                    59,
-                    999,
-                  );
-                  const daysLeft = Math.ceil(
-                    (endOfExpiryDay.getTime() - startOfToday.getTime()) /
-                      (1000 * 60 * 60 * 24),
-                  );
-                  if (slotExpiryFilter === "EXPIRED") return daysLeft <= 0;
-                  if (slotExpiryFilter === "D1") return daysLeft === 1;
-                  if (slotExpiryFilter === "D3") return daysLeft > 0 && daysLeft <= 3;
-                  if (slotExpiryFilter === "D7") return daysLeft > 0 && daysLeft <= 7;
-                  return false;
-                });
+                const hasMatch = (contents.boxes ?? []).some((b) =>
+                  matchesSlotExpiryFilter(b.expiryDate, slotExpiryFilter, nowMs),
+                );
                 if (hasMatch) matchedSet.add(slot.id);
               } catch {
                 // skip slot errors, keep others
@@ -1451,7 +1615,7 @@ const WarehouseMap = () => {
         confirmLabel="Tiêu hủy ngay"
         showReasonField={false}
       />
-      {detailSlot && (
+      {detailSlot && !isAreaDetailModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
           onClick={() => setDetailSlot(null)}
@@ -1799,7 +1963,10 @@ const WarehouseMap = () => {
               </select>
               <button
                 type="button"
-                onClick={() => setIsAreaDetailModalOpen(true)}
+                onClick={() => {
+                  setDetailSlot(null);
+                  setIsAreaDetailModalOpen(true);
+                }}
                 className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 sm:ml-auto"
               >
                 Mở chi tiết khu vực
@@ -1814,7 +1981,7 @@ const WarehouseMap = () => {
                 className="w-full sm:w-auto min-w-[130px] max-w-[160px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400"
               >
                 <option value="LOT">Quét QR lô</option>
-                <option value="BOX">Quét QR box</option>
+                <option value="BOX">Quét QR thùng</option>
               </select>
               <input
                 value={qrSearchValue}
@@ -1826,7 +1993,7 @@ const WarehouseMap = () => {
                   }
                 }}
                 placeholder={
-                  qrSearchType === "LOT" ? "Nhập/Quét QR lô..." : "Nhập/Quét QR box..."
+                  qrSearchType === "LOT" ? "Nhập/Quét QR lô..." : "Nhập/Quét QR thùng..."
                 }
                 className="w-full sm:w-auto min-w-[230px] max-w-[320px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400"
               />
@@ -1902,6 +2069,7 @@ const WarehouseMap = () => {
                   name={z.name}
                   onSlotClick={(slot) => setDetailSlot(slot)}
                   variantFilterId={selectedVariantFilterId}
+                  variantMatchedSlotIds={variantMatchedSlotIds}
                   qrMatchedSlotIds={qrMatchedSlotIds}
                   expiryMatchedSlotIds={slotIdsByExpiryFilter}
                   hasExpiryFilter={slotExpiryFilter !== "ALL"}
@@ -1915,7 +2083,7 @@ const WarehouseMap = () => {
 
       <QrCameraScannerModal
         open={isQrCameraOpen}
-        title={qrSearchType === "LOT" ? "Quét QR lô" : "Quét QR box"}
+        title={qrSearchType === "LOT" ? "Quét QR lô" : "Quét QR thùng"}
         onClose={() => setIsQrCameraOpen(false)}
         onDetected={(value) => {
           setQrSearchValue(value);
@@ -2092,12 +2260,11 @@ const WarehouseMap = () => {
                         ? (slot.currentCapacity / slot.capacity) * 100
                         : 0;
                     const isSelected = detailSlot?.id === slot.id;
-                    const hasVariantFilter = !!selectedVariantFilterId;
+                    const hasVariantHighlight =
+                      !!selectedVariantFilterId && variantMatchedSlotIds.length > 0;
                     const isVariantMatched =
-                      hasVariantFilter &&
-                      Number(slot.productVariantId ?? 0) ===
-                        Number(selectedVariantFilterId);
-                    const isVariantDimmed = hasVariantFilter && !isVariantMatched;
+                      hasVariantHighlight && variantMatchedSlotIds.includes(slot.id);
+                    const isVariantDimmed = hasVariantHighlight && !isVariantMatched;
                     const hasExpiryFilter = slotExpiryFilter !== "ALL";
                     const isExpiryMatched = hasExpiryFilter && slotIdsByExpiryFilter.includes(slot.id);
                     const isExpiryDimmed = hasExpiryFilter && !isExpiryMatched;
@@ -2111,11 +2278,12 @@ const WarehouseMap = () => {
                       <button
                         key={slot.id}
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
+                          setIsAreaDetailModalOpen(false);
                           setDetailSlot((prev) =>
-                            prev?.id === slot.id ? null : slot
-                          )
-                        }
+                            prev?.id === slot.id ? null : slot,
+                          );
+                        }}
                         className={`relative flex flex-col items-center justify-center rounded-xl border text-[10px] font-medium shadow-sm h-14 cursor-pointer transition ring-2 ring-transparent hover:ring-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-400 ${style} ${isSelected ? "ring-2 ring-emerald-500 ring-offset-2" : ""} ${isHighlighted ? "z-10 bg-sky-600 text-white border-sky-700 shadow-[0_0_0_3px_rgba(14,165,233,0.30)] scale-[1.03]" : ""} ${shouldDim ? "opacity-35 saturate-50" : ""}`}
                         title="Bấm xem chi tiết vị trí"
                       >

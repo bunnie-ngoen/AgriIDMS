@@ -60,6 +60,7 @@ const mainMenu: MenuItem[] = [
       { name: "Danh sách kho", path: "warehouses", icon: List },
       { name: "Tạo kho", path: "warehouses/create", icon: CirclePlus },
       { name: "Xếp hàng vào vị trí", path: "putaway", icon: Boxes },
+      { name: "Hàng chưa xếp vị trí", path: "unassigned-inventory", icon: Boxes },
       { name: "Hàng hư hỏng / quá hạn", path: "inventory-issues", icon: AlertTriangle },
       { name: "Duyệt phiếu hỏng", path: "damage-reports", icon: AlertTriangle },
       { name: "Duyệt yêu cầu tiêu hủy", path: "disposal-requests", icon: Trash2 },

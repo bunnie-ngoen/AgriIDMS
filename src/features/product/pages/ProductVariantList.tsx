@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useToggleProductVariantStatusMutation } from "../api/product-variant.api";
+import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 
 type ConfirmState = {
@@ -49,6 +50,10 @@ const ConfirmModal = ({ open, title, description, onConfirm, onCancel }: Confirm
 
 const ProductVariantList = () => {
   const navigate = useNavigate();
+  const { isManager } = useRoleGuard();
+  const productVariantBasePath = isManager()
+    ? "/manager/product-variants"
+    : "/admin/product-variants";
   const { data, isLoading, isError } = useGetProductVariantsQuery();
   const [deleteVariant, { isLoading: isDeleting }] = useDeleteProductVariantMutation();
   const [toggleStatus] = useToggleProductVariantStatusMutation();
@@ -61,8 +66,8 @@ const ProductVariantList = () => {
     const nextStatus = !variant.isActive;
     setConfirm({
       open: true,
-      title: nextStatus ? "Kích hoạt variant" : "Vô hiệu hóa variant",
-      description: `Bạn có chắc muốn ${nextStatus ? "kích hoạt" : "vô hiệu hóa"} variant #${variant.id} — "${variant.productName}"?`,
+      title: nextStatus ? "Kích hoạt biến thể" : "Vô hiệu hóa biến thể",
+      description: `Bạn có chắc muốn ${nextStatus ? "kích hoạt" : "vô hiệu hóa"} biến thể #${variant.id} — "${variant.productName}"?`,
       onConfirm: async () => {
         closeConfirm();
         const toastId = toast.loading("Đang cập nhật...");
@@ -80,7 +85,7 @@ const ProductVariantList = () => {
     setConfirm({
       open: true,
       title: "Xóa biến thể sản phẩm",
-      description: `Xóa variant #${variant.id} — "${variant.productName}" sẽ không thể hoàn tác.`,
+      description: `Xóa biến thể #${variant.id} — "${variant.productName}" sẽ không thể hoàn tác.`,
       onConfirm: async () => {
         closeConfirm();
         const toastId = toast.loading("Đang xóa...");
@@ -101,23 +106,23 @@ const ProductVariantList = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Product Variants</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Biến thể sản phẩm</h1>
           <p className="text-xs text-slate-400 mt-0.5">Quản lý toàn bộ biến thể sản phẩm trong hệ thống</p>
         </div>
         <button
           type="button"
-          onClick={() => navigate("/admin/product-variants/create")}
+          onClick={() => navigate(`${productVariantBasePath}/create`)}
           className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-slate-700 transition-colors shadow-sm"
         >
           <Plus size={14} />
-          Thêm Variant
+          Thêm biến thể
         </button>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Tổng variant", value: totalCount, icon: Package, color: "bg-blue-50 text-blue-600 border-blue-100" },
+          { label: "Tổng biến thể", value: totalCount, icon: Package, color: "bg-blue-50 text-blue-600 border-blue-100" },
           { label: "Đang hoạt động", value: activeCount, icon: Activity, color: "bg-emerald-50 text-emerald-600 border-emerald-100" },
           { label: "Không hoạt động", value: totalCount - activeCount, icon: TrendingUp, color: "bg-orange-50 text-orange-600 border-orange-100" },
         ].map((stat) => (
@@ -230,7 +235,7 @@ const ProductVariantList = () => {
                             ? "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
                             : "bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200"
                           }`}
-                        title="Click để đổi trạng thái"
+                        title="Bấm để đổi trạng thái"
                       >
                         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${variant.isActive ? "bg-emerald-500" : "bg-slate-400"}`} />
                         {variant.isActive ? "Hoạt động" : "Vô hiệu"}
@@ -240,7 +245,7 @@ const ProductVariantList = () => {
                       <div className="inline-flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => navigate(`/admin/product-variants/${variant.id}/edit`, { state: { variant } })}
+                          onClick={() => navigate(`${productVariantBasePath}/${variant.id}/edit`, { state: { variant } })}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:border-blue-300 hover:text-blue-600 hover:bg-blue-50 transition-colors shadow-sm"
                         >
                           <Pencil size={11} />
@@ -256,7 +261,7 @@ const ProductVariantList = () => {
                           Xóa
                         </button>
                         <button
-                          onClick={() => navigate(`/admin/product-variants/${variant.id}/detail`, { state: { variant } })}
+                          onClick={() => navigate(`${productVariantBasePath}/${variant.id}/detail`, { state: { variant } })}
                           className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-sky-500 hover:bg-sky-50 transition-all"
                           title="Xem chi tiết"
                         >
@@ -276,10 +281,10 @@ const ProductVariantList = () => {
                       <p className="text-sm font-medium text-slate-400">Chưa có product variant nào</p>
                       <button
                         type="button"
-                        onClick={() => navigate("/admin/product-variants/create")}
+                        onClick={() => navigate(`${productVariantBasePath}/create`)}
                         className="text-xs text-blue-600 hover:underline"
                       >
-                        Tạo variant đầu tiên →
+                        Tạo biến thể đầu tiên →
                       </button>
                     </div>
                   </td>

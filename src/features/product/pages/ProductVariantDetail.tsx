@@ -5,6 +5,7 @@ import {
   ArrowLeft, PencilLine, Tag, Clock, BadgeDollarSign,
   ImageIcon, CheckCircle2, XCircle, Hash
 } from "lucide-react";
+import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 const DetailRow = ({ label, value, accent }: { label: string; value: React.ReactNode; accent?: boolean }) => (
   <div className="flex items-center justify-between py-3 border-b border-slate-50 last:border-0">
@@ -16,11 +17,15 @@ const DetailRow = ({ label, value, accent }: { label: string; value: React.React
 const ProductVariantDetail = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { isManager } = useRoleGuard();
+  const productVariantBasePath = isManager()
+    ? "/manager/product-variants"
+    : "/admin/product-variants";
   const variant = location.state?.variant as ProductVariant | undefined;
 
   useEffect(() => {
-    if (!variant) navigate("/admin/product-variants");
-  }, [variant]);
+    if (!variant) navigate(productVariantBasePath);
+  }, [variant, navigate, productVariantBasePath]);
 
   if (!variant) return null;
 
@@ -46,7 +51,7 @@ const ProductVariantDetail = () => {
             </p>
           </div>
           <button
-            onClick={() => navigate(`/admin/product-variants/${variant.id}/edit`, { state: { variant } })}
+            onClick={() => navigate(`${productVariantBasePath}/${variant.id}/edit`, { state: { variant } })}
             className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-700 transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5">
             <PencilLine size={13} />
             Chỉnh sửa
@@ -163,7 +168,7 @@ const ProductVariantDetail = () => {
             Quay lại
           </button>
           <button
-            onClick={() => navigate(`/admin/product-variants/${variant.id}/edit`, { state: { variant } })}
+            onClick={() => navigate(`${productVariantBasePath}/${variant.id}/edit`, { state: { variant } })}
             className="flex-[2] rounded-2xl py-3.5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 flex items-center justify-center gap-2.5 transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5">
             <PencilLine size={14} />
             Chỉnh sửa Variant

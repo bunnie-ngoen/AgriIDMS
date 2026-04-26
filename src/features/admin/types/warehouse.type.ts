@@ -73,6 +73,7 @@ export interface SlotBoxItem {
   weight: number;
   volumeM3?: number;
   status: string;
+  supplierName?: string | null;
   lotId: number;
   lotCode: string;
   receivedDate: string;

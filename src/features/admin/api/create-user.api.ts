@@ -59,6 +59,11 @@ export const userApi = api.injectEndpoints({
           lengthM: body.lengthM,
           widthM: body.widthM,
           floorAreaM2: body.floorAreaM2,
+          minColdStorageHours:
+            body.titleWarehouse === "Cold"
+              ? (body.minColdStorageHours ?? 48)
+              : null,
+          minReceiptWeight: body.minReceiptWeight ?? null,
         },
       }),
     }),
@@ -237,6 +242,11 @@ export const userApi = api.injectEndpoints({
           lengthM: data.lengthM,
           widthM: data.widthM,
           floorAreaM2: data.floorAreaM2,
+          minColdStorageHours:
+            data.titleWarehouse === "Cold"
+              ? (data.minColdStorageHours ?? 48)
+              : null,
+          minReceiptWeight: data.minReceiptWeight ?? null,
         },
       }),
     }),
@@ -556,6 +566,12 @@ export const userApi = api.injectEndpoints({
             weight: Number(b.weight ?? b.Weight ?? 0),
             volumeM3: Number(b.volumeM3 ?? b.VolumeM3 ?? 0),
             status: String(b.status ?? b.Status ?? ""),
+            supplierName:
+              (b.supplierName as string | null | undefined) ??
+              (b.SupplierName as string | null | undefined) ??
+              (b.providerName as string | null | undefined) ??
+              (b.ProviderName as string | null | undefined) ??
+              null,
             lotId: Number(b.lotId ?? b.LotId ?? 0),
             lotCode: String(b.lotCode ?? b.LotCode ?? ""),
             receivedDate: String(b.receivedDate ?? b.ReceivedDate ?? ""),
