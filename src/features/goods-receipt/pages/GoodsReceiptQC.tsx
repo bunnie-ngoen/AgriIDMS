@@ -417,7 +417,7 @@ export default function GoodsReceiptQC() {
   };
 
   const canReviewApprovalStage = isAdmin() || isManager();
-  const canQC = receipt?.status === "Received";
+  const canQC = isWarehouseStaff() && receipt?.status === "Received";
   const canManagerToleranceAction =
     canReviewApprovalStage && receipt?.status === "PendingManagerApproval";
   const canManagerMinWeightAction =
@@ -1380,7 +1380,7 @@ export default function GoodsReceiptQC() {
                       </button>
                     </>
                   )}
-                  {canManagerToleranceAction && (
+                  {canManagerMinWeightAction && (
                     <button
                       type="button"
                       onClick={handleManagerAllowQc}
