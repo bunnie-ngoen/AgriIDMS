@@ -789,12 +789,12 @@ export default function GoodsReceiptQC() {
   const handleManagerAllowQc = async () => {
     if (
       !window.confirm(
-        "Quản lí cho phép quay lại bước kiểm tra chất lượng?"
+        "Quản lí xác nhận mở lại bước kiểm tra chất lượng cho kho?"
       )
     )
       return;
     const toastId = toast.loading(
-      "Đang cập nhật trạng thái để kiểm tra chất lượng tiếp..."
+      "Đang mở lại bước kiểm tra chất lượng..."
     );
     try {
       await managerAllowQc(receipt.id).unwrap();
@@ -1380,7 +1380,7 @@ export default function GoodsReceiptQC() {
                       </button>
                     </>
                   )}
-                  {canManagerMinWeightAction && (
+                  {(canManagerMinWeightAction || canManagerToleranceAction) && (
                     <button
                       type="button"
                       onClick={handleManagerAllowQc}
@@ -1390,7 +1390,7 @@ export default function GoodsReceiptQC() {
                       {isManagerAllowingQc && (
                         <Loader2 size={12} className="animate-spin" />
                       )}
-                      Cho phép kiểm tra chất lượng lại
+                      Mở lại màn QC cho kho
                     </button>
                   )}
                 </div>
