@@ -121,6 +121,19 @@ function toVietnameseQcResult(qcResult?: string | null): string {
   return qcResult;
 }
 
+function toVietnameseProductGrade(grade?: number | null): string {
+  switch (Number(grade ?? 0)) {
+    case 1:
+      return "Loại 1";
+    case 2:
+      return "Loại 2";
+    case 3:
+      return "Loại 3";
+    default:
+      return "Loại chưa xác định";
+  }
+}
+
 export default function GoodsReceiptQC() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
@@ -471,9 +484,7 @@ export default function GoodsReceiptQC() {
   const productVariantsForSelectedDetail = useMemo(() => {
     if (!selectedDetailForQc) return [];
     return productVariants
-      .filter(
-        (v) => v.isActive && Number(v.productId) === Number(selectedDetailForQc.productId),
-      )
+      .filter((v) => Number(v.productId) === Number(selectedDetailForQc.productId))
       .sort((a, b) => Number(a.grade) - Number(b.grade));
   }, [productVariants, selectedDetailForQc]);
 
@@ -1115,14 +1126,15 @@ export default function GoodsReceiptQC() {
                   >
                     <option value={0}>
                       {selectedDetailForQc
-                        ? `Chọn biến thể của ${selectedDetailForQc.productName}`
+                        ? `Chọn loại của ${selectedDetailForQc.productName}`
                         : "Chọn biến thể"}
                     </option>
                     {productVariantsForSelectedDetail.map((v) => (
-                        <option key={v.id} value={v.id}>
-                          {v.productName} (Grade {v.grade})
-                        </option>
-                      ))}
+                      <option key={v.id} value={v.id}>
+                        {toVietnameseProductGrade(v.grade)}
+                        {!v.isActive ? " (Ngừng áp dụng)" : ""}
+                      </option>
+                    ))}
                   </select>
                   {selectedDetailForQc &&
                     productVariantsForSelectedDetail.length === 0 && (
