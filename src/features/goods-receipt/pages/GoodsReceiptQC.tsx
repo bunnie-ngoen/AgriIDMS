@@ -25,7 +25,7 @@ import { useGetProductVariantsQuery } from "../../product/api/product-variant.ap
 import { BoxTypeEnum } from "../types/goods-receipt.type";
 import { useGetBoxTypeSpecsQuery } from "../../admin/api/create-user.api";
 
-type QCForm = {
+type QcClassificationLine = {
   productVariantId: number;
   usableWeight: number;
 };
@@ -220,6 +220,10 @@ export default function GoodsReceiptQC() {
   const [selectedDetailIdForQc, setSelectedDetailIdForQc] = useState<
     number | null
   >(null);
+  const [qcLines, setQcLines] = useState<QcClassificationLine[]>([
+    { productVariantId: 0, usableWeight: 0 },
+  ]);
+  const [qcLinesError, setQcLinesError] = useState<string | null>(null);
   const autoApprovedOnPageRef = useRef(false);
 
   const [isAiQcModalOpen, setIsAiQcModalOpen] = useState(false);
@@ -264,13 +268,6 @@ export default function GoodsReceiptQC() {
 
   const [isWarehouseModalOpen, setIsWarehouseModalOpen] = useState(false);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<number>(0);
-
-  const qcForm = useForm<QCForm>({
-    defaultValues: {
-      productVariantId: 0,
-      usableWeight: 0,
-    },
-  });
 
   const createBoxesForm = useForm<CreateBoxesForm>({
     defaultValues: {
@@ -487,6 +484,15 @@ export default function GoodsReceiptQC() {
       .filter((v) => Number(v.productId) === Number(selectedDetailForQc.productId))
       .sort((a, b) => Number(a.grade) - Number(b.grade));
   }, [productVariants, selectedDetailForQc]);
+  const selectedDetailReceivedWeight = Number(selectedDetailForQc?.receivedWeight ?? 0);
+  const totalUsableWeightFromLines = useMemo(
+    () =>
+      qcLines.reduce((sum, line) => {
+        const qty = Number(line.usableWeight);
+        return sum + (Number.isFinite(qty) ? qty : 0);
+      }, 0),
+    [qcLines],
+  );
 
   const handleOpenQcForDetail = (detailId: number, currentUsable: number) => {
     const targetDetail = detailsForTable.find((d) => d.id === detailId);
@@ -495,10 +501,13 @@ export default function GoodsReceiptQC() {
         ? targetDetail.productVariantId
         : 0;
     setSelectedDetailIdForQc(detailId);
-    qcForm.reset({
-      productVariantId: defaultVariantId,
-      usableWeight: currentUsable,
-    });
+    setQcLines([
+      {
+        productVariantId: defaultVariantId,
+        usableWeight: Number(currentUsable) || 0,
+      },
+    ]);
+    setQcLinesError(null);
     // Reset AI QC state per line
     setAiQcResult(null);
     setAiQcImageFile(null);
@@ -606,7 +615,7 @@ export default function GoodsReceiptQC() {
     await runAiQc(file);
   };
 
-  const handleSubmitQc = async (values: QCForm) => {
+  const handleSubmitQc = async () => {
     if (!selectedDetailIdForQc) {
       toast.error("Vui lòng chọn dòng chi tiết cần kiểm tra chất lượng.");
       return;
@@ -617,22 +626,69 @@ export default function GoodsReceiptQC() {
       return;
     }
 
-    const usable = Number(values.usableWeight);
-    const productVariantId = Number(values.productVariantId);
-    if (Number.isNaN(usable) || usable < 0) {
-      toast.error("Khối lượng dùng được phải >= 0.");
-      return;
-    }
-    if (Number.isNaN(productVariantId) || productVariantId <= 0) {
-      toast.error("Vui lòng chọn Product Variant sau QC.");
-      return;
-    }
-    if (usable > Number(detail.receivedWeight)) {
+    if (productVariantsForSelectedDetail.length === 0) {
       toast.error(
-        `Khối lượng dùng được không được vượt quá khối lượng nhận (${detail.receivedWeight} kg).`,
+        "Không thể lưu QC vì sản phẩm này chưa có loại phân hạng (Loại 1/2/3). Vui lòng cấu hình Product Variant trước.",
       );
       return;
     }
+
+    if (qcLines.length === 0 || qcLines.length > 3) {
+      const msg = "Bạn chỉ được phân loại tối đa 3 loại biến thể theo grade.";
+      setQcLinesError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    const duplicateVariant = qcLines
+      .map((line) => Number(line.productVariantId))
+      .filter((id) => id > 0)
+      .some((id, idx, arr) => arr.indexOf(id) !== idx);
+    if (duplicateVariant) {
+      const msg = "Mỗi loại chỉ được chọn một lần trong một lần QC.";
+      setQcLinesError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    const invalidVariantLine = qcLines.some(
+      (line) => Number(line.productVariantId) <= 0,
+    );
+    if (invalidVariantLine) {
+      const msg =
+        "Bạn chưa chọn đủ loại phân hạng sau QC. Vui lòng chọn Loại 1/2/3 trước khi lưu.";
+      setQcLinesError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    const invalidWeightLine = qcLines.some((line) => Number(line.usableWeight) <= 0);
+    if (invalidWeightLine) {
+      const msg = "Khối lượng dùng được của từng loại phải lớn hơn 0 kg.";
+      setQcLinesError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    const totalUsable = qcLines.reduce((sum, line) => sum + Number(line.usableWeight), 0);
+    if (totalUsable > Number(detail.receivedWeight)) {
+      const msg = `Tổng khối lượng dùng được của các loại (${totalUsable} kg) không được vượt quá khối lượng nhận (${detail.receivedWeight} kg).`;
+      setQcLinesError(msg);
+      toast.error(msg);
+      return;
+    }
+    if (totalUsable <= 0) {
+      const msg = "Tổng khối lượng dùng được phải lớn hơn 0 kg.";
+      setQcLinesError(msg);
+      toast.error(msg);
+      return;
+    }
+    setQcLinesError(null);
+
+    const classificationDetails = qcLines.map((line) => ({
+      productVariantId: Number(line.productVariantId),
+      quantity: Number(line.usableWeight),
+    }));
     const toastId = toast.loading(
       "Đang cập nhật kiểm tra chất lượng cho dòng chi tiết..."
     );
@@ -640,13 +696,8 @@ export default function GoodsReceiptQC() {
       await qcInspection({
         detailId: selectedDetailIdForQc,
         inspectedWeight: Number(detail.receivedWeight),
-        damagedWeight: Number(detail.receivedWeight) - usable,
-        classificationDetails: [
-          {
-            productVariantId,
-            quantity: usable,
-          },
-        ],
+        damagedWeight: Number(detail.receivedWeight) - totalUsable,
+        classificationDetails,
       }).unwrap();
       toast.success("Cập nhật kiểm tra chất lượng thành công.", {
         id: toastId,
@@ -1111,63 +1162,152 @@ export default function GoodsReceiptQC() {
                 </button>
               </div>
               <form
-                onSubmit={qcForm.handleSubmit(handleSubmitQc)}
-                className="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm items-end"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void handleSubmitQc();
+                }}
+                className="space-y-3 text-sm"
               >
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Biến thể sản phẩm sau QC
-                  </label>
-                  <select
-                    {...qcForm.register("productVariantId", {
-                      valueAsNumber: true,
-                    })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
+                {qcLines.map((line, idx) => (
+                  <div key={idx} className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                    <div className="md:col-span-5">
+                      <label className="block text-xs font-medium text-slate-600 mb-1">
+                        Loại phân hạng #{idx + 1}
+                      </label>
+                      <select
+                        value={line.productVariantId}
+                        onChange={(e) => {
+                          const next = [...qcLines];
+                          next[idx] = {
+                            ...next[idx],
+                            productVariantId: Number(e.target.value),
+                          };
+                          setQcLines(next);
+                          setQcLinesError(null);
+                        }}
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
+                      >
+                        <option value={0}>
+                          {selectedDetailForQc
+                            ? `Chọn loại của ${selectedDetailForQc.productName}`
+                            : "Chọn loại"}
+                        </option>
+                        {productVariantsForSelectedDetail.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {toVietnameseProductGrade(v.grade)}
+                            {!v.isActive ? " (Ngừng áp dụng)" : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="md:col-span-4">
+                      <label className="block text-xs font-medium text-slate-600 mb-1">
+                        Khối lượng dùng được (kg)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={line.usableWeight}
+                        onChange={(e) => {
+                          const next = [...qcLines];
+                          next[idx] = {
+                            ...next[idx],
+                            usableWeight: Number(e.target.value),
+                          };
+                          setQcLines(next);
+                          setQcLinesError(null);
+                        }}
+                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
+                      />
+                    </div>
+                    <div className="md:col-span-3">
+                      <div className="flex gap-2">
+                        {qcLines.length < 3 && idx === qcLines.length - 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setQcLines([
+                                ...qcLines,
+                                { productVariantId: 0, usableWeight: 0 },
+                              ]);
+                              setQcLinesError(null);
+                            }}
+                            className="px-3 py-2 rounded-xl border border-emerald-200 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+                          >
+                            + Thêm loại
+                          </button>
+                        )}
+                        {qcLines.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setQcLines(qcLines.filter((_, lineIdx) => lineIdx !== idx));
+                              setQcLinesError(null);
+                            }}
+                            className="px-3 py-2 rounded-xl border border-rose-200 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                          >
+                            Xóa
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <div className="flex flex-wrap items-center gap-4 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                  <p className="text-xs text-slate-600">
+                    Tổng KL dùng được:{" "}
+                    <span className="font-semibold text-slate-800">
+                      {totalUsableWeightFromLines} kg
+                    </span>
+                  </p>
+                  <p className="text-xs text-slate-600">
+                    KL nhận:{" "}
+                    <span className="font-semibold text-slate-800">
+                      {selectedDetailReceivedWeight} kg
+                    </span>
+                  </p>
+                  <p
+                    className={`text-xs font-semibold ${
+                      totalUsableWeightFromLines <= selectedDetailReceivedWeight
+                        ? "text-emerald-700"
+                        : "text-rose-700"
+                    }`}
                   >
-                    <option value={0}>
-                      {selectedDetailForQc
-                        ? `Chọn loại của ${selectedDetailForQc.productName}`
-                        : "Chọn biến thể"}
-                    </option>
-                    {productVariantsForSelectedDetail.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {toVietnameseProductGrade(v.grade)}
-                        {!v.isActive ? " (Ngừng áp dụng)" : ""}
-                      </option>
-                    ))}
-                  </select>
-                  {selectedDetailForQc &&
-                    productVariantsForSelectedDetail.length === 0 && (
-                      <p className="mt-1 text-[11px] text-amber-600">
-                        Chưa có biến thể đang hoạt động cho sản phẩm này.
-                      </p>
-                    )}
+                    {totalUsableWeightFromLines <= selectedDetailReceivedWeight
+                      ? "Hợp lệ"
+                      : "Vượt quá KL nhận"}
+                  </p>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    Khối lượng dùng được (kg)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    {...qcForm.register("usableWeight", {
-                      valueAsNumber: true,
-                    })}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 transition-all"
-                  />
-                </div>
-                <div className="flex gap-2 md:col-span-4 justify-end">
+                {selectedDetailForQc && productVariantsForSelectedDetail.length === 0 && (
+                  <p className="text-[11px] text-amber-600">
+                    Chưa có loại phân hạng cho sản phẩm này. Không thể lưu QC cho đến khi cấu hình Product Variant (Loại 1/2/3).
+                  </p>
+                )}
+                {qcLinesError && (
+                  <p className="text-[11px] text-rose-600">{qcLinesError}</p>
+                )}
+                <div className="flex gap-2 justify-end">
                   <button
                     type="button"
-                    onClick={() => setSelectedDetailIdForQc(null)}
+                    onClick={() => {
+                      setSelectedDetailIdForQc(null);
+                      setQcLinesError(null);
+                    }}
                     className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100"
                   >
                     Huỷ
                   </button>
                   <button
                     type="submit"
-                    disabled={isQcLoading}
+                    disabled={
+                      isQcLoading ||
+                      (selectedDetailForQc != null &&
+                        productVariantsForSelectedDetail.length === 0) ||
+                      qcLines.length === 0 ||
+                      qcLines.length > 3 ||
+                      totalUsableWeightFromLines > selectedDetailReceivedWeight
+                    }
                     className="px-4 py-2 rounded-xl bg-slate-900 text-xs font-semibold text-white hover:bg-slate-700 disabled:opacity-60 flex items-center gap-2"
                   >
                     {isQcLoading && (
