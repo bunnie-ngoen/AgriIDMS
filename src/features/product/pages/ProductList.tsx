@@ -11,6 +11,7 @@ import type { Product } from "../types/product.type";
 import EditProductModal from "../components/EditProductModal";
 import { useGetCategoriesQuery } from "../../category/api/category.api";
 import type { Category } from "../../category/types/category.type";
+import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 const PAGE_SIZE = 10;
 const DESC_PREVIEW_LEN = 50; // Số ký tự mô tả hiển thị trên bảng (1 dòng)
@@ -27,6 +28,8 @@ function formatProductCreatedAt(iso: string | undefined | null): string {
 }
 
 export default function ProductList() {
+  const { isManager } = useRoleGuard();
+  const productBasePath = isManager() ? "/manager/products" : "/admin/products";
   const [searchParams, setSearchParams] = useSearchParams();
   const initialPage = Number(searchParams.get("page") ?? "1") || 1;
 
@@ -158,7 +161,7 @@ export default function ProductList() {
           </p>
         </div>
         <Link
-          to="/admin/products/create"
+          to={`${productBasePath}/create`}
           className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-slate-700 transition-colors shadow-sm"
         >
           <Plus size={14} />
@@ -351,7 +354,7 @@ export default function ProductList() {
                       </div>
                       <p className="text-sm font-medium text-slate-400">Chưa có sản phẩm nào</p>
                       <Link
-                        to="/admin/products/create"
+                        to={`${productBasePath}/create`}
                         className="text-xs text-blue-600 hover:underline"
                       >
                         Tạo sản phẩm đầu tiên →

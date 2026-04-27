@@ -8,10 +8,13 @@ import {
 } from "../api/supplier.api";
 import type { Supplier } from "../types/supplier.type";
 import EditSupplierModal from "../components/EditSupplierModal";
+import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 const PAGE_SIZE = 10;
 
 export default function SupplierList() {
+  const { isManager } = useRoleGuard();
+  const supplierBasePath = isManager() ? "/manager/suppliers" : "/admin/suppliers";
   const [searchParams, setSearchParams] = useSearchParams();
   const initialPage = Number(searchParams.get("page") ?? "1") || 1;
 
@@ -110,7 +113,7 @@ export default function SupplierList() {
             </div>
           </div>
           <Link
-            to="/admin/suppliers/create"
+            to={`${supplierBasePath}/create`}
             className="inline-flex items-center justify-center gap-2 rounded-2xl py-3 px-5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
           >
             <Plus size={16} />

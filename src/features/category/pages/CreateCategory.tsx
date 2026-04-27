@@ -6,6 +6,7 @@ import { useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Sparkles, Package, Loader2 } from "lucide-react";
+import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 const Field = ({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) => (
   <div className="space-y-1.5">
@@ -23,6 +24,8 @@ const inputCls = (hasError?: boolean) =>
   }`;
 
 export default function CreateCategory() {
+  const { isManager } = useRoleGuard();
+  const categoryBasePath = isManager() ? "/manager/categories" : "/admin/categories";
   const [createCategory, { isLoading }] = useCreateCategoryMutation();
   const [serverMessage, setServerMessage] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -45,7 +48,7 @@ export default function CreateCategory() {
       }).unwrap();
       toast.success("Tạo danh mục thành công", { id: toastId });
       form.reset({ name: "", description: "" });
-      setTimeout(() => navigate("/admin/categories"), 400);
+      setTimeout(() => navigate(categoryBasePath), 400);
     } catch (error: any) {
       const msg =
         error?.data?.error ||
@@ -63,7 +66,7 @@ export default function CreateCategory() {
         <div className="flex items-center gap-4 mb-8">
           <button
             type="button"
-            onClick={() => navigate("/admin/categories")}
+            onClick={() => navigate(categoryBasePath)}
             className="h-10 w-10 rounded-2xl border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:border-slate-300 hover:shadow-md transition-all duration-200 shadow-sm"
           >
             <ArrowLeft size={16} />
@@ -126,7 +129,7 @@ export default function CreateCategory() {
           <div className="flex gap-3 pt-1 pb-6">
             <button
               type="button"
-              onClick={() => navigate("/admin/categories")}
+              onClick={() => navigate(categoryBasePath)}
               className="flex-1 rounded-2xl border border-slate-200 py-3.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 bg-white shadow-sm"
             >
               Hủy bỏ

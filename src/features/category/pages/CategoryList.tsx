@@ -9,10 +9,13 @@ import {
 } from "../api/category.api";
 import type { Category } from "../types/category.type";
 import EditCategoryModal from "../components/EditCategoryModal";
+import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 const PAGE_SIZE = 10;
 
 export default function CategoryList() {
+  const { isManager } = useRoleGuard();
+  const categoryBasePath = isManager() ? "/manager/categories" : "/admin/categories";
   const [searchParams, setSearchParams] = useSearchParams();
   const initialPage = Number(searchParams.get("page") ?? "1") || 1;
 
@@ -129,7 +132,7 @@ export default function CategoryList() {
             </div>
           </div>
           <Link
-            to="/admin/categories/create"
+            to={`${categoryBasePath}/create`}
             className="inline-flex items-center justify-center gap-2 rounded-2xl py-3 px-5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
           >
             <Plus size={16} />
