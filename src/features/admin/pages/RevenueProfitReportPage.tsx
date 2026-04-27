@@ -398,7 +398,6 @@ const RevenueProfitReportPage = () => {
                 const total = revenue + cost + profit;
                 const revenuePct = total > 0 ? (revenue / total) * 100 : 0;
                 const costPct = total > 0 ? (cost / total) * 100 : 0;
-                const profitPct = total > 0 ? (profit / total) * 100 : 0;
                 const stop1 = revenuePct;
                 const stop2 = revenuePct + costPct;
                 return (
