@@ -11,6 +11,7 @@ import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Sparkles, Package, ImagePlus, Loader2, X, ChevronDown } from "lucide-react";
 import { uploadFileToCloudinary } from "../../../shared/lib/cloudinaryUpload";
+import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 const Field = ({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) => (
   <div className="space-y-1.5">
@@ -28,6 +29,8 @@ const inputCls = (hasError?: boolean) =>
   }`;
 
 export default function CreateProduct() {
+  const { isManager } = useRoleGuard();
+  const productBasePath = isManager() ? "/manager/products" : "/admin/products";
   const [createProduct, { isLoading }] = useCreateProductMutation();
   const { data: categories, isLoading: isLoadingCategories } =
     useGetCategoriesQuery();
@@ -68,7 +71,7 @@ export default function CreateProduct() {
       });
       setImageFile(null);
       setImagePreview(null);
-      setTimeout(() => navigate("/admin/products"), 400);
+      setTimeout(() => navigate(productBasePath), 400);
     } catch (error: any) {
       const fallbackMsg = "Tạo sản phẩm thất bại. Vui lòng kiểm tra lại thông tin.";
       const msg =
@@ -104,7 +107,7 @@ export default function CreateProduct() {
         <div className="flex items-center gap-4 mb-8">
           <button
             type="button"
-            onClick={() => navigate("/admin/products")}
+            onClick={() => navigate(productBasePath)}
             className="h-10 w-10 rounded-2xl border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:border-slate-300 hover:shadow-md transition-all duration-200 shadow-sm"
           >
             <ArrowLeft size={16} />
@@ -238,7 +241,7 @@ export default function CreateProduct() {
           <div className="flex gap-3 pt-1 pb-6">
             <button
               type="button"
-              onClick={() => navigate("/admin/products")}
+              onClick={() => navigate(productBasePath)}
               className="flex-1 rounded-2xl border border-slate-200 py-3.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 bg-white shadow-sm"
             >
               Hủy bỏ

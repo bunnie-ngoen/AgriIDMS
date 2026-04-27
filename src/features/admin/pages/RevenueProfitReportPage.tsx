@@ -118,12 +118,6 @@ const RevenueProfitReportPage = () => {
     });
   }, [chartMode, data?.rows]);
 
-  const chartMax = useMemo(() => {
-    return chartRows.reduce((max, x) => {
-      return Math.max(max, x.revenue, x.cost, Math.abs(x.profit));
-    }, 0);
-  }, [chartRows]);
-
   const exportExcel = () => {
     const rows = data?.rows ?? [];
     if (!rows.length) return;
@@ -191,7 +185,7 @@ const RevenueProfitReportPage = () => {
     const a = document.createElement("a");
     const stamp = new Date().toISOString().slice(0, 10);
     a.href = url;
-    a.download = `bao-cao-doanh-thu-loi-nhuan-dich-danh-${stamp}.xls`;
+    a.download = `bao-cao-doanh-thu-loi-nhuan-${stamp}.xls`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -202,13 +196,13 @@ const RevenueProfitReportPage = () => {
         <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
           <div>
             <h1 className="text-xl font-semibold text-slate-900">
-              Báo cáo doanh thu - lợi nhuận (đích danh)
+              Báo cáo doanh thu - lợi nhuận
             </h1>
             <p className="mt-1 text-xs text-slate-500">
               Chế độ thực tế tính theo box đã xuất; chế độ dự kiến tính theo box đã phân bổ cho đơn.
             </p>
           </div>
-          <div className="flex flex-wrap items-end gap-2">
+          <div className="grid w-full grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3 md:grid-cols-2 xl:grid-cols-4">
             <div>
               <label className="mb-1 block text-[11px] font-medium text-slate-500">
                 Chế độ dữ liệu
@@ -219,7 +213,7 @@ const RevenueProfitReportPage = () => {
                   setReportMode(e.target.value as "actual" | "estimated");
                   setPage(1);
                 }}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-xs min-w-[200px]"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
               >
                 <option value="estimated">Dự kiến (theo phân bổ)</option>
                 <option value="actual">Thực tế (theo xuất kho)</option>
@@ -236,7 +230,7 @@ const RevenueProfitReportPage = () => {
                   setFromDate(e.target.value);
                   setPage(1);
                 }}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-xs"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
               />
             </div>
             <div>
@@ -250,7 +244,7 @@ const RevenueProfitReportPage = () => {
                   setToDate(e.target.value);
                   setPage(1);
                 }}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-xs"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
               />
             </div>
             <div>
@@ -263,7 +257,7 @@ const RevenueProfitReportPage = () => {
                   setWarehouseId(Number(e.target.value));
                   setPage(1);
                 }}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-xs min-w-[180px]"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
               >
                 <option value={0}>Tất cả kho</option>
                 {warehouses.map((w) => (
@@ -285,7 +279,7 @@ const RevenueProfitReportPage = () => {
                   setProductVariantId(0);
                   setPage(1);
                 }}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-xs min-w-[180px]"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
               >
                 <option value={0}>Tất cả sản phẩm</option>
                 {products.map((p) => (
@@ -305,7 +299,7 @@ const RevenueProfitReportPage = () => {
                   setProductVariantId(Number(e.target.value));
                   setPage(1);
                 }}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-xs min-w-[200px]"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
               >
                 <option value={0}>Tất cả biến thể</option>
                 {variantsByProduct.map((v) => (
@@ -315,28 +309,10 @@ const RevenueProfitReportPage = () => {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="mb-1 block text-[11px] font-medium text-slate-500">
-                Số dòng/trang
-              </label>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="rounded-lg border border-slate-300 px-3 py-2 text-xs"
-              >
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-                <option value={200}>200</option>
-              </select>
-            </div>
             <button
               type="button"
               onClick={() => void refetch()}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
               <RefreshCcw size={14} />
               Làm mới
@@ -345,7 +321,7 @@ const RevenueProfitReportPage = () => {
               type="button"
               onClick={exportExcel}
               disabled={!data?.rows?.length}
-              className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
             >
               <Download size={14} />
               Xuất Excel
@@ -385,7 +361,7 @@ const RevenueProfitReportPage = () => {
 
         <div className="mb-4 rounded-xl border border-slate-200 p-4">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold text-slate-700">Biểu đồ tổng hợp</p>
+            <p className="text-xs font-semibold text-slate-700">Biểu đồ tổng hợp (hình tròn)</p>
             <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 text-[11px]">
               <button
                 type="button"
@@ -416,46 +392,40 @@ const RevenueProfitReportPage = () => {
               <p className="text-xs text-slate-500">Chưa có dữ liệu để vẽ biểu đồ.</p>
             ) : (
               chartRows.map((r) => {
-                const revenuePct = chartMax > 0 ? (r.revenue / chartMax) * 100 : 0;
-                const costPct = chartMax > 0 ? (r.cost / chartMax) * 100 : 0;
-                const profitAbsPct = chartMax > 0 ? (Math.abs(r.profit) / chartMax) * 100 : 0;
-                const profitPositive = r.profit >= 0;
+                const revenue = Math.max(0, r.revenue);
+                const cost = Math.max(0, r.cost);
+                const profit = Math.max(0, r.profit);
+                const total = revenue + cost + profit;
+                const revenuePct = total > 0 ? (revenue / total) * 100 : 0;
+                const costPct = total > 0 ? (cost / total) * 100 : 0;
+                const profitPct = total > 0 ? (profit / total) * 100 : 0;
+                const stop1 = revenuePct;
+                const stop2 = revenuePct + costPct;
                 return (
-                  <div key={r.label} className="rounded-lg border border-slate-100 p-2">
-                    <div className="mb-1 flex items-center justify-between text-[11px]">
+                  <div key={r.label} className="rounded-lg border border-slate-100 p-3">
+                    <div className="mb-2 flex items-center justify-between text-[11px]">
                       <span className="font-semibold text-slate-700">{r.label}</span>
-                      <span className="text-slate-500">
-                        DT: {formatMoney(r.revenue)} | LN: {formatMoney(r.profit)}
-                      </span>
+                      <span className="text-slate-500">Tổng: {formatMoney(total)}</span>
                     </div>
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="w-16 text-[10px] text-slate-500">Doanh thu</span>
-                        <div className="h-2 flex-1 rounded bg-slate-100">
-                          <div
-                            className="h-2 rounded bg-emerald-500"
-                            style={{ width: `${Math.max(revenuePct, 2)}%` }}
-                          />
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                      <div
+                        className="h-24 w-24 rounded-full border border-slate-200"
+                        style={{
+                          background: `conic-gradient(#10b981 0% ${stop1}%, #f59e0b ${stop1}% ${stop2}%, #0ea5e9 ${stop2}% 100%)`,
+                        }}
+                      />
+                      <div className="grid flex-1 grid-cols-1 gap-1 text-[11px] text-slate-600 sm:grid-cols-3">
+                        <div className="rounded-md bg-emerald-50 px-2 py-1">
+                          <p className="font-semibold text-emerald-700">Doanh thu</p>
+                          <p>{formatMoney(r.revenue)}</p>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-16 text-[10px] text-slate-500">Giá vốn</span>
-                        <div className="h-2 flex-1 rounded bg-slate-100">
-                          <div
-                            className="h-2 rounded bg-amber-500"
-                            style={{ width: `${Math.max(costPct, 2)}%` }}
-                          />
+                        <div className="rounded-md bg-amber-50 px-2 py-1">
+                          <p className="font-semibold text-amber-700">Giá vốn</p>
+                          <p>{formatMoney(r.cost)}</p>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-16 text-[10px] text-slate-500">Lợi nhuận</span>
-                        <div className="h-2 flex-1 rounded bg-slate-100">
-                          <div
-                            className={`h-2 rounded ${
-                              profitPositive ? "bg-sky-500" : "bg-rose-500"
-                            }`}
-                            style={{ width: `${Math.max(profitAbsPct, 2)}%` }}
-                          />
+                        <div className="rounded-md bg-sky-50 px-2 py-1">
+                          <p className="font-semibold text-sky-700">Lợi nhuận</p>
+                          <p>{formatMoney(r.profit)}</p>
                         </div>
                       </div>
                     </div>
@@ -544,11 +514,25 @@ const RevenueProfitReportPage = () => {
               </tbody>
             </table>
           </div>
-          <div className="flex items-center justify-between border-t border-slate-100 px-4 py-2 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-2 text-xs">
             <span className="text-slate-500">
               Hiển thị {(data?.rows ?? []).length} / {data?.totalRows ?? 0} dòng
             </span>
             <div className="inline-flex items-center gap-2">
+              <label className="text-slate-500">Số dòng/trang</label>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="rounded border border-slate-300 px-2 py-1 text-xs"
+              >
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={200}>200</option>
+              </select>
               <button
                 type="button"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}

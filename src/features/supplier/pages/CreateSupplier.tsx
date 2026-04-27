@@ -14,6 +14,7 @@ import {
   type VnWard,
 } from "../api/vn-address.api";
 import { ArrowLeft, Sparkles, Building2, MapPin, Loader2, ChevronDown } from "lucide-react";
+import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 const Field = ({
   label,
@@ -50,6 +51,8 @@ const selectCls = (hasError?: boolean) =>
   }`;
 
 export default function CreateSupplier() {
+  const { isManager } = useRoleGuard();
+  const supplierBasePath = isManager() ? "/manager/suppliers" : "/admin/suppliers";
   const navigate = useNavigate();
   const [createSupplier, { isLoading }] = useCreateSupplierMutation();
   const [serverMessage, setServerMessage] = useState<{
@@ -168,7 +171,7 @@ export default function CreateSupplier() {
         detailAddress: "",
         phone: "",
       });
-      setTimeout(() => navigate("/admin/suppliers"), 400);
+      setTimeout(() => navigate(supplierBasePath), 400);
     } catch (error: unknown) {
       const msg =
         (error as { data?: { error?: string; message?: string } })?.data?.error ||
@@ -186,7 +189,7 @@ export default function CreateSupplier() {
         <div className="flex items-center gap-4 mb-8">
           <button
             type="button"
-            onClick={() => navigate("/admin/suppliers")}
+            onClick={() => navigate(supplierBasePath)}
             className="h-10 w-10 rounded-2xl border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:border-slate-300 hover:shadow-md transition-all duration-200 shadow-sm"
           >
             <ArrowLeft size={16} />
@@ -368,7 +371,7 @@ export default function CreateSupplier() {
           <div className="flex gap-3 pt-1 pb-6">
             <button
               type="button"
-              onClick={() => navigate("/admin/suppliers")}
+              onClick={() => navigate(supplierBasePath)}
               className="flex-1 rounded-2xl border border-slate-200 py-3.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 bg-white shadow-sm"
             >
               Hủy bỏ
