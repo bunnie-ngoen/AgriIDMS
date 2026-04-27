@@ -6,6 +6,8 @@ import {
   LogOut,
   ShieldCheck,
   MessageCircleWarning,
+  ChevronDown,
+  ChevronRight,
   Bell,
   PlusCircle,
   Wallet,
@@ -31,6 +33,10 @@ export default function SalesStaffLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const isComplaintsRouteActive = location.pathname.startsWith("/sales/complaints");
+  const [isInternalOpen, setIsInternalOpen] = useState(true);
+  const [isOrderProcessingOpen, setIsOrderProcessingOpen] = useState(true);
+  const [isPosOpen, setIsPosOpen] = useState(true);
+  const [isComplaintsOpen, setIsComplaintsOpen] = useState(isComplaintsRouteActive);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
   const { data: notificationData, refetch: refetchNotifications } = useGetMyNotificationsQuery({
@@ -134,98 +140,157 @@ export default function SalesStaffLayout() {
         <div className="flex-1 overflow-y-auto px-3 py-4">
           <ul className="space-y-4">
             <li>
-              <div className="px-3 mb-2">
-                <p className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
-                  Xử lý đơn hàng
-                </p>
+              <button
+                type="button"
+                onClick={() => setIsInternalOpen((prev) => !prev)}
+                className="w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-semibold bg-slate-800/80 border border-slate-700 text-white"
+              >
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-700 text-emerald-300">
+                  <ShieldCheck size={15} />
+                </span>
+                <span className="flex-1 text-left">Kênh nội bộ Sales Staff</span>
+                <ChevronDown
+                  size={15}
+                  className={`transition-transform duration-200 ${isInternalOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+              <div className={`grid transition-all duration-200 ${isInternalOpen ? "grid-rows-[1fr] mt-1.5" : "grid-rows-[0fr]"}`}>
+                <ul className="overflow-hidden space-y-1 pl-4">
+                  <li>
+                    <NavLink
+                      to="/sales/orders"
+                      end
+                      className={({ isActive }) =>
+                        `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                          isActive
+                            ? "bg-blue-900/40 text-blue-100 border border-blue-700/60"
+                            : "text-slate-300 hover:bg-slate-800/60 hover:text-slate-100"
+                        }`
+                      }
+                    >
+                      <ClipboardList size={14} />
+                      Theo dõi đơn (tất cả hàng đợi)
+                    </NavLink>
+                  </li>
+                </ul>
               </div>
-              <ul className="space-y-1 pl-4">
-                <li>
-                  <NavLink
-                    to="/sales/orders/sale-confirm"
-                    className={({ isActive }) =>
-                      `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                        isActive
-                          ? "bg-sky-900/30 text-sky-200 border border-sky-700/60"
-                          : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
-                      }`
-                    }
-                  >
-                    <UserCheck size={14} />
-                    Đơn hàng chờ xác nhận bán
-                  </NavLink>
-                </li>
-                <li>
-                  <NavLink
-                    to="/sales/orders/pending-cod"
-                    className={({ isActive }) =>
-                      `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                        isActive
-                          ? "bg-violet-900/30 text-violet-200 border border-violet-700/60"
-                          : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
-                      }`
-                    }
-                  >
-                    <CreditCard size={14} />
-                    Thanh toán chờ xử lý
-                  </NavLink>
-                </li>
-                <li>
-                  <NavLink
-                    to="/sales/orders/approved-export"
-                    className={({ isActive }) =>
-                      `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                        isActive
-                          ? "bg-teal-900/30 text-teal-200 border border-teal-700/60"
-                          : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
-                      }`
-                    }
-                  >
-                    <PackageCheck size={14} />
-                    Xác nhận đơn hàng đã giao
-                  </NavLink>
-                </li>
-              </ul>
             </li>
 
             <li>
-              <div className="px-3 mb-2">
-                <p className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">
-                  Bán tại quầy (POS)
-                </p>
+              <button
+                type="button"
+                onClick={() => setIsOrderProcessingOpen((prev) => !prev)}
+                className="w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-semibold bg-slate-800/80 border border-slate-700 text-white"
+              >
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-700 text-blue-300">
+                  <UserCheck size={15} />
+                </span>
+                <span className="flex-1 text-left">Xử lý đơn hàng</span>
+                <ChevronDown
+                  size={15}
+                  className={`transition-transform duration-200 ${isOrderProcessingOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+              <div className={`grid transition-all duration-200 ${isOrderProcessingOpen ? "grid-rows-[1fr] mt-1.5" : "grid-rows-[0fr]"}`}>
+                <ul className="overflow-hidden space-y-1 pl-4">
+                  <li>
+                    <NavLink
+                      to="/sales/orders/sale-confirm"
+                      className={({ isActive }) =>
+                        `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                          isActive
+                            ? "bg-sky-900/30 text-sky-200 border border-sky-700/60"
+                            : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                        }`
+                      }
+                    >
+                      <UserCheck size={14} />
+                      Đơn hàng chờ xác nhận bán
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink
+                      to="/sales/orders/pending-cod"
+                      className={({ isActive }) =>
+                        `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                          isActive
+                            ? "bg-violet-900/30 text-violet-200 border border-violet-700/60"
+                            : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                        }`
+                      }
+                    >
+                      <CreditCard size={14} />
+                      Thanh toán chờ xử lý
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink
+                      to="/sales/orders/approved-export"
+                      className={({ isActive }) =>
+                        `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                          isActive
+                            ? "bg-teal-900/30 text-teal-200 border border-teal-700/60"
+                            : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                        }`
+                      }
+                    >
+                      <PackageCheck size={14} />
+                      Xác nhận đơn hàng đã giao
+                    </NavLink>
+                  </li>
+                </ul>
               </div>
-              <ul className="space-y-1 pl-4">
-                <li>
-                  <NavLink
-                    to="/sales/orders/pos-create"
-                    className={({ isActive }) =>
-                      `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                        isActive
-                          ? "bg-emerald-900/30 text-emerald-200 border border-emerald-700/60"
-                          : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
-                      }`
-                    }
-                  >
-                    <PlusCircle size={14} />
-                    Tạo đơn tại quầy
-                  </NavLink>
-                </li>
-                <li>
-                  <NavLink
-                    to="/sales/orders/unpaid-pos"
-                    className={({ isActive }) =>
-                      `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                        isActive
-                          ? "bg-emerald-900/30 text-emerald-200 border border-emerald-700/60"
-                          : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
-                      }`
-                    }
-                  >
-                    <Wallet size={14} />
-                    Đơn tại quầy chưa thanh toán
-                  </NavLink>
-                </li>
-              </ul>
+            </li>
+
+            <li>
+              <button
+                type="button"
+                onClick={() => setIsPosOpen((prev) => !prev)}
+                className="w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-semibold bg-slate-800/80 border border-slate-700 text-white"
+              >
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-700 text-cyan-300">
+                  <PlusCircle size={15} />
+                </span>
+                <span className="flex-1 text-left">Bán tại quầy (POS)</span>
+                <ChevronDown
+                  size={15}
+                  className={`transition-transform duration-200 ${isPosOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+              <div className={`grid transition-all duration-200 ${isPosOpen ? "grid-rows-[1fr] mt-1.5" : "grid-rows-[0fr]"}`}>
+                <ul className="overflow-hidden space-y-1 pl-4">
+                  <li>
+                    <NavLink
+                      to="/sales/orders/pos-create"
+                      className={({ isActive }) =>
+                        `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                          isActive
+                            ? "bg-emerald-900/30 text-emerald-200 border border-emerald-700/60"
+                            : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                        }`
+                      }
+                    >
+                      <PlusCircle size={14} />
+                      Tạo đơn tại quầy
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink
+                      to="/sales/orders/unpaid-pos"
+                      className={({ isActive }) =>
+                        `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                          isActive
+                            ? "bg-emerald-900/30 text-emerald-200 border border-emerald-700/60"
+                            : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                        }`
+                      }
+                    >
+                      <Wallet size={14} />
+                      Đơn tại quầy chưa thanh toán
+                    </NavLink>
+                  </li>
+                </ul>
+              </div>
             </li>
             <li>
               <NavLink
@@ -242,25 +307,50 @@ export default function SalesStaffLayout() {
                   <User size={15} />
                 </span>
                 <span className="flex-1 text-left">Hồ sơ cá nhân</span>
+                <ChevronRight size={15} className="text-slate-400" />
               </NavLink>
             </li>
             <li>
-              <NavLink
-                to="/sales/complaints/pending"
-                className={`w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+              <button
+                type="button"
+                onClick={() => setIsComplaintsOpen((prev) => !prev)}
+                className={`w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
                   isComplaintsRouteActive
                     ? "bg-slate-800 text-white border border-slate-700"
-                    : "text-slate-300 hover:bg-slate-800/70"
+                    : "bg-slate-800/80 border border-slate-700 text-white"
                 }`}
               >
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-800 text-slate-200">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-700 text-amber-300">
                   <MessageCircleWarning size={15} />
                 </span>
                 <span className="flex-1 text-left">Khiếu nại</span>
-                <span className="inline-flex items-center rounded-full bg-amber-900/30 px-2 py-0.5 text-[11px] text-amber-300">
+                <span className="inline-flex items-center rounded-full bg-amber-900/30 px-2 py-0.5 text-[11px] text-amber-300 mr-2">
                   chờ xử lý
                 </span>
-              </NavLink>
+                <ChevronDown
+                  size={15}
+                  className={`transition-transform duration-200 ${isComplaintsOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+              <div className={`grid transition-all duration-200 ${isComplaintsOpen ? "grid-rows-[1fr] mt-1.5" : "grid-rows-[0fr]"}`}>
+                <ul className="overflow-hidden space-y-1 pl-4">
+                  <li>
+                    <NavLink
+                      to="/sales/complaints/pending"
+                      className={({ isActive }) =>
+                        `w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                          isActive
+                            ? "bg-amber-900/30 text-amber-200 border border-amber-700/60"
+                            : "text-slate-400 hover:bg-slate-800/60 hover:text-slate-200"
+                        }`
+                      }
+                    >
+                      <MessageCircleWarning size={14} />
+                      Khiếu nại chờ xử lý
+                    </NavLink>
+                  </li>
+                </ul>
+              </div>
             </li>
           </ul>
         </div>
