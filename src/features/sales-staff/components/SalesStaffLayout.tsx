@@ -114,29 +114,6 @@ export default function SalesStaffLayout() {
           </div>
         </div>
 
-        <div className="px-5 py-4 border-b border-slate-800">
-          <div className="rounded-xl bg-slate-800/80 border border-slate-700 px-3 py-2.5">
-            <div className="flex items-center gap-2 text-slate-200 text-xs font-medium">
-              <ShieldCheck size={14} className="text-emerald-400" />
-              Kênh nội bộ Sales Staff
-            </div>
-            <NavLink
-              to="/sales/orders"
-              end
-              className={({ isActive }) =>
-                `mt-2 w-full flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm transition-colors ${
-                  isActive
-                    ? "bg-slate-700/80 text-white border border-slate-600/80"
-                    : "text-slate-300 hover:bg-slate-800/60 hover:text-slate-100"
-                }`
-              }
-            >
-              <ClipboardList size={14} />
-              Theo dõi đơn (tất cả hàng đợi)
-            </NavLink>
-          </div>
-        </div>
-
         <div className="flex-1 overflow-y-auto px-3 py-4">
           <ul className="space-y-4">
             <li>
@@ -367,12 +344,8 @@ export default function SalesStaffLayout() {
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white/90 pl-0 pr-3 backdrop-blur">
-          <div className="min-w-0 pl-0">
-            <p className="text-sm text-slate-500">Không gian bán hàng</p>
-            <span className="text-slate-800 font-semibold">Hệ thống xử lý đơn bán</span>
-          </div>
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
+        <header className="flex shrink-0 items-center justify-end border-b border-slate-200 bg-white/90 px-6 sm:px-8 py-4 backdrop-blur">
           <div className="relative" ref={notificationRef}>
             <button
               type="button"
@@ -441,7 +414,7 @@ export default function SalesStaffLayout() {
             )}
           </div>
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto p-0">
+        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 sm:px-8 py-6">
           <Outlet />
         </main>
       </div>
