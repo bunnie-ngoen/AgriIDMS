@@ -87,6 +87,7 @@ export default function WarehouseStaffLayout() {
       message: `Kho ${warehouseWithMostUnassigned.name} còn ${unassignedWeight.toLocaleString("vi-VN")} kg hàng chưa xếp vị trí.`,
       referenceType: "LotPendingPutaway",
       referenceId: lotId,
+      warehouseId: warehouseWithMostUnassigned.id,
       createdAt: new Date().toISOString(),
       isRead: false,
       readAt: null,
@@ -117,6 +118,7 @@ export default function WarehouseStaffLayout() {
     referenceId?: number | null,
     referenceType?: string | null,
     type?: string | null,
+    warehouseId?: number | null,
   ) => {
     if (!isRead) {
       try {
@@ -138,13 +140,16 @@ export default function WarehouseStaffLayout() {
 
     const putawayKeywords = ["Putaway", "Unassigned", "Unslotted", "NeedSlot", "NeedPutaway"];
     const isPutawayNotification =
-      !!referenceId &&
-      (putawayKeywords.some(
+      putawayKeywords.some(
         (k) => normalizedReferenceType.includes(k) || normalizedType.includes(k),
-      ) ||
-        normalizedReferenceType === "LotPendingPutaway");
+      ) || normalizedReferenceType === "LotPendingPutaway";
     if (isPutawayNotification) {
-      navigate(`/warehouse/putaway?lotId=${referenceId}`);
+      navigate("/warehouse/putaway", {
+        state: {
+          lotId: referenceId ?? null,
+          warehouseId: warehouseId ?? null,
+        },
+      });
       setNotificationOpen(false);
       return;
     }
@@ -174,6 +179,7 @@ export default function WarehouseStaffLayout() {
   const [isWarehouseMenuOpen, setIsWarehouseMenuOpen] = useState(
     location.pathname.includes("/warehouse/warehouses") ||
       location.pathname.includes("/warehouse/putaway") ||
+      location.pathname.includes("/warehouse/unassigned-inventory") ||
       location.pathname.includes("/warehouse/inventory-issues") ||
       location.pathname.includes("/warehouse/damage-reports"),
   );
@@ -388,6 +394,20 @@ export default function WarehouseStaffLayout() {
                   </li>
                   <li>
                     <NavLink
+                      to="/warehouse/unassigned-inventory"
+                      className={({ isActive }) =>
+                        `w-full flex items-center px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
+                          isActive
+                            ? "bg-slate-700 text-white border border-slate-600"
+                            : "text-slate-300 hover:bg-slate-800/70"
+                        }`
+                      }
+                    >
+                      Hàng chưa xếp vị trí
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink
                       to="/warehouse/damage-reports"
                       className={({ isActive }) =>
                         `w-full flex items-center px-3 py-2 rounded-xl text-xs font-medium transition-colors ${
@@ -527,6 +547,7 @@ export default function WarehouseStaffLayout() {
                               item.referenceId,
                               item.referenceType,
                               item.type,
+                              (item as { warehouseId?: number | null }).warehouseId,
                             )
                           }
                           className={`w-full px-4 py-3 text-left transition-colors hover:bg-slate-50 ${

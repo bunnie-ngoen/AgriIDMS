@@ -1,6 +1,5 @@
 import { useLocation, Link } from "react-router-dom";
 import AdminHeaderQrMiniScan from "./AdminHeaderQrMiniScan";
-import AdminHeaderNotificationBell from "./AdminHeaderNotificationBell";
 
 const AdminHeader = () => {
     const location = useLocation(); //lấy thông tin của url hiện tại 
@@ -42,9 +41,6 @@ const AdminHeader = () => {
                 </div>
             </div>
             <div className="flex items-center">
-              <div className="mr-2">
-                <AdminHeaderNotificationBell />
-              </div>
               <AdminHeaderQrMiniScan />
             </div>
         </div>

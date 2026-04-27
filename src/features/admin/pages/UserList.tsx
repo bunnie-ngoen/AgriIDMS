@@ -20,12 +20,19 @@ type StatusConfig = {
 };
 
 const STATUS_CONFIG: Record<UserStatus, StatusConfig> = {
-  1: { label: "Active", color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
-  2: { label: "Inactive", color: "text-slate-600", bg: "bg-slate-100", border: "border-slate-200" },
-  3: { label: "Locked", color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200" },
+  1: { label: "Hoạt động", color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
+  2: { label: "Không hoạt động", color: "text-slate-600", bg: "bg-slate-100", border: "border-slate-200" },
+  3: { label: "Đã khóa", color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200" },
 };
 
 const ROLES = ["Manager", "PurchasingStaff", "WarehouseStaff", "SalesStaff", "Customer"];
+const ROLE_LABEL: Record<string, string> = {
+  Manager: "Quản lý",
+  PurchasingStaff: "Nhân viên thu mua",
+  WarehouseStaff: "Nhân viên kho",
+  SalesStaff: "Nhân viên kinh doanh",
+  Customer: "Khách hàng",
+};
 
 const toUserStatus = (status?: number): UserStatus => {
   if (status === 1 || status === 2 || status === 3) return status;
@@ -148,7 +155,7 @@ const RoleDropdown = ({
       >
         {ROLES.map((role) => (
           <option key={role} value={role}>
-            {role}
+            {ROLE_LABEL[role] ?? role}
           </option>
         ))}
       </select>
@@ -227,7 +234,7 @@ const UserList = () => {
 
   const handleStatusChange = (id: string, status: UserStatus) => {
     const labelMap: Record<UserStatus, string> = {
-      1: "Active", 2: "Inactive", 3: "Locked"
+      1: "Hoạt động", 2: "Không hoạt động", 3: "Đã khóa"
     };
     setConfirm({
       open: true,
@@ -243,10 +250,11 @@ const UserList = () => {
   };
 
   const handleRoleChange = (id: string, roleName: string) => {
+    const nextRoleLabel = ROLE_LABEL[roleName] ?? roleName;
     setConfirm({
       open: true,
-      title: "Thay đổi role",
-      description: `Bạn có chắc muốn đổi role thành "${roleName}"?`,
+      title: "Thay đổi vai trò",
+      description: `Bạn có chắc muốn đổi vai trò thành "${nextRoleLabel}"?`,
       variant: "primary",
       onConfirm: async () => {
         closeConfirm();
@@ -293,7 +301,7 @@ const UserList = () => {
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleSearch();
               }}
-              placeholder="Tìm userName / họ tên (API)..."
+              placeholder="Tìm theo tên"
               className="w-full rounded-lg border border-slate-200 bg-slate-50 py-1.5 pl-8 pr-8 text-xs text-slate-700 placeholder-slate-400 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-100"
             />
             {searchInput && (
@@ -345,10 +353,10 @@ const UserList = () => {
           <table className="min-w-full text-xs md:text-sm">
             <thead className="bg-slate-50 text-slate-600">
               <tr>
-                <th className="px-4 py-2 text-left font-medium">UserName</th>
+                <th className="px-4 py-2 text-left font-medium">Tên đăng nhập</th>
                 <th className="px-4 py-2 text-left font-medium">Họ tên</th>
                 <th className="px-4 py-2 text-left font-medium">Email</th>
-                <th className="px-4 py-2 text-left font-medium">Role</th>
+                <th className="px-4 py-2 text-left font-medium">Vai trò</th>
                 <th className="px-4 py-2 text-left font-medium">Trạng thái</th>
                 <th className="px-4 py-2 text-right font-medium">Thao tác</th>
               </tr>

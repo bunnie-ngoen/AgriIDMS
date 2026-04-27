@@ -96,6 +96,7 @@ export default function AdminHeaderNotificationBell() {
       message: `Kho ${warehouseWithMostUnassigned.name} còn ${unassignedWeight.toLocaleString("vi-VN")} kg hàng chưa xếp vị trí.`,
       referenceType: "LotPendingPutaway",
       referenceId: lotId,
+      warehouseId: warehouseWithMostUnassigned.id,
       createdAt: new Date().toISOString(),
       isRead: false,
       readAt: null,
@@ -149,11 +150,11 @@ export default function AdminHeaderNotificationBell() {
     type?: string | null;
     referenceType?: string | null;
     referenceId?: number | null;
+    warehouseId?: number | null;
   }): string | null => {
-    if (!item.referenceId) return null;
-
     const referenceType = item.referenceType ?? "";
     const notificationType = item.type ?? "";
+    const referenceId = item.referenceId ?? null;
 
     if (
       referenceType === "PurchaseOrder" ||
@@ -162,7 +163,7 @@ export default function AdminHeaderNotificationBell() {
       referenceType.includes("PurchaseOrder") ||
       notificationType.includes("PurchaseOrder")
     ) {
-      return `${purchaseOrderBasePath}/${item.referenceId}`;
+      return referenceId ? `${purchaseOrderBasePath}/${referenceId}` : purchaseOrderBasePath;
     }
 
     const putawayKeywords = ["Putaway", "Unassigned", "Unslotted", "NeedSlot", "NeedPutaway"];
@@ -170,23 +171,28 @@ export default function AdminHeaderNotificationBell() {
       putawayKeywords.some((k) => referenceType.includes(k) || notificationType.includes(k)) ||
       referenceType === "LotPendingPutaway";
     if (isPutawayNotification) {
-      return `${putawayBasePath}?lotId=${item.referenceId}`;
+      const params = new URLSearchParams();
+      if (referenceId) params.set("lotId", String(referenceId));
+      if (item.warehouseId && item.warehouseId > 0) params.set("warehouseId", String(item.warehouseId));
+      const query = params.toString();
+      return query ? `${putawayBasePath}?${query}` : putawayBasePath;
     }
 
     switch (referenceType) {
       case "NearExpiryLot":
-        return `${lotBasePath}/${item.referenceId}`;
+        return referenceId ? `${lotBasePath}/${referenceId}` : lotBasePath;
       case "StockCheck": {
+        if (!referenceId) return isWarehouseStaff() ? "/warehouse/stock-checks" : isManager() ? "/manager/stock-checks" : "/admin/stock-checks";
         if (isWarehouseStaff()) return `/warehouse/stock-checks/${item.referenceId}`;
         if (isManager()) return `/manager/stock-checks/${item.referenceId}`;
         return `/admin/stock-checks/${item.referenceId}`;
       }
       case "GoodsReceipt":
-        return `${goodsReceiptBasePath}/${item.referenceId}`;
+        return referenceId ? `${goodsReceiptBasePath}/${referenceId}` : goodsReceiptBasePath;
       case "BackorderExpired":
         // Only warehouse staff has the proposals page.
         if (isWarehouseStaff()) {
-          return `/warehouse/orders/${item.referenceId}/proposals`;
+          return referenceId ? `/warehouse/orders/${referenceId}/proposals` : "/warehouse/orders";
         }
         return null;
       case "DisposalRequest":
@@ -206,6 +212,7 @@ export default function AdminHeaderNotificationBell() {
     type?: string | null;
     referenceType?: string | null;
     referenceId?: number | null;
+    warehouseId?: number | null;
   }) => {
     // Navigate after marking as read (best effort).
     if (!item.isRead) {
@@ -217,8 +224,25 @@ export default function AdminHeaderNotificationBell() {
       }
     }
 
-    const path = getNavigationPath(item);
+    const referenceType = item.referenceType ?? "";
+    const notificationType = item.type ?? "";
+    const putawayKeywords = ["Putaway", "Unassigned", "Unslotted", "NeedSlot", "NeedPutaway"];
+    const isPutawayNotification =
+      putawayKeywords.some((k) => referenceType.includes(k) || notificationType.includes(k)) ||
+      referenceType === "LotPendingPutaway";
+
     setOpen(false);
+    if (isPutawayNotification) {
+      navigate(putawayBasePath, {
+        state: {
+          lotId: item.referenceId ?? null,
+          warehouseId: item.warehouseId ?? null,
+        },
+      });
+      return;
+    }
+
+    const path = getNavigationPath(item);
     if (path) navigate(path);
   };
 

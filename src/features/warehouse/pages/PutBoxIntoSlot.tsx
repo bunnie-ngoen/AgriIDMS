@@ -9,7 +9,7 @@ import {
   Camera,
 } from "lucide-react";
 import toast from "react-hot-toast";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { decodeQrFromImageFile } from "../../../shared/lib/decodeQrFromImage";
 import QrCameraScannerModal from "../../../shared/components/QrCameraScannerModal";
 import {
@@ -30,6 +30,7 @@ import {
 
 export default function PutBoxIntoSlot() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
 
   const [boxQrInput, setBoxQrInput] = useState("");
@@ -93,8 +94,22 @@ export default function PutBoxIntoSlot() {
 
   // Nếu đi từ sơ đồ kho qua (bấm "Chuyển"), tự fill QR box
   useEffect(() => {
+    const navState = (location.state ?? {}) as {
+      lotId?: number | null;
+      warehouseId?: number | null;
+    };
     const prefillQr = (searchParams.get("boxQr") || "").trim();
-    const prefillLotId = Number(searchParams.get("lotId") || 0);
+    const prefillLotId = Number((navState.lotId ?? searchParams.get("lotId")) || 0);
+    const prefillWarehouseId = Number(
+      (navState.warehouseId ?? searchParams.get("warehouseId")) || 0,
+    );
+
+    if (prefillWarehouseId > 0) {
+      setSelectedWarehouseId(prefillWarehouseId);
+      setSelectedZoneId(0);
+      setSelectedRackId(0);
+      setSelectedSlotId(0);
+    }
 
     if (prefillLotId > 0) {
       setSourceMode("lot");
@@ -511,10 +526,6 @@ export default function PutBoxIntoSlot() {
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">
               Kho · Xếp hàng vào vị trí
             </h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Hỗ trợ quét QR hàng, QR lô hàng và QR vị trí (máy quét / dán mã / ảnh /
-              camera). Có thể xếp nhiều hàng cùng lúc từ một lô.
-            </p>
           </div>
         </div>
 
@@ -1109,12 +1120,6 @@ export default function PutBoxIntoSlot() {
                 ? `Xếp ${selectedLotBoxIds.length} hàng vào vị trí`
                 : "Xếp vào vị trí"}
             </button>
-          </div>
-          <div className="px-6 pb-5">
-            <p className="text-xs text-slate-500">
-              Gợi ý: máy quét QR gõ thẳng vào ô (Enter = Tải); ảnh chụp tem nhãn
-              dùng nút “Chọn ảnh” / “Chụp ảnh QR”.
-            </p>
           </div>
         </div>
       </div>

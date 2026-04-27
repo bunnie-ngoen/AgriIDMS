@@ -89,6 +89,9 @@ const PutBoxIntoSlotPage = lazy(() => import("../warehouse/pages/PutBoxIntoSlot"
 const InventoryIssueManagementPage = lazy(
   () => import("./pages/InventoryIssueManagementPage"),
 );
+const UnassignedInventoryPage = lazy(
+  () => import("./pages/UnassignedInventoryPage"),
+);
 const NearExpiryDiscountConfigPage = lazy(
   () => import("./pages/NearExpiryDiscountConfigPage"),
 );
@@ -130,6 +133,7 @@ export const managerRoutes = [
 
       // Xep box vao slot
       { path: "putaway", element: <PutBoxIntoSlotPage /> },
+      { path: "unassigned-inventory", element: <UnassignedInventoryPage /> },
       { path: "inventory-issues", element: <InventoryIssueManagementPage /> },
       { path: "near-expiry-discount-config", element: <NearExpiryDiscountConfigPage /> },
       { path: "variant-discount-config", element: <VariantDiscountOverrideConfigPage /> },

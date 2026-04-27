@@ -11,23 +11,23 @@ import toast from "react-hot-toast";
 const roleOptions = [
   {
     value: "Manager",
-    label: "Manager",
-    description: "Full access & team oversight",
+    label: "Quản lý",
+    description: "Toàn quyền truy cập và giám sát đội nhóm",
   },
   {
     value: "PurchasingStaff",
-    label: "Purchasing Staff",
-    description: "Procurement & supplier management",
+    label: "Nhân viên thu mua",
+    description: "Quản lý thu mua và nhà cung cấp",
   },
   {
     value: "WarehouseStaff",
-    label: "Warehouse Staff",
-    description: "Inventory & logistics",
+    label: "Nhân viên kho",
+    description: "Quản lý tồn kho và vận hành kho",
   },
   {
     value: "SalesStaff",
-    label: "Sales Staff",
-    description: "Orders & customer relations",
+    label: "Nhân viên kinh doanh",
+    description: "Quản lý đơn hàng và chăm sóc khách hàng",
   },
 ];
 
@@ -44,7 +44,7 @@ const CreateUser = () => {
   const onSubmit = async (values: CreateEmployeeDto) => {
     setServerError(null);
 
-    const toastId = toast.loading("Creating Employee...");
+    const toastId = toast.loading("Đang tạo nhân viên...");
 
     try {
       await createUser(values).unwrap();
@@ -93,7 +93,7 @@ const CreateUser = () => {
             {/* Email */}
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600 mb-2">
-                Email Address
+                Địa chỉ email
               </label>
               <input
                 {...form.register("email")}
@@ -115,7 +115,7 @@ const CreateUser = () => {
             {/* Role */}
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600 mb-3">
-                Assign Role
+                Phân quyền
               </label>
 
               <div className="space-y-2">
@@ -152,7 +152,7 @@ const CreateUser = () => {
             {/* Success */}
             {isSuccess && (
               <div className="bg-green-50 border border-green-200 text-green-700 text-sm px-3 py-2 rounded-lg">
-                User created successfully!
+                Tạo tài khoản nhân viên thành công!
               </div>
             )}
 
@@ -173,7 +173,7 @@ ${isLoading
                   : "bg-[#00A6F4] hover:bg-[#0090d6] active:scale-[0.98]"
                 }`}
             >
-              {isLoading ? "Creating..." : "Create User"}
+              {isLoading ? "Đang tạo..." : "Tạo nhân viên"}
             </button>
 
           </form>

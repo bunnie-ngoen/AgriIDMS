@@ -35,4 +35,6 @@ export type CreateWarehousePayload = {
   lengthM: number;
   widthM: number;
   floorAreaM2: number;
+  minColdStorageHours?: number | null;
+  minReceiptWeight?: number | null;
 };

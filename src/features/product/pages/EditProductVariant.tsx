@@ -13,6 +13,7 @@ import type { ProductVariant } from "../types/product-variant.type";
 import { ImagePlus, Loader2, X, ArrowLeft, ChevronDown, Tag, Clock, BadgeDollarSign, PencilLine } from "lucide-react";
 import toast from "react-hot-toast";
 import { uploadFileToCloudinary } from "../../../shared/lib/cloudinaryUpload";
+import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 const Field = ({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) => (
   <div className="space-y-1.5">
@@ -32,6 +33,10 @@ const inputCls = (hasError?: boolean) =>
 const EditProductVariant = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { isManager } = useRoleGuard();
+  const productVariantBasePath = isManager()
+    ? "/manager/product-variants"
+    : "/admin/product-variants";
   const variant = location.state?.variant as ProductVariant | undefined;
 
   const [updateVariant, { isLoading: isUpdating }] = useUpdateProductVariantMutation();
@@ -56,8 +61,8 @@ const EditProductVariant = () => {
   });
 
   useEffect(() => {
-    if (!variant) navigate("/admin/product-variants");
-  }, [variant]);
+    if (!variant) navigate(productVariantBasePath);
+  }, [variant, navigate, productVariantBasePath]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -86,7 +91,7 @@ const EditProductVariant = () => {
       }
       await updateVariant({ id: variant.id, ...values, imageUrl }).unwrap();
       toast.success("Cập nhật thành công!", { id: toastId });
-      navigate("/admin/product-variants");
+      navigate(productVariantBasePath);
     } catch (err: any) {
       setIsUploading(false);
       toast.error(err?.message ?? err?.data?.message ?? "Có lỗi xảy ra", { id: toastId });

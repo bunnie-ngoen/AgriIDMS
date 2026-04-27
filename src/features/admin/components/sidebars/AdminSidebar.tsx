@@ -1,23 +1,13 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
-  Archive,
   Users,
   CirclePlus,
   List,
   LogOut,
   LayoutDashboard,
   ChevronRight,
-  Boxes,
-  Truck,
-  Tags,
-  Layers,
   UserX,
-  FileText,
-  PackageSearch,
-  ShieldCheck,
-  QrCode,
-  Trash2,
-  AlertTriangle,
+  BarChart3,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
@@ -25,7 +15,6 @@ import { useAppDispatch } from "../../../../app/hook";
 import { logout } from "../../../auth/slices/auth.slice";
 import { persistor } from "../../../../app/store";
 import { api } from "../../../../shared/api";
-import AdminQrScanPanel from "../qr/AdminQrScanPanel";
 
 type SubMenuItem = {
   name: string;
@@ -52,7 +41,6 @@ function isNestedMenuItem(item: SubMenuItem | NestedMenuItem): item is NestedMen
 }
 
 const mainMenu: MenuItem[] = [
-  { name: "Trang tổng quan", path: "dashboard", icon: Archive },
   {
     name: "Quản lý nhân viên",
     icon: Users,
@@ -63,74 +51,16 @@ const mainMenu: MenuItem[] = [
     ],
   },
   {
-    name: "Quản lý kho",
-    icon: Boxes,
+    name: "Báo cáo",
+    icon: BarChart3,
     children: [
-      { name: "Danh sách kho", path: "warehouses", icon: List },
-      { name: "Tạo kho", path: "warehouses/create", icon: CirclePlus },
-      { name: "Xếp hàng vào vị trí", path: "putaway", icon: Boxes },
-      { name: "Duyệt yêu cầu tiêu hủy", path: "disposal-requests", icon: Trash2 },
-      { name: "Duyệt phiếu hỏng", path: "damage-reports", icon: AlertTriangle },
-    ],
-  },
-  {
-    name: "Nhà cung cấp",
-    icon: Truck,
-    children: [
-      { name: "Danh sách NCC", path: "suppliers", icon: List },
-      { name: "Tạo NCC", path: "suppliers/create", icon: CirclePlus },
-    ],
-  },
-  {
-    name: "Đơn mua hàng",
-    icon: FileText,
-    children: [
-      { name: "Duyệt đơn mua", path: "purchase-orders", icon: List },
-    ],
-  },
-  {
-    name: "Nhập kho",
-    icon: PackageSearch,
-    children: [
-      { name: "Danh sách phiếu nhập", path: "goods-receipts", icon: List },
-      { name: "Tạo phiếu nhập", path: "goods-receipts/create", icon: CirclePlus },
-      { name: "Danh sách lot", path: "lots", icon: List },
-    ],
-  },
-  {
-    name: "Kiểm kê",
-    icon: ShieldCheck,
-    children: [{ name: "Trang tổng quan", path: "stock-checks", icon: ShieldCheck }],
-  },
-  {
-    name: "Danh mục sản phẩm",
-    icon: Tags,
-    children: [
-      { name: "Danh sách danh mục", path: "categories", icon: List },
-      { name: "Tạo danh mục", path: "categories/create", icon: CirclePlus },
-    ],
-  },
-  {
-    name: "Sản phẩm",
-    icon: Archive,
-    children: [
-      { name: "Danh sách sản phẩm", path: "products", icon: List },
-      { name: "Tạo sản phẩm", path: "products/create", icon: CirclePlus },
-      // ← Nested dropdown cho Product Variant
       {
-        name: "Biến thể sản phẩm",
-        icon: Layers,
-        children: [
-          { name: "Danh sách biến thể", path: "product-variants", icon: List },
-          { name: "Tạo biến thể", path: "product-variants/create", icon: CirclePlus },
-        ],
+        name: "Doanh thu - lợi nhuận",
+        path: "reports/revenue-profit-specific",
+        icon: BarChart3,
       },
     ],
   },
-];
-
-const accountMenu: MenuItem[] = [
-  { name: "Thông tin cá nhân", path: "profile", icon: Users },
 ];
 
 export default function AdminSidebar() {
@@ -139,7 +69,6 @@ export default function AdminSidebar() {
   const location = useLocation();
 
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
-  const [isQrDropdownOpen, setIsQrDropdownOpen] = useState(false);
 
   const currentLastSegment =
     location.pathname.split("/").filter(Boolean).slice(-1)[0] ?? "";
@@ -382,45 +311,6 @@ export default function AdminSidebar() {
           </ul>
         </div>
 
-        <div>
-          <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-            Tài khoản
-          </p>
-          <ul className="space-y-1">
-            {accountMenu.map((item) => renderLeafItem(item))}
-          </ul>
-        </div>
-
-        {/* SCAN QR DROPDOWN (1 dòng, bấm để mở panel) */}
-        <div className="border-t border-[#1a2226] bg-[#222d32]">
-          <button
-            type="button"
-            onClick={() => setIsQrDropdownOpen((v) => !v)}
-            className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors ${
-              isQrDropdownOpen ? "bg-[#1a2530]" : "hover:bg-[#1b2225]"
-            }`}
-          >
-            <span className="flex items-center gap-3 min-w-0">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded bg-sky-500 text-white">
-                <QrCode size={16} />
-              </span>
-              <span className="min-w-0">
-                <p className="text-sm font-semibold text-slate-100 truncate">
-                  Quét QR
-                </p>
-              </span>
-            </span>
-
-            <ChevronRight
-              size={16}
-              className={`transition-transform ${
-                isQrDropdownOpen ? "rotate-90" : ""
-              }`}
-            />
-          </button>
-
-          {isQrDropdownOpen ? <AdminQrScanPanel /> : null}
-        </div>
       </div>
 
       {/* FOOTER / LOGOUT */}
