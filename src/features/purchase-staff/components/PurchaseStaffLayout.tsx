@@ -187,9 +187,6 @@ export default function PurchaseStaffLayout() {
             <Menu size={18} />
           </button>
           <span className="text-slate-600 font-medium">Hệ thống đơn mua hàng</span>
-          <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1">
-            {username ? `Xin chào, ${username}` : "Chưa có tên đăng nhập"}
-          </span>
         </header>
         <main className="flex-1 overflow-y-auto px-3 pt-3 pb-6 sm:px-4 sm:pt-4 sm:pb-8 lg:px-6 lg:pt-6 lg:pb-10">
           <Outlet />

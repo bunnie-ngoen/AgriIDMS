@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Download, RefreshCcw } from "lucide-react";
 import {
   useGetRevenueProfitSpecificReportQuery,
@@ -6,6 +6,7 @@ import {
 import { useGetWarehousesQuery } from "../api/create-user.api";
 import { useGetProductsQuery } from "../../product/api/product.api";
 import { useGetProductVariantsQuery } from "../../product/api/product-variant.api";
+import { useGetAllLotsQuery } from "../../goods-receipt/api/goods-receipt.api";
 
 const formatMoney = (value: number) =>
   Number(value || 0).toLocaleString("vi-VN", {
@@ -36,9 +37,30 @@ const toDateKey = (value: string) => {
   return `${year}-${month}-${day}`;
 };
 
+const toMonthKey = (value: string) => {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+};
+
+const toIsoDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const formatDeltaPercent = (current: number, previous: number) => {
+  if (!previous) return current ? "100%" : "0%";
+  const pct = ((current - previous) / Math.abs(previous)) * 100;
+  return `${pct.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`;
+};
+
 const toBucketLabel = (isoDate: string, mode: "day" | "month") => {
   const d = new Date(isoDate);
-  if (Number.isNaN(d.getTime())) return "N/A";
+  if (Number.isNaN(d.getTime())) return "Không rõ";
   if (mode === "month") {
     return `${d.getMonth() + 1}/${d.getFullYear()}`;
   }
@@ -50,6 +72,8 @@ const RevenueProfitReportPage = () => {
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>(today);
   const [chartMode, setChartMode] = useState<"day" | "month">("day");
+  const [chartDay, setChartDay] = useState<string>(today);
+  const [chartMonth, setChartMonth] = useState<string>(today.slice(0, 7));
   const [warehouseId, setWarehouseId] = useState<number | 0>(0);
   const [productId, setProductId] = useState<number | 0>(0);
   const [productVariantId, setProductVariantId] = useState<number | 0>(0);
@@ -60,10 +84,16 @@ const RevenueProfitReportPage = () => {
   >(null);
   const [isSoldItemsModalOpen, setIsSoldItemsModalOpen] = useState(false);
   const [isLotProfitModalOpen, setIsLotProfitModalOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<
+    "overview" | "chart" | "analysis"
+  >("overview");
+  const chartDayPickerRef = useRef<HTMLInputElement | null>(null);
+  const chartMonthPickerRef = useRef<HTMLInputElement | null>(null);
 
   const { data: warehouses = [] } = useGetWarehousesQuery();
   const { data: products = [] } = useGetProductsQuery();
   const { data: productVariants = [] } = useGetProductVariantsQuery();
+  const { data: allLots = [] } = useGetAllLotsQuery();
 
   const variantsByProduct = useMemo(
     () =>
@@ -85,17 +115,41 @@ const RevenueProfitReportPage = () => {
     }),
     [fromDate, toDate, warehouseId, productId, productVariantId, page, pageSize],
   );
+  const previousPeriodQuery = useMemo(() => {
+    if (!fromDate || !toDate) return null;
+    const from = new Date(fromDate);
+    const to = new Date(toDate);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) {
+      return null;
+    }
+    const oneDay = 24 * 60 * 60 * 1000;
+    const rangeMs = to.getTime() - from.getTime();
+    const previousTo = new Date(from.getTime() - oneDay);
+    const previousFrom = new Date(previousTo.getTime() - rangeMs);
+    return {
+      ...query,
+      fromDate: toIsoDate(previousFrom),
+      toDate: toIsoDate(previousTo),
+      page: 1,
+      pageSize: 5000,
+    };
+  }, [fromDate, toDate, query]);
 
   const actualQuery = useGetRevenueProfitSpecificReportQuery(query);
   const data = actualQuery.data;
   const isFetching = actualQuery.isFetching;
+  const previousPeriodResult = useGetRevenueProfitSpecificReportQuery(
+    previousPeriodQuery ?? undefined,
+    { skip: !previousPeriodQuery },
+  );
+  const previousData = previousPeriodResult.data;
   const refetch = () => actualQuery.refetch();
 
   const chartRows = useMemo(() => {
     const source = data?.rows ?? [];
 
     if (chartMode === "day") {
-      const selectedDay = toDate || today;
+      const selectedDay = chartDay || toDate || today;
       const selectedRows = source.filter(
         (row) => toDateKey(row.exportedAt) === selectedDay,
       );
@@ -121,45 +175,54 @@ const RevenueProfitReportPage = () => {
       ];
     }
 
-    const map = new Map<
-      string,
-      { label: string; revenue: number; cost: number; profit: number }
-    >();
-    for (const row of source) {
-      const label = toBucketLabel(row.exportedAt, chartMode);
-      const existed = map.get(label);
-      if (existed) {
-        existed.revenue += row.revenue;
-        existed.cost += row.cost;
-        existed.profit += row.profit;
-      } else {
-        map.set(label, {
-          label,
-          revenue: row.revenue,
-          cost: row.cost,
-          profit: row.profit,
-        });
-      }
-    }
-    return Array.from(map.values()).sort((a, b) => {
-      const pa = a.label.split("/").map(Number);
-      const pb = b.label.split("/").map(Number);
-      if (pa.length === 2 && pb.length === 2) {
-        return pa[1] === pb[1] ? pa[0] - pb[0] : pa[1] - pb[1];
-      }
-      return 0;
-    });
-  }, [chartMode, data?.rows, toDate, today]);
+    const selectedMonth = chartMonth || today.slice(0, 7);
+    const selectedRows = source.filter(
+      (row) => toMonthKey(row.exportedAt) === selectedMonth,
+    );
+    if (!selectedRows.length) return [];
+
+    const totals = selectedRows.reduce(
+      (acc, row) => {
+        acc.revenue += row.revenue;
+        acc.cost += row.cost;
+        acc.profit += row.profit;
+        return acc;
+      },
+      { revenue: 0, cost: 0, profit: 0 },
+    );
+
+    return [
+      {
+        label: toBucketLabel(`${selectedMonth}-01T00:00:00`, "month"),
+        revenue: totals.revenue,
+        cost: totals.cost,
+        profit: totals.profit,
+      },
+    ];
+  }, [chartMode, data?.rows, chartDay, chartMonth, toDate, today]);
 
   const lotProfitRows = useMemo(() => {
     const source = data?.rows ?? [];
+    const lotRemainingById = new Map<number, number>();
+    const lotRemainingByCode = new Map<string, number>();
+    allLots.forEach((lot) => {
+      if (lot.lotId > 0) {
+        lotRemainingById.set(lot.lotId, Number(lot.remainingQuantity ?? 0));
+      }
+      if (lot.lotCode) {
+        lotRemainingByCode.set(lot.lotCode, Number(lot.remainingQuantity ?? 0));
+      }
+    });
     const map = new Map<
       string,
       {
+        lotId: number;
         lotCode: string;
         supplierName: string;
         warehouseName: string;
         totalKg: number;
+        soldKg: number;
+        unsoldKg: number;
         revenue: number;
         cost: number;
         profit: number;
@@ -168,18 +231,28 @@ const RevenueProfitReportPage = () => {
 
     source.forEach((row) => {
       const lotCode = row.lotCode || `LÔ-#${row.boxId}`;
-      const current = map.get(lotCode);
+      const lotId = Number(row.lotId ?? 0);
+      const lotKey = lotId > 0 ? `ID-${lotId}` : lotCode;
+      const current = map.get(lotKey);
       if (current) {
         current.totalKg += row.quantityKg;
+        current.soldKg += row.quantityKg;
         current.revenue += row.revenue;
         current.cost += row.cost;
         current.profit += row.profit;
       } else {
-        map.set(lotCode, {
+        const unsoldKg =
+          lotId > 0
+            ? Number(lotRemainingById.get(lotId) ?? 0)
+            : Number(lotRemainingByCode.get(lotCode) ?? 0);
+        map.set(lotKey, {
+          lotId,
           lotCode,
           supplierName: row.supplierName || "—",
           warehouseName: row.warehouseName || "—",
           totalKg: row.quantityKg,
+          soldKg: row.quantityKg,
+          unsoldKg: Math.max(0, unsoldKg),
           revenue: row.revenue,
           cost: row.cost,
           profit: row.profit,
@@ -188,6 +261,38 @@ const RevenueProfitReportPage = () => {
     });
 
     return Array.from(map.values()).sort((a, b) => b.profit - a.profit);
+  }, [data?.rows, allLots]);
+
+  const topBottomProducts = useMemo(() => {
+    const source = data?.rows ?? [];
+    const map = new Map<
+      string,
+      { label: string; soldKg: number; revenue: number; cost: number; profit: number }
+    >();
+    source.forEach((row) => {
+      const label = `${row.productName || "—"}${row.variantName ? ` · ${row.variantName}` : ""}`;
+      const key = `${row.productId ?? 0}-${row.productVariantId ?? 0}-${label}`;
+      const current = map.get(key);
+      if (current) {
+        current.soldKg += row.quantityKg;
+        current.revenue += row.revenue;
+        current.cost += row.cost;
+        current.profit += row.profit;
+      } else {
+        map.set(key, {
+          label,
+          soldKg: row.quantityKg,
+          revenue: row.revenue,
+          cost: row.cost,
+          profit: row.profit,
+        });
+      }
+    });
+    const rows = Array.from(map.values());
+    return {
+      top: [...rows].sort((a, b) => b.profit - a.profit).slice(0, 5),
+      bottom: [...rows].sort((a, b) => a.profit - b.profit).slice(0, 5),
+    };
   }, [data?.rows]);
 
   const exportExcel = () => {
@@ -269,28 +374,13 @@ const RevenueProfitReportPage = () => {
   return (
     <div className="px-5">
       <div className="rounded-[15px] bg-white p-6 shadow-sm">
-        <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-          <div>
+        <div className="mb-4">
+          <div className="text-center">
             <h1 className="text-xl font-semibold text-slate-900">
               Báo cáo doanh thu - lợi nhuận
             </h1>
-            <p className="mt-1 text-xs text-slate-500">
-              Dữ liệu được tính theo thực tế xuất kho.
-            </p>
           </div>
           <div className="grid w-full grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3 md:grid-cols-2 xl:grid-cols-4">
-            <div>
-              <label className="mb-1 block text-[11px] font-medium text-slate-500">
-                Chế độ dữ liệu
-              </label>
-              <select
-                value="actual"
-                disabled
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
-              >
-                <option value="actual">Thực tế (theo xuất kho)</option>
-              </select>
-            </div>
             <div>
               <label className="mb-1 block text-[11px] font-medium text-slate-500">
                 Từ ngày
@@ -361,42 +451,84 @@ const RevenueProfitReportPage = () => {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="mb-1 block text-[11px] font-medium text-slate-500">
-                Biến thể
-              </label>
-              <select
-                value={productVariantId}
-                onChange={(e) => {
-                  setProductVariantId(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
-              >
-                <option value={0}>Tất cả biến thể</option>
-                {variantsByProduct.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.productName} · Grade {v.grade}
-                  </option>
-                ))}
-              </select>
+            <div className="md:col-span-2 xl:col-span-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-[11px] font-medium text-slate-500">
+                    Biến thể
+                  </label>
+                  <select
+                    value={productVariantId}
+                    onChange={(e) => {
+                      setProductVariantId(Number(e.target.value));
+                      setPage(1);
+                    }}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
+                  >
+                    <option value={0}>Tất cả biến thể</option>
+                    {variantsByProduct.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.productName} · Hạng {v.grade}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void refetch()}
+                  className="mt-[18px] inline-flex h-[38px] items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <RefreshCcw size={14} />
+                  Làm mới
+                </button>
+                <button
+                  type="button"
+                  onClick={exportExcel}
+                  disabled={!data?.rows?.length}
+                  className="mt-[18px] inline-flex h-[38px] items-center justify-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                >
+                  <Download size={14} />
+                  Xuất Excel
+                </button>
+              </div>
             </div>
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <div className="inline-flex w-full flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
             <button
               type="button"
-              onClick={() => void refetch()}
-              className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              onClick={() => setActiveSection("overview")}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+                activeSection === "overview"
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-600 hover:bg-white/70"
+              }`}
             >
-              <RefreshCcw size={14} />
-              Làm mới
+              Tổng quan
             </button>
             <button
               type="button"
-              onClick={exportExcel}
-              disabled={!data?.rows?.length}
-              className="inline-flex items-center justify-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+              onClick={() => setActiveSection("chart")}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+                activeSection === "chart"
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-600 hover:bg-white/70"
+              }`}
             >
-              <Download size={14} />
-              Xuất Excel
+              Biểu đồ
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveSection("analysis")}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+                activeSection === "analysis"
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-600 hover:bg-white/70"
+              }`}
+            >
+              Phân tích chi tiết
             </button>
           </div>
         </div>
@@ -431,134 +563,294 @@ const RevenueProfitReportPage = () => {
           </div>
         </div>
 
-        <div className="mb-4 rounded-xl border border-slate-200 p-4">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <div>
-              <p className="text-xs font-semibold text-slate-700">Biểu đồ tổng hợp</p>
-              {chartMode === "day" ? (
+        {activeSection === "overview" ? (
+          <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-slate-700">So sánh kỳ trước</p>
+              {previousPeriodQuery ? (
                 <p className="text-[11px] text-slate-500">
-                  Chế độ theo ngày đang hiển thị đúng ngày đã chọn ở mục "Đến ngày".
+                  Kỳ trước: {previousPeriodQuery.fromDate} → {previousPeriodQuery.toDate}
                 </p>
-              ) : null}
+              ) : (
+                <p className="text-[11px] text-slate-500">
+                  Chọn đủ Từ ngày và Đến ngày để xem so sánh.
+                </p>
+              )}
             </div>
-            <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 text-[11px]">
-              <button
-                type="button"
-                onClick={() => setChartMode("day")}
-                className={`rounded px-2 py-1 ${
-                  chartMode === "day"
-                    ? "bg-white font-semibold text-slate-900 shadow-sm"
-                    : "text-slate-600"
-                }`}
-              >
-                Theo ngày
-              </button>
-              <button
-                type="button"
-                onClick={() => setChartMode("month")}
-                className={`rounded px-2 py-1 ${
-                  chartMode === "month"
-                    ? "bg-white font-semibold text-slate-900 shadow-sm"
-                    : "text-slate-600"
-                }`}
-              >
-                Theo tháng
-              </button>
-            </div>
+            {previousPeriodQuery ? (
+              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-xs">
+                  <p className="text-emerald-700">Doanh thu</p>
+                  <p className="mt-1 font-semibold text-emerald-900">
+                    {formatMoney(data?.totalRevenue ?? 0)}
+                  </p>
+                  <p className="mt-1 text-emerald-800">
+                    Kỳ trước: {formatMoney(previousData?.totalRevenue ?? 0)} ·{" "}
+                    {formatDeltaPercent(
+                      data?.totalRevenue ?? 0,
+                      previousData?.totalRevenue ?? 0,
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-amber-100 bg-amber-50 p-3 text-xs">
+                  <p className="text-amber-700">Giá vốn</p>
+                  <p className="mt-1 font-semibold text-amber-900">
+                    {formatMoney(data?.totalCost ?? 0)}
+                  </p>
+                  <p className="mt-1 text-amber-800">
+                    Kỳ trước: {formatMoney(previousData?.totalCost ?? 0)} ·{" "}
+                    {formatDeltaPercent(
+                      data?.totalCost ?? 0,
+                      previousData?.totalCost ?? 0,
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-sky-100 bg-sky-50 p-3 text-xs">
+                  <p className="text-sky-700">Lợi nhuận</p>
+                  <p className="mt-1 font-semibold text-sky-900">
+                    {formatMoney(data?.totalProfit ?? 0)}
+                  </p>
+                  <p className="mt-1 text-sky-800">
+                    Kỳ trước: {formatMoney(previousData?.totalProfit ?? 0)} ·{" "}
+                    {formatDeltaPercent(
+                      data?.totalProfit ?? 0,
+                      previousData?.totalProfit ?? 0,
+                    )}
+                  </p>
+                </div>
+              </div>
+            ) : null}
           </div>
-          <div className="space-y-2">
-            {!chartRows.length ? (
-              <p className="text-xs text-slate-500">Chưa có dữ liệu để vẽ biểu đồ.</p>
-            ) : (
-              chartRows.map((r) => {
-                const revenue = Math.max(0, r.revenue);
-                const cost = Math.max(0, r.cost);
-                const profit = Math.max(0, r.profit);
-                const total = revenue + cost + profit;
-                const revenuePct = total > 0 ? (revenue / total) * 100 : 0;
-                const costPct = total > 0 ? (cost / total) * 100 : 0;
-                const stop1 = revenuePct;
-                const stop2 = revenuePct + costPct;
-                return (
-                  <div key={r.label} className="rounded-lg border border-slate-100 p-3">
-                    <div className="mb-2 flex items-center justify-between text-[11px]">
-                      <span className="font-semibold text-slate-700">{r.label}</span>
-                      <span className="text-slate-500">Tổng: {formatMoney(total)}</span>
-                    </div>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                      <div
-                        className="h-24 w-24 rounded-full border border-slate-200"
-                        style={{
-                          background: `conic-gradient(#10b981 0% ${stop1}%, #f59e0b ${stop1}% ${stop2}%, #0ea5e9 ${stop2}% 100%)`,
-                        }}
-                      />
-                      <div className="grid flex-1 grid-cols-1 gap-1 text-[11px] text-slate-600 sm:grid-cols-3">
-                        <div className="rounded-md bg-emerald-50 px-2 py-1">
-                          <p className="font-semibold text-emerald-700">Doanh thu</p>
-                          <p>{formatMoney(r.revenue)}</p>
-                        </div>
-                        <div className="rounded-md bg-amber-50 px-2 py-1">
-                          <p className="font-semibold text-amber-700">Giá vốn</p>
-                          <p>{formatMoney(r.cost)}</p>
-                        </div>
-                        <div className="rounded-md bg-sky-50 px-2 py-1">
-                          <p className="font-semibold text-sky-700">Lợi nhuận</p>
-                          <p>{formatMoney(r.profit)}</p>
+        ) : null}
+
+        {activeSection === "chart" ? (
+          <div className="mb-4 rounded-xl border border-slate-200 p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold text-slate-700">Biểu đồ tổng hợp</p>
+                {chartMode === "day" ? (
+                  <p className="text-[11px] text-slate-500">
+                    Chế độ theo ngày đang hiển thị đúng ngày bạn chọn.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-slate-500">
+                    Chế độ theo tháng đang hiển thị đúng tháng bạn chọn.
+                  </p>
+                )}
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-1 text-[11px]">
+                <input
+                  ref={chartDayPickerRef}
+                  type="date"
+                  value={chartDay}
+                  onChange={(e) => setChartDay(e.target.value || today)}
+                  className="sr-only"
+                  aria-label="Chọn ngày biểu đồ"
+                />
+                <input
+                  ref={chartMonthPickerRef}
+                  type="month"
+                  value={chartMonth}
+                  onChange={(e) => setChartMonth(e.target.value || today.slice(0, 7))}
+                  className="sr-only"
+                  aria-label="Chọn tháng biểu đồ"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setChartMode("day");
+                    const input = chartDayPickerRef.current;
+                    if (!input) return;
+                    if (typeof input.showPicker === "function") input.showPicker();
+                    else {
+                      input.focus();
+                      input.click();
+                    }
+                  }}
+                  className={`rounded px-2 py-1 ${
+                    chartMode === "day"
+                      ? "bg-white font-semibold text-slate-900 shadow-sm"
+                      : "text-slate-600"
+                  }`}
+                >
+                  Theo ngày
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setChartMode("month");
+                    const input = chartMonthPickerRef.current;
+                    if (!input) return;
+                    if (typeof input.showPicker === "function") input.showPicker();
+                    else {
+                      input.focus();
+                      input.click();
+                    }
+                  }}
+                  className={`rounded px-2 py-1 ${
+                    chartMode === "month"
+                      ? "bg-white font-semibold text-slate-900 shadow-sm"
+                      : "text-slate-600"
+                  }`}
+                >
+                  Theo tháng
+                </button>
+                <span className="rounded bg-white px-2 py-1 text-[10px] text-slate-600">
+                  {chartMode === "day" ? chartDay : chartMonth}
+                </span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {!chartRows.length ? (
+                <p className="text-xs text-slate-500">Chưa có dữ liệu để vẽ biểu đồ.</p>
+              ) : (
+                chartRows.map((r) => {
+                  const revenue = Math.max(0, r.revenue);
+                  const cost = Math.max(0, r.cost);
+                  const profit = Math.max(0, r.profit);
+                  const total = revenue + cost + profit;
+                  const revenuePct = total > 0 ? (revenue / total) * 100 : 0;
+                  const costPct = total > 0 ? (cost / total) * 100 : 0;
+                  const stop1 = revenuePct;
+                  const stop2 = revenuePct + costPct;
+                  return (
+                    <div key={r.label} className="rounded-lg border border-slate-100 p-3">
+                      <div className="mb-2 flex items-center justify-between text-[11px]">
+                        <span className="font-semibold text-slate-700">{r.label}</span>
+                        <span className="text-slate-500">Tổng: {formatMoney(total)}</span>
+                      </div>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                        <div
+                          className="h-24 w-24 rounded-full border border-slate-200"
+                          style={{
+                            background: `conic-gradient(#10b981 0% ${stop1}%, #f59e0b ${stop1}% ${stop2}%, #0ea5e9 ${stop2}% 100%)`,
+                          }}
+                        />
+                        <div className="grid flex-1 grid-cols-1 gap-1 text-[11px] text-slate-600 sm:grid-cols-3">
+                          <div className="rounded-md bg-emerald-50 px-2 py-1">
+                            <p className="font-semibold text-emerald-700">Doanh thu</p>
+                            <p>{formatMoney(r.revenue)}</p>
+                          </div>
+                          <div className="rounded-md bg-amber-50 px-2 py-1">
+                            <p className="font-semibold text-amber-700">Giá vốn</p>
+                            <p>{formatMoney(r.cost)}</p>
+                          </div>
+                          <div className="rounded-md bg-sky-50 px-2 py-1">
+                            <p className="font-semibold text-sky-700">Lợi nhuận</p>
+                            <p>{formatMoney(r.profit)}</p>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })
-            )}
+                  );
+                })
+              )}
+            </div>
           </div>
-        </div>
+        ) : null}
 
-        <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50/40 p-3 sm:p-4">
-          <p className="text-xs font-semibold text-slate-700">Bảng phân tích doanh thu</p>
-          <p className="mt-1 text-[11px] text-slate-500">
-            Bấm nút để mở chi tiết doanh thu theo khách hàng hoặc theo nhà cung cấp.
-          </p>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <button
-              type="button"
-              onClick={() => setOpenedRevenueModal("customer")}
-              className="inline-flex items-center justify-center rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-100"
-            >
-              Doanh thu theo khách hàng ({(data?.revenueByCustomers ?? []).length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setOpenedRevenueModal("supplier")}
-              className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
-            >
-              Doanh thu theo nhà cung cấp ({(data?.revenueBySuppliers ?? []).length})
-            </button>
-          </div>
-        </div>
+        {activeSection === "analysis" ? (
+          <>
+            <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50/40 p-3 sm:p-4">
+              <p className="text-xs font-semibold text-slate-700">Bảng phân tích doanh thu</p>
+              <p className="mt-1 text-[11px] text-slate-500">
+                Bấm nút để mở chi tiết doanh thu theo khách hàng hoặc theo nhà cung cấp.
+              </p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => setOpenedRevenueModal("customer")}
+                  className="inline-flex items-center justify-center rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+                >
+                  Doanh thu theo khách hàng ({(data?.revenueByCustomers ?? []).length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOpenedRevenueModal("supplier")}
+                  className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                >
+                  Doanh thu theo nhà cung cấp ({(data?.revenueBySuppliers ?? []).length})
+                </button>
+              </div>
+            </div>
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-3 sm:p-4">
-          <p className="text-xs font-semibold text-slate-700">Chi tiết và thống kê nâng cao</p>
-          <p className="mt-1 text-[11px] text-slate-500">
-            Bấm nút để mở danh sách mặt hàng đã bán hoặc thống kê lợi nhuận theo từng lô.
-          </p>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <button
-              type="button"
-              onClick={() => setIsSoldItemsModalOpen(true)}
-              className="inline-flex items-center justify-center rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
-            >
-              Danh sách mặt hàng đã bán ({data?.totalRows ?? 0})
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsLotProfitModalOpen(true)}
-              className="inline-flex items-center justify-center rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100"
-            >
-              Thống kê lợi nhuận theo từng lô ({lotProfitRows.length})
-            </button>
-          </div>
-        </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-3 sm:p-4">
+              <p className="text-xs font-semibold text-slate-700">
+                Chi tiết và thống kê nâng cao
+              </p>
+              <p className="mt-1 text-[11px] text-slate-500">
+                Bấm nút để mở danh sách mặt hàng đã bán hoặc thống kê lợi nhuận theo từng lô.
+              </p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => setIsSoldItemsModalOpen(true)}
+                  className="inline-flex items-center justify-center rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                >
+                  Danh sách mặt hàng đã bán ({data?.totalRows ?? 0})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsLotProfitModalOpen(true)}
+                  className="inline-flex items-center justify-center rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100"
+                >
+                  Thống kê lợi nhuận theo từng lô ({lotProfitRows.length})
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-3">
+                <p className="text-xs font-semibold text-emerald-800">
+                  5 mặt hàng lãi cao nhất
+                </p>
+                <div className="mt-2 space-y-1.5">
+                  {topBottomProducts.top.length === 0 ? (
+                    <p className="text-[11px] text-slate-500">Chưa có dữ liệu.</p>
+                  ) : (
+                    topBottomProducts.top.map((item, idx) => (
+                      <div
+                        key={`${item.label}-${idx}`}
+                        className="flex items-center justify-between gap-2 rounded-md bg-white/80 px-2 py-1.5 text-[11px]"
+                      >
+                        <span className="truncate text-slate-700">{item.label}</span>
+                        <span className="shrink-0 font-semibold text-emerald-700">
+                          {formatMoney(item.profit)}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+              <div className="rounded-xl border border-rose-200 bg-rose-50/40 p-3">
+                <p className="text-xs font-semibold text-rose-800">
+                  5 mặt hàng lợi nhuận thấp nhất
+                </p>
+                <div className="mt-2 space-y-1.5">
+                  {topBottomProducts.bottom.length === 0 ? (
+                    <p className="text-[11px] text-slate-500">Chưa có dữ liệu.</p>
+                  ) : (
+                    topBottomProducts.bottom.map((item, idx) => (
+                      <div
+                        key={`${item.label}-${idx}`}
+                        className="flex items-center justify-between gap-2 rounded-md bg-white/80 px-2 py-1.5 text-[11px]"
+                      >
+                        <span className="truncate text-slate-700">{item.label}</span>
+                        <span
+                          className={`shrink-0 font-semibold ${
+                            item.profit >= 0 ? "text-emerald-700" : "text-rose-700"
+                          }`}
+                        >
+                          {formatMoney(item.profit)}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        ) : null}
       </div>
 
       {openedRevenueModal ? (
@@ -847,13 +1139,14 @@ const RevenueProfitReportPage = () => {
               </button>
             </div>
             <div className="max-h-[72vh] overflow-auto">
-              <table className="w-full min-w-[980px] text-[11px]">
+              <table className="w-full min-w-[1120px] text-[11px]">
                 <thead className="sticky top-0 bg-slate-50 text-slate-600">
                   <tr>
                     <th className="px-3 py-2 text-left">Mã lô</th>
                     <th className="px-3 py-2 text-left">Nhà cung cấp</th>
                     <th className="px-3 py-2 text-left">Kho</th>
-                    <th className="px-3 py-2 text-right">Khối lượng (kg)</th>
+                    <th className="px-3 py-2 text-right">Đã bán (kg)</th>
+                    <th className="px-3 py-2 text-right">Chưa bán (kg)</th>
                     <th className="px-3 py-2 text-right">Doanh thu</th>
                     <th className="px-3 py-2 text-right">Giá vốn</th>
                     <th className="px-3 py-2 text-right">Lợi nhuận</th>
@@ -862,17 +1155,18 @@ const RevenueProfitReportPage = () => {
                 <tbody>
                   {lotProfitRows.length === 0 ? (
                     <tr>
-                      <td className="px-3 py-6 text-center text-slate-500" colSpan={7}>
+                      <td className="px-3 py-6 text-center text-slate-500" colSpan={8}>
                         Chưa có dữ liệu lô hàng trong khoảng thời gian đã chọn.
                       </td>
                     </tr>
                   ) : (
                     lotProfitRows.map((row) => (
-                      <tr key={row.lotCode} className="border-t border-slate-100 hover:bg-slate-50">
+                      <tr key={`${row.lotId}-${row.lotCode}`} className="border-t border-slate-100 hover:bg-slate-50">
                         <td className="px-3 py-2 font-medium text-slate-800">{row.lotCode}</td>
                         <td className="px-3 py-2">{row.supplierName}</td>
                         <td className="px-3 py-2">{row.warehouseName}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatKg(row.totalKg)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatKg(row.soldKg)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatKg(row.unsoldKg)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatMoney(row.revenue)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatMoney(row.cost)}</td>
                         <td
