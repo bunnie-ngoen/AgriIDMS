@@ -306,7 +306,11 @@ export default function ProductsSection() {
                                                 key={item}
                                                 type="button"
                                                 aria-label={`Trang ${item}`}
-                                                onClick={() => setCurrentPage(item)}
+                                                onClick={() => {
+                                                    if (typeof item === "number") {
+                                                        setCurrentPage(item);
+                                                    }
+                                                }}
                                                 className={`h-9 min-w-9 rounded-md border px-3 text-sm font-medium transition-colors ${
                                                     item === currentPage
                                                         ? "bg-[#1a5f2a] text-white border-[#1a5f2a]"
