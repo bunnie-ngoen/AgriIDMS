@@ -2,7 +2,6 @@ import { useLocation, Link } from "react-router-dom";
 import AdminHeaderQrMiniScan from "./AdminHeaderQrMiniScan";
 import AdminHeaderNotificationBell from "./AdminHeaderNotificationBell";
 import { Menu } from "lucide-react";
-import { useAppSelector } from "../../../../app/hook";
 
 const ROUTE_LABELS: Record<string, string> = {
   admin: "Quản trị",
@@ -80,7 +79,6 @@ const HIDDEN_BREADCRUMB_SEGMENTS = new Set(["config"]);
 
 const AdminHeader = ({ onToggleSidebar }: AdminHeaderProps) => {
     const location = useLocation(); //lấy thông tin của url hiện tại 
-  const loggedInName = useAppSelector((state) => state.auth.user?.username?.trim() ?? "");
 
   const pathnames = location.pathname
     .split("/")  //["", "admin", "user-management", "create"]
@@ -134,11 +132,6 @@ const AdminHeader = ({ onToggleSidebar }: AdminHeaderProps) => {
             </div>
             </div>
             <div className="flex w-full items-center justify-end gap-2 lg:w-auto">
-              <div className="hidden sm:flex items-center rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-800">
-                <span className="font-medium">
-                  {loggedInName ? `Xin chào, ${loggedInName}` : "Chưa có tên đăng nhập"}
-                </span>
-              </div>
               <AdminHeaderNotificationBell />
               <AdminHeaderQrMiniScan />
             </div>

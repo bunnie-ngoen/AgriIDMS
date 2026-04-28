@@ -592,11 +592,6 @@ export default function WarehouseStaffLayout() {
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="hidden sm:inline-flex text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1">
-              {username ? `Xin chào, ${username}` : "Chưa có tên đăng nhập"}
-            </span>
-          </div>
           <div className="relative shrink-0 flex items-center gap-2" ref={notificationRef}>
             {unreadCount > 0 && !notificationOpen ? (
               <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 border border-amber-200">

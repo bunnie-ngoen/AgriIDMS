@@ -381,9 +381,6 @@ export default function SalesStaffLayout() {
           >
             <Menu size={18} />
           </button>
-          <span className="hidden sm:inline-flex mr-2 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1">
-            {username ? `Xin chào, ${username}` : "Chưa có tên đăng nhập"}
-          </span>
           <div className="relative" ref={notificationRef}>
             <button
               type="button"
