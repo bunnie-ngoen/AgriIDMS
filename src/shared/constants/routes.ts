@@ -36,6 +36,8 @@ export const ROUTES = {
     CHECKOUT: "/checkout/purchase-order",
     /** Sau khi đặt hàng thành công — `orderId` khớp GET Orders/:id */
     CHECKOUT_ORDER_RECEIVED: "/checkout/purchase-order/received/:orderId",
+    PAYMENT_SUCCESS: "/payment/success",
+    PAYMENT_CANCEL: "/payment/cancel",
 
     /** Tab in phiếu xuất (cùng origin, tránh URL blob ở chân trang in). */
     PRINT_EXPORT_SLIP: "/print/export-slip",

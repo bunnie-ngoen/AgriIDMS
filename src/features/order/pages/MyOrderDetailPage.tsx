@@ -77,9 +77,11 @@ function paymentStatusTone(status?: string | null) {
 function ReviewAction({
     orderDetailId,
     orderStatus,
+    onReviewSubmitted,
 }: {
     orderDetailId: number;
     orderStatus: string;
+    onReviewSubmitted?: () => Promise<unknown> | void;
 }) {
     const [open, setOpen] = useState(false);
     const [rating, setRating] = useState(5);
@@ -92,8 +94,9 @@ function ReviewAction({
     });
     const [createReview, { isLoading }] = useCreateReviewMutation();
 
-    const canReview = !!data?.isReviewable;
-    const canShow = orderStatus === "Delivered" || orderStatus === "Completed";
+    const canReview = data?.status === "Reviewable" && !!data?.isReviewable;
+    const hasReviewed = !!data?.hasReviewed || data?.status === "AlreadyReviewed";
+    const canShow = orderStatus === "Delivered";
 
     if (!canShow || orderDetailId <= 0) return null;
 
@@ -109,11 +112,18 @@ function ReviewAction({
             }).unwrap();
             setFeedback("Đã gửi đánh giá thành công.");
             setOpen(false);
-            await refetch();
+            await Promise.all([refetch(), Promise.resolve(onReviewSubmitted?.())]);
         } catch (err) {
             setFeedback(getApiErrorMessage(err, "Chưa đủ điều kiện đánh giá hoặc đã đánh giá trước đó."));
         }
     };
+
+    const ineligibleMessage = data?.message || "Chưa đủ điều kiện đánh giá.";
+    const actionLabel = hasReviewed
+        ? "Đã đánh giá"
+        : canReview
+            ? "Đánh giá sản phẩm"
+            : "Chưa đủ điều kiện đánh giá";
 
     return (
         <div className="mt-3">
@@ -123,7 +133,7 @@ function ReviewAction({
                 disabled={!canReview || isFetching}
                 className="rounded-lg border border-indigo-300 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-                {canReview ? "Đánh giá sản phẩm" : "Chưa đủ điều kiện đánh giá"}
+                {actionLabel}
             </button>
             {open && canReview && (
                 <div className="mt-2 grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
@@ -182,6 +192,7 @@ function ReviewAction({
                     </button>
                 </div>
             )}
+            {!canReview && !feedback && <p className="mt-1 text-xs text-slate-600">{ineligibleMessage}</p>}
             {!!feedback && <p className="mt-1 text-xs text-slate-700">{feedback}</p>}
         </div>
     );
@@ -419,7 +430,11 @@ export default function MyOrderDetailPage() {
                                     </div>
                                 </div>
 
-                                <ReviewAction orderDetailId={i.orderDetailId} orderStatus={order.status} />
+                                <ReviewAction
+                                    orderDetailId={i.orderDetailId}
+                                    orderStatus={order.status}
+                                    onReviewSubmitted={() => refetch()}
+                                />
                             </article>
                         ))}
                     </div>

@@ -1,8 +1,17 @@
 import { z } from "zod";
 
 export const reviewableResponseSchema = z.object({
-  orderDetailId: z.coerce.number().int(),
   isReviewable: z.boolean(),
+  status: z.enum([
+    "NotDelivered",
+    "TooEarly",
+    "Expired",
+    "AlreadyReviewed",
+    "HasPendingComplaint",
+    "Reviewable",
+  ]),
+  message: z.string(),
+  hasReviewed: z.boolean(),
 });
 
 export type ReviewableResponse = z.infer<typeof reviewableResponseSchema>;

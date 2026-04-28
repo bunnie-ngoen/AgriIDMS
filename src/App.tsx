@@ -24,6 +24,8 @@ import MyOrdersPage from './features/order/pages/MyOrdersPage';
 import MyOrderDetailPage from './features/order/pages/MyOrderDetailPage';
 import CustomerComplaintsPage from './features/complaint/pages/CustomerComplaintsPage';
 import ExportPrintSlipPage from './features/export/pages/ExportPrintSlipPage';
+import PaymentSuccessPage from './features/payment/pages/PaymentSuccessPage';
+import PaymentCancelPage from './features/payment/pages/PaymentCancelPage';
 function App() {
     return (
         <BrowserRouter>
@@ -83,6 +85,8 @@ function App() {
                                 </ProtectedRoute>
                             }
                         />
+                        <Route path={ROUTES.PAYMENT_SUCCESS} element={<PaymentSuccessPage />} />
+                        <Route path={ROUTES.PAYMENT_CANCEL} element={<PaymentCancelPage />} />
                     </Route>
 
                     {/* Auth routes — không có layout public */}

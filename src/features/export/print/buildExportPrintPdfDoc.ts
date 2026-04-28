@@ -18,10 +18,12 @@ function formatCurrency(value?: number): string {
   return formatNumber(value);
 }
 
-/** Giống buildExportPrintHtml: hậu tố mã thùng (vd. BOX-12 → 12). */
-function getBoxCodeSuffix(boxCode: string): string {
-  const match = boxCode.match(/-(\d+)$/);
-  return match ? match[1] : boxCode;
+function formatMaSo(item: { maSo?: string; productVariantId?: number | null }): string {
+  if (item.maSo && item.maSo.trim() !== "") return item.maSo.trim();
+  if (item.productVariantId != null && Number.isFinite(item.productVariantId)) {
+    return `PV-${String(item.productVariantId).padStart(4, "0")}`;
+  }
+  return "N/A";
 }
 
 function buildLineRow(
@@ -59,7 +61,7 @@ export function buildExportPrintPdfDoc(d: ExportPrintData): TDocumentDefinitions
     return buildLineRow(
       x.lineNo,
       x.productName,
-      getBoxCodeSuffix(x.boxCode),
+      formatMaSo(x),
       "kg",
       requestedQty,
       actualQty,
