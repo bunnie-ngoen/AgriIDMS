@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
-import { useAppDispatch } from "../../../../app/hook";
+import { useAppDispatch, useAppSelector } from "../../../../app/hook";
 import { logout } from "../../../auth/slices/auth.slice";
 import { persistor } from "../../../../app/store";
 import { api } from "../../../../shared/api";
@@ -73,6 +73,7 @@ export default function AdminSidebar({
   onCloseMobile,
 }: AdminSidebarProps) {
   const dispatch = useAppDispatch();
+  const username = useAppSelector((state) => state.auth.user?.username?.trim() ?? "");
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -112,6 +113,7 @@ export default function AdminSidebar({
   const closeMobileIfNeeded = () => {
     if (mobileOpen) onCloseMobile?.();
   };
+  const userInitials = username.slice(0, 2).toUpperCase() || "AD";
 
   // ── Render leaf (không có children) ──────────────────────────────────────
   const renderLeafItem = (item: MenuItem) => {
@@ -309,10 +311,10 @@ export default function AdminSidebar({
       {/* USER PANEL */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-[#1a2226] bg-[#222d32]">
         <div className="h-9 w-9 rounded-full bg-sky-500 flex items-center justify-center text-xs font-semibold">
-          AD
+          {userInitials}
         </div>
         <div className="flex-1">
-          <p className="text-sm font-semibold">Tài khoản Admin</p>
+          <p className="text-sm font-semibold truncate">{username || "Tài khoản Admin"}</p>
           <p className="text-[11px] text-emerald-400">Đang hoạt động</p>
         </div>
       </div>

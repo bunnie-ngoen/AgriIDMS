@@ -11,16 +11,16 @@ export default function UnauthorizedPage() {
     };
 
     return (
-        <div className="h-screen flex items-center justify-center bg-gray-100">
-            <div className="text-center">
+        <div className="h-screen bg-gray-100 px-4 flex items-center justify-center">
+            <div className="text-center max-w-md">
                 <h1 className="text-6xl font-bold text-red-600 mb-4">403</h1>
-                <p className="text-xl mb-4">Unauthorized Access</p>
+                <p className="text-xl mb-4">Không có quyền truy cập</p>
                 <p className="text-gray-600 mb-6">
                     Bạn không có quyền truy cập trang này.
                 </p>
                 <button
                     onClick={goToMyDashboard}
-                    className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
+                    className="w-full sm:w-auto bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
                 >
                     Về trang của tôi
                 </button>

@@ -149,9 +149,9 @@ export default function ProductList() {
   };
 
   return (
-    <div className="px-5 py-2 space-y-5">
+    <div className="px-3 py-2 sm:px-4 lg:px-5 space-y-5">
       {/* Header — giống ProductVariantList */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
             Danh sách sản phẩm
@@ -162,7 +162,7 @@ export default function ProductList() {
         </div>
         <Link
           to={`${productBasePath}/create`}
-          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-slate-700 transition-colors shadow-sm"
+          className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-slate-700 transition-colors shadow-sm"
         >
           <Plus size={14} />
           Thêm sản phẩm
@@ -170,7 +170,7 @@ export default function ProductList() {
       </div>
 
       {/* Stats — giống ProductVariantList */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         {[
           { label: "Tổng sản phẩm", value: allProducts.length, icon: Package, color: "bg-blue-50 text-blue-600 border-blue-100" },
           { label: "Đang hoạt động", value: activeCount, icon: Activity, color: "bg-emerald-50 text-emerald-600 border-emerald-100" },
@@ -190,7 +190,7 @@ export default function ProductList() {
 
       {/* Bộ lọc + Table card — giống ProductVariantList */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="px-4 sm:px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center gap-3">
           <input
             type="text"
             value={searchText}
@@ -226,7 +226,7 @@ export default function ProductList() {
         )}
 
         <div className="overflow-x-auto">
-          <table className="min-w-full">
+          <table className="min-w-[980px] w-full">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
                 <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Ảnh</th>
@@ -369,7 +369,7 @@ export default function ProductList() {
 
         {/* Phân trang */}
         {totalItems > 0 && (
-          <div className="px-6 py-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-sm">
+          <div className="px-4 sm:px-6 py-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-sm">
             <p className="text-slate-500">
               Trang {currentPage} / {totalPages} — {totalItems} sản phẩm
             </p>

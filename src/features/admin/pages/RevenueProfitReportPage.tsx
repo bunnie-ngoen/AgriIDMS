@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { Download, RefreshCcw } from "lucide-react";
 import {
-  useGetEstimatedRevenueProfitSpecificReportQuery,
   useGetRevenueProfitSpecificReportQuery,
 } from "../api/revenue-report.api";
 import { useGetWarehousesQuery } from "../api/create-user.api";
@@ -28,6 +27,15 @@ const formatKg = (value: number) =>
     maximumFractionDigits: 3,
   });
 
+const toDateKey = (value: string) => {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const toBucketLabel = (isoDate: string, mode: "day" | "month") => {
   const d = new Date(isoDate);
   if (Number.isNaN(d.getTime())) return "N/A";
@@ -47,7 +55,11 @@ const RevenueProfitReportPage = () => {
   const [productVariantId, setProductVariantId] = useState<number | 0>(0);
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(50);
-  const [reportMode, setReportMode] = useState<"actual" | "estimated">("estimated");
+  const [openedRevenueModal, setOpenedRevenueModal] = useState<
+    "customer" | "supplier" | null
+  >(null);
+  const [isSoldItemsModalOpen, setIsSoldItemsModalOpen] = useState(false);
+  const [isLotProfitModalOpen, setIsLotProfitModalOpen] = useState(false);
 
   const { data: warehouses = [] } = useGetWarehousesQuery();
   const { data: products = [] } = useGetProductsQuery();
@@ -74,20 +86,41 @@ const RevenueProfitReportPage = () => {
     [fromDate, toDate, warehouseId, productId, productVariantId, page, pageSize],
   );
 
-  const actualQuery = useGetRevenueProfitSpecificReportQuery(query, {
-    skip: reportMode !== "actual",
-  });
-  const estimatedQuery = useGetEstimatedRevenueProfitSpecificReportQuery(query, {
-    skip: reportMode !== "estimated",
-  });
-  const data = reportMode === "actual" ? actualQuery.data : estimatedQuery.data;
-  const isFetching =
-    reportMode === "actual" ? actualQuery.isFetching : estimatedQuery.isFetching;
-  const refetch = () =>
-    reportMode === "actual" ? actualQuery.refetch() : estimatedQuery.refetch();
+  const actualQuery = useGetRevenueProfitSpecificReportQuery(query);
+  const data = actualQuery.data;
+  const isFetching = actualQuery.isFetching;
+  const refetch = () => actualQuery.refetch();
 
   const chartRows = useMemo(() => {
     const source = data?.rows ?? [];
+
+    if (chartMode === "day") {
+      const selectedDay = toDate || today;
+      const selectedRows = source.filter(
+        (row) => toDateKey(row.exportedAt) === selectedDay,
+      );
+      if (!selectedRows.length) return [];
+
+      const totals = selectedRows.reduce(
+        (acc, row) => {
+          acc.revenue += row.revenue;
+          acc.cost += row.cost;
+          acc.profit += row.profit;
+          return acc;
+        },
+        { revenue: 0, cost: 0, profit: 0 },
+      );
+
+      return [
+        {
+          label: toBucketLabel(`${selectedDay}T00:00:00`, "day"),
+          revenue: totals.revenue,
+          cost: totals.cost,
+          profit: totals.profit,
+        },
+      ];
+    }
+
     const map = new Map<
       string,
       { label: string; revenue: number; cost: number; profit: number }
@@ -111,12 +144,51 @@ const RevenueProfitReportPage = () => {
     return Array.from(map.values()).sort((a, b) => {
       const pa = a.label.split("/").map(Number);
       const pb = b.label.split("/").map(Number);
-      if (chartMode === "month" && pa.length === 2 && pb.length === 2) {
+      if (pa.length === 2 && pb.length === 2) {
         return pa[1] === pb[1] ? pa[0] - pb[0] : pa[1] - pb[1];
       }
       return 0;
     });
-  }, [chartMode, data?.rows]);
+  }, [chartMode, data?.rows, toDate, today]);
+
+  const lotProfitRows = useMemo(() => {
+    const source = data?.rows ?? [];
+    const map = new Map<
+      string,
+      {
+        lotCode: string;
+        supplierName: string;
+        warehouseName: string;
+        totalKg: number;
+        revenue: number;
+        cost: number;
+        profit: number;
+      }
+    >();
+
+    source.forEach((row) => {
+      const lotCode = row.lotCode || `LÔ-#${row.boxId}`;
+      const current = map.get(lotCode);
+      if (current) {
+        current.totalKg += row.quantityKg;
+        current.revenue += row.revenue;
+        current.cost += row.cost;
+        current.profit += row.profit;
+      } else {
+        map.set(lotCode, {
+          lotCode,
+          supplierName: row.supplierName || "—",
+          warehouseName: row.warehouseName || "—",
+          totalKg: row.quantityKg,
+          revenue: row.revenue,
+          cost: row.cost,
+          profit: row.profit,
+        });
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.profit - a.profit);
+  }, [data?.rows]);
 
   const exportExcel = () => {
     const rows = data?.rows ?? [];
@@ -203,7 +275,7 @@ const RevenueProfitReportPage = () => {
               Báo cáo doanh thu - lợi nhuận
             </h1>
             <p className="mt-1 text-xs text-slate-500">
-              Chế độ thực tế tính theo box đã xuất; chế độ dự kiến tính theo box đã phân bổ cho đơn.
+              Dữ liệu được tính theo thực tế xuất kho.
             </p>
           </div>
           <div className="grid w-full grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3 md:grid-cols-2 xl:grid-cols-4">
@@ -212,14 +284,10 @@ const RevenueProfitReportPage = () => {
                 Chế độ dữ liệu
               </label>
               <select
-                value={reportMode}
-                onChange={(e) => {
-                  setReportMode(e.target.value as "actual" | "estimated");
-                  setPage(1);
-                }}
+                value="actual"
+                disabled
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
               >
-                <option value="estimated">Dự kiến (theo phân bổ)</option>
                 <option value="actual">Thực tế (theo xuất kho)</option>
               </select>
             </div>
@@ -365,7 +433,14 @@ const RevenueProfitReportPage = () => {
 
         <div className="mb-4 rounded-xl border border-slate-200 p-4">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <p className="text-xs font-semibold text-slate-700">Biểu đồ tổng hợp (hình tròn)</p>
+            <div>
+              <p className="text-xs font-semibold text-slate-700">Biểu đồ tổng hợp</p>
+              {chartMode === "day" ? (
+                <p className="text-[11px] text-slate-500">
+                  Chế độ theo ngày đang hiển thị đúng ngày đã chọn ở mục "Đến ngày".
+                </p>
+              ) : null}
+            </div>
             <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 text-[11px]">
               <button
                 type="button"
@@ -439,81 +514,128 @@ const RevenueProfitReportPage = () => {
           </div>
         </div>
 
-        <div className="mb-4 grid grid-cols-1 gap-3 xl:grid-cols-2">
-          <div className="rounded-xl border border-slate-200">
-            <div className="border-b border-slate-100 px-4 py-2">
-              <p className="text-xs font-semibold text-slate-700">
-                Doanh thu theo khách hàng
-              </p>
-              <p className="text-[11px] text-slate-500">
-                Xem nhóm khách hàng mang lại doanh thu nhiều nhất.
-              </p>
+        <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50/40 p-3 sm:p-4">
+          <p className="text-xs font-semibold text-slate-700">Bảng phân tích doanh thu</p>
+          <p className="mt-1 text-[11px] text-slate-500">
+            Bấm nút để mở chi tiết doanh thu theo khách hàng hoặc theo nhà cung cấp.
+          </p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => setOpenedRevenueModal("customer")}
+              className="inline-flex items-center justify-center rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+            >
+              Doanh thu theo khách hàng ({(data?.revenueByCustomers ?? []).length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpenedRevenueModal("supplier")}
+              className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+            >
+              Doanh thu theo nhà cung cấp ({(data?.revenueBySuppliers ?? []).length})
+            </button>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-3 sm:p-4">
+          <p className="text-xs font-semibold text-slate-700">Chi tiết và thống kê nâng cao</p>
+          <p className="mt-1 text-[11px] text-slate-500">
+            Bấm nút để mở danh sách mặt hàng đã bán hoặc thống kê lợi nhuận theo từng lô.
+          </p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => setIsSoldItemsModalOpen(true)}
+              className="inline-flex items-center justify-center rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+            >
+              Danh sách mặt hàng đã bán ({data?.totalRows ?? 0})
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsLotProfitModalOpen(true)}
+              className="inline-flex items-center justify-center rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100"
+            >
+              Thống kê lợi nhuận theo từng lô ({lotProfitRows.length})
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {openedRevenueModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+          <button
+            type="button"
+            aria-label="Đóng"
+            onClick={() => setOpenedRevenueModal(null)}
+            className="absolute inset-0 bg-black/40"
+          />
+          <div className="relative z-10 w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">
+                  {openedRevenueModal === "customer"
+                    ? "Doanh thu theo khách hàng"
+                    : "Doanh thu theo nhà cung cấp"}
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  {openedRevenueModal === "customer"
+                    ? "Xem nhóm khách hàng mang lại doanh thu nhiều nhất."
+                    : "So sánh mức mua từ từng nhà cung cấp qua giá vốn."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpenedRevenueModal(null)}
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Đóng
+              </button>
             </div>
-            <div className="max-h-72 overflow-auto">
-              <table className="w-full min-w-[560px] text-[11px]">
+
+            <div className="max-h-[72vh] overflow-auto">
+              <table className="w-full min-w-[760px] text-[11px]">
                 <thead className="sticky top-0 bg-slate-50 text-slate-600">
                   <tr>
-                    <th className="px-3 py-2 text-left">Khách hàng</th>
+                    <th className="px-3 py-2 text-left">
+                      {openedRevenueModal === "customer" ? "Khách hàng" : "Nhà cung cấp"}
+                    </th>
                     <th className="px-3 py-2 text-right">Doanh thu</th>
                     <th className="px-3 py-2 text-right">Giá vốn</th>
                     <th className="px-3 py-2 text-right">Lợi nhuận</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(data?.revenueByCustomers ?? []).length === 0 ? (
-                    <tr>
-                      <td className="px-3 py-6 text-center text-slate-500" colSpan={4}>
-                        Chưa có dữ liệu theo khách hàng.
-                      </td>
-                    </tr>
-                  ) : (
-                    (data?.revenueByCustomers ?? []).map((item) => (
-                      <tr
-                        key={item.customerKey}
-                        className="border-t border-slate-100 hover:bg-slate-50"
-                      >
-                        <td className="px-3 py-2">{item.customerName || "—"}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {formatMoney(item.revenue)}
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {formatMoney(item.cost)}
-                        </td>
-                        <td
-                          className={`px-3 py-2 text-right tabular-nums font-semibold ${
-                            item.profit >= 0 ? "text-emerald-700" : "text-rose-700"
-                          }`}
-                        >
-                          {formatMoney(item.profit)}
+                  {openedRevenueModal === "customer" ? (
+                    (data?.revenueByCustomers ?? []).length === 0 ? (
+                      <tr>
+                        <td className="px-3 py-6 text-center text-slate-500" colSpan={4}>
+                          Chưa có dữ liệu theo khách hàng.
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div className="rounded-xl border border-slate-200">
-            <div className="border-b border-slate-100 px-4 py-2">
-              <p className="text-xs font-semibold text-slate-700">
-                Doanh thu theo nhà cung cấp
-              </p>
-              <p className="text-[11px] text-slate-500">
-                So sánh mức mua từ từng nhà cung cấp qua giá vốn.
-              </p>
-            </div>
-            <div className="max-h-72 overflow-auto">
-              <table className="w-full min-w-[560px] text-[11px]">
-                <thead className="sticky top-0 bg-slate-50 text-slate-600">
-                  <tr>
-                    <th className="px-3 py-2 text-left">Nhà cung cấp</th>
-                    <th className="px-3 py-2 text-right">Doanh thu</th>
-                    <th className="px-3 py-2 text-right">Giá vốn</th>
-                    <th className="px-3 py-2 text-right">Lợi nhuận</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(data?.revenueBySuppliers ?? []).length === 0 ? (
+                    ) : (
+                      (data?.revenueByCustomers ?? []).map((item) => (
+                        <tr
+                          key={item.customerKey}
+                          className="border-t border-slate-100 hover:bg-slate-50"
+                        >
+                          <td className="px-3 py-2">{item.customerName || "—"}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">
+                            {formatMoney(item.revenue)}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums">
+                            {formatMoney(item.cost)}
+                          </td>
+                          <td
+                            className={`px-3 py-2 text-right tabular-nums font-semibold ${
+                              item.profit >= 0 ? "text-emerald-700" : "text-rose-700"
+                            }`}
+                          >
+                            {formatMoney(item.profit)}
+                          </td>
+                        </tr>
+                      ))
+                    )
+                  ) : (data?.revenueBySuppliers ?? []).length === 0 ? (
                     <tr>
                       <td className="px-3 py-6 text-center text-slate-500" colSpan={4}>
                         Chưa có dữ liệu theo nhà cung cấp.
@@ -547,135 +669,228 @@ const RevenueProfitReportPage = () => {
             </div>
           </div>
         </div>
+      ) : null}
 
-        <div className="rounded-xl border border-slate-200">
-          <div className="border-b border-slate-100 px-4 py-2 text-xs text-slate-500">
-            {isFetching
-              ? "Đang tải dữ liệu..."
-              : `${data?.totalRows ?? 0} dòng chi tiết theo box · Trang ${data?.page ?? 1}/${data?.totalPages ?? 1}`}
-          </div>
-          <div className="max-h-[65vh] overflow-auto">
-            <table className="w-full min-w-[1520px] text-[11px]">
-              <thead className="sticky top-0 bg-slate-50 text-slate-600">
-                <tr>
-                  <th className="px-3 py-2 text-left">Thời gian xuất</th>
-                  <th className="px-3 py-2 text-left">Phiếu xuất</th>
-                  <th className="px-3 py-2 text-left">Đơn hàng</th>
-                  <th className="px-3 py-2 text-left">Khách hàng</th>
-                  <th className="px-3 py-2 text-left">Chế độ</th>
-                  <th className="px-3 py-2 text-left">Nhà cung cấp</th>
-                  <th className="px-3 py-2 text-left">Kho</th>
-                  <th className="px-3 py-2 text-left">Box</th>
-                  <th className="px-3 py-2 text-left">Lô</th>
-                  <th className="px-3 py-2 text-left">Sản phẩm</th>
-                  <th className="px-3 py-2 text-right">Kg</th>
-                  <th className="px-3 py-2 text-right">Đơn giá bán</th>
-                  <th className="px-3 py-2 text-right">Đơn giá vốn</th>
-                  <th className="px-3 py-2 text-right">Doanh thu</th>
-                  <th className="px-3 py-2 text-right">Giá vốn</th>
-                  <th className="px-3 py-2 text-right">Lợi nhuận</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(data?.rows ?? []).length === 0 ? (
+      {isSoldItemsModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+          <button
+            type="button"
+            aria-label="Đóng"
+            onClick={() => setIsSoldItemsModalOpen(false)}
+            className="absolute inset-0 bg-black/40"
+          />
+          <div className="relative z-10 w-full max-w-[96vw] overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Danh sách mặt hàng đã bán</p>
+                <p className="text-[11px] text-slate-500">
+                  {isFetching
+                    ? "Đang tải dữ liệu..."
+                    : `${data?.totalRows ?? 0} dòng chi tiết theo box · Trang ${data?.page ?? 1}/${data?.totalPages ?? 1}`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSoldItemsModalOpen(false)}
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Đóng
+              </button>
+            </div>
+
+            <div className="max-h-[70vh] overflow-auto">
+              <table className="w-full min-w-[1520px] text-[11px]">
+                <thead className="sticky top-0 bg-slate-50 text-slate-600">
                   <tr>
-                    <td className="px-3 py-6 text-center text-slate-500" colSpan={16}>
-                      Không có dữ liệu trong khoảng thời gian đã chọn.
-                    </td>
+                    <th className="px-3 py-2 text-left">Thời gian xuất</th>
+                    <th className="px-3 py-2 text-left">Phiếu xuất</th>
+                    <th className="px-3 py-2 text-left">Đơn hàng</th>
+                    <th className="px-3 py-2 text-left">Khách hàng</th>
+                    <th className="px-3 py-2 text-left">Chế độ</th>
+                    <th className="px-3 py-2 text-left">Nhà cung cấp</th>
+                    <th className="px-3 py-2 text-left">Kho</th>
+                    <th className="px-3 py-2 text-left">Box</th>
+                    <th className="px-3 py-2 text-left">Lô</th>
+                    <th className="px-3 py-2 text-left">Sản phẩm</th>
+                    <th className="px-3 py-2 text-right">Kg</th>
+                    <th className="px-3 py-2 text-right">Đơn giá bán</th>
+                    <th className="px-3 py-2 text-right">Đơn giá vốn</th>
+                    <th className="px-3 py-2 text-right">Doanh thu</th>
+                    <th className="px-3 py-2 text-right">Giá vốn</th>
+                    <th className="px-3 py-2 text-right">Lợi nhuận</th>
                   </tr>
-                ) : (
-                  (data?.rows ?? []).map((r, idx) => (
-                    <tr
-                      key={`${r.exportId}-${r.boxId}-${idx}`}
-                      className="border-t border-slate-100 hover:bg-slate-50"
-                    >
-                      <td className="px-3 py-2">{formatDateTime(r.exportedAt)}</td>
-                      <td className="px-3 py-2 font-mono">{r.exportCode}</td>
-                      <td className="px-3 py-2">#{r.orderId}</td>
-                      <td className="px-3 py-2">{r.customerName || "—"}</td>
-                      <td className="px-3 py-2">
-                        {r.exportCode === "DU_KIEN" ? "Dự kiến" : "Thực tế"}
-                      </td>
-                      <td className="px-3 py-2">{r.supplierName || "—"}</td>
-                      <td className="px-3 py-2">{r.warehouseName || "—"}</td>
-                      <td className="px-3 py-2 font-mono">{r.boxCode || `#${r.boxId}`}</td>
-                      <td className="px-3 py-2">{r.lotCode || "—"}</td>
-                      <td className="px-3 py-2">
-                        {r.productName || "—"}
-                        {r.variantName ? ` · ${r.variantName}` : ""}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums">{formatKg(r.quantityKg)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {formatMoney(r.saleUnitPrice)}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {formatMoney(r.costUnitPrice)}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {formatMoney(r.revenue)}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {formatMoney(r.cost)}
-                      </td>
-                      <td
-                        className={`px-3 py-2 text-right tabular-nums font-semibold ${
-                          r.profit >= 0 ? "text-emerald-700" : "text-rose-700"
-                        }`}
-                      >
-                        {formatMoney(r.profit)}
+                </thead>
+                <tbody>
+                  {(data?.rows ?? []).length === 0 ? (
+                    <tr>
+                      <td className="px-3 py-6 text-center text-slate-500" colSpan={16}>
+                        Không có dữ liệu trong khoảng thời gian đã chọn.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-2 text-xs">
-            <span className="text-slate-500">
-              Hiển thị {(data?.rows ?? []).length} / {data?.totalRows ?? 0} dòng
-            </span>
-            <div className="inline-flex items-center gap-2">
-              <label className="text-slate-500">Số dòng/trang</label>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="rounded border border-slate-300 px-2 py-1 text-xs"
-              >
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-                <option value={200}>200</option>
-              </select>
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={isFetching || (data?.page ?? 1) <= 1}
-                className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50"
-              >
-                Trước
-              </button>
-              <span className="text-slate-600">
-                Trang {data?.page ?? page}/{data?.totalPages ?? 1}
+                  ) : (
+                    (data?.rows ?? []).map((r, idx) => (
+                      <tr
+                        key={`${r.exportId}-${r.boxId}-${idx}`}
+                        className="border-t border-slate-100 hover:bg-slate-50"
+                      >
+                        <td className="px-3 py-2">{formatDateTime(r.exportedAt)}</td>
+                        <td className="px-3 py-2 font-mono">{r.exportCode}</td>
+                        <td className="px-3 py-2">#{r.orderId}</td>
+                        <td className="px-3 py-2">{r.customerName || "—"}</td>
+                        <td className="px-3 py-2">Thực tế</td>
+                        <td className="px-3 py-2">{r.supplierName || "—"}</td>
+                        <td className="px-3 py-2">{r.warehouseName || "—"}</td>
+                        <td className="px-3 py-2 font-mono">{r.boxCode || `#${r.boxId}`}</td>
+                        <td className="px-3 py-2">{r.lotCode || "—"}</td>
+                        <td className="px-3 py-2">
+                          {r.productName || "—"}
+                          {r.variantName ? ` · ${r.variantName}` : ""}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatKg(r.quantityKg)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {formatMoney(r.saleUnitPrice)}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {formatMoney(r.costUnitPrice)}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {formatMoney(r.revenue)}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {formatMoney(r.cost)}
+                        </td>
+                        <td
+                          className={`px-3 py-2 text-right tabular-nums font-semibold ${
+                            r.profit >= 0 ? "text-emerald-700" : "text-rose-700"
+                          }`}
+                        >
+                          {formatMoney(r.profit)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-2 text-xs">
+              <span className="text-slate-500">
+                Hiển thị {(data?.rows ?? []).length} / {data?.totalRows ?? 0} dòng
               </span>
-              <button
-                type="button"
-                onClick={() =>
-                  setPage((p) =>
-                    Math.min(data?.totalPages ?? p, p + 1),
-                  )
-                }
-                disabled={isFetching || (data?.page ?? page) >= (data?.totalPages ?? 1)}
-                className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50"
-              >
-                Sau
-              </button>
+              <div className="inline-flex items-center gap-2">
+                <label className="text-slate-500">Số dòng/trang</label>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setPage(1);
+                  }}
+                  className="rounded border border-slate-300 px-2 py-1 text-xs"
+                >
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value={200}>200</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={isFetching || (data?.page ?? 1) <= 1}
+                  className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50"
+                >
+                  Trước
+                </button>
+                <span className="text-slate-600">
+                  Trang {data?.page ?? page}/{data?.totalPages ?? 1}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPage((p) =>
+                      Math.min(data?.totalPages ?? p, p + 1),
+                    )
+                  }
+                  disabled={isFetching || (data?.page ?? page) >= (data?.totalPages ?? 1)}
+                  className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50"
+                >
+                  Sau
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      ) : null}
+
+      {isLotProfitModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+          <button
+            type="button"
+            aria-label="Đóng"
+            onClick={() => setIsLotProfitModalOpen(false)}
+            className="absolute inset-0 bg-black/40"
+          />
+          <div className="relative z-10 w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">
+                  Thống kê lợi nhuận theo từng lô
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  Tổng hợp doanh thu, giá vốn và lợi nhuận theo từng lô hàng.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsLotProfitModalOpen(false)}
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Đóng
+              </button>
+            </div>
+            <div className="max-h-[72vh] overflow-auto">
+              <table className="w-full min-w-[980px] text-[11px]">
+                <thead className="sticky top-0 bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Mã lô</th>
+                    <th className="px-3 py-2 text-left">Nhà cung cấp</th>
+                    <th className="px-3 py-2 text-left">Kho</th>
+                    <th className="px-3 py-2 text-right">Khối lượng (kg)</th>
+                    <th className="px-3 py-2 text-right">Doanh thu</th>
+                    <th className="px-3 py-2 text-right">Giá vốn</th>
+                    <th className="px-3 py-2 text-right">Lợi nhuận</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lotProfitRows.length === 0 ? (
+                    <tr>
+                      <td className="px-3 py-6 text-center text-slate-500" colSpan={7}>
+                        Chưa có dữ liệu lô hàng trong khoảng thời gian đã chọn.
+                      </td>
+                    </tr>
+                  ) : (
+                    lotProfitRows.map((row) => (
+                      <tr key={row.lotCode} className="border-t border-slate-100 hover:bg-slate-50">
+                        <td className="px-3 py-2 font-medium text-slate-800">{row.lotCode}</td>
+                        <td className="px-3 py-2">{row.supplierName}</td>
+                        <td className="px-3 py-2">{row.warehouseName}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatKg(row.totalKg)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(row.revenue)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatMoney(row.cost)}</td>
+                        <td
+                          className={`px-3 py-2 text-right tabular-nums font-semibold ${
+                            row.profit >= 0 ? "text-emerald-700" : "text-rose-700"
+                          }`}
+                        >
+                          {formatMoney(row.profit)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

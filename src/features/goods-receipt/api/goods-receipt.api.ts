@@ -1836,6 +1836,7 @@ export const {
   useGetAllLotsQuery,
   useLazyGetLotsByProductVariantIdQuery,
   useGetLotDetailByIdQuery,
+  useLazyGetLotDetailByIdQuery,
   useLazyGetLotByQrQuery,
   useGetUnassignedBoxesByWarehouseQuery,
   useGetBoxesByGoodsReceiptIdQuery,

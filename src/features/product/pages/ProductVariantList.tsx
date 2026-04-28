@@ -100,11 +100,11 @@ const ProductVariantList = () => {
   };
 
   return (
-    <div className="px-5 py-2 space-y-5">
+    <div className="px-3 py-2 sm:px-4 lg:px-5 space-y-5">
       <ConfirmModal {...confirm} onCancel={closeConfirm} />
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Biến thể sản phẩm</h1>
           <p className="text-xs text-slate-400 mt-0.5">Quản lý toàn bộ biến thể sản phẩm trong hệ thống</p>
@@ -112,7 +112,7 @@ const ProductVariantList = () => {
         <button
           type="button"
           onClick={() => navigate(`${productVariantBasePath}/create`)}
-          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-slate-700 transition-colors shadow-sm"
+          className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-slate-700 transition-colors shadow-sm"
         >
           <Plus size={14} />
           Thêm biến thể
@@ -120,7 +120,7 @@ const ProductVariantList = () => {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         {[
           { label: "Tổng biến thể", value: totalCount, icon: Package, color: "bg-blue-50 text-blue-600 border-blue-100" },
           { label: "Đang hoạt động", value: activeCount, icon: Activity, color: "bg-emerald-50 text-emerald-600 border-emerald-100" },
@@ -146,7 +146,7 @@ const ProductVariantList = () => {
           </div>
         )}
         <div className="overflow-x-auto">
-          <table className="min-w-full">
+          <table className="min-w-[1180px] w-full">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
                 <th className="px-5 py-3.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Ảnh</th>

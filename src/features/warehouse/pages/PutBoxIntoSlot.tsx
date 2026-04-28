@@ -18,6 +18,7 @@ import {
   useLazyGetSlotByQrQuery,
   useAssignBoxToSlotMutation,
   useAssignBoxesToSlotMutation,
+  useDisposeExpiredBoxesMutation,
   useGetLotDetailByIdQuery,
   useTransferBoxToSlotMutation,
 } from "../../goods-receipt/api/goods-receipt.api";
@@ -27,6 +28,16 @@ import {
   useGetRacksQuery,
   useGetSlotsQuery,
 } from "../../admin/api/create-user.api";
+
+function toVietnameseBoxStatus(status?: string | null): string {
+  const normalized = (status ?? "").trim().toLowerCase();
+  if (!normalized) return "—";
+  if (normalized === "stored") return "Đang lưu kho";
+  if (normalized === "exported") return "Đã xuất";
+  if (normalized === "disposed") return "Đã tiêu hủy";
+  if (normalized === "damaged") return "Hư hỏng";
+  return status ?? "—";
+}
 
 export default function PutBoxIntoSlot() {
   const navigate = useNavigate();
@@ -63,6 +74,8 @@ export default function PutBoxIntoSlot() {
     useAssignBoxToSlotMutation();
   const [assignBoxesToSlot, { isLoading: isBulkAssigningByApi }] =
     useAssignBoxesToSlotMutation();
+  const [disposeExpiredBoxes, { isLoading: isDisposingExpired }] =
+    useDisposeExpiredBoxesMutation();
   const [transferBoxToSlot, { isLoading: isTransferring }] =
     useTransferBoxToSlotMutation();
   const { data: lotDetail, isFetching: isFetchingLotDetail, refetch: refetchLotDetail } =
@@ -500,6 +513,49 @@ export default function PutBoxIntoSlot() {
     }
   };
 
+  const handleDisposeExpiredFromLot = async () => {
+    const selectedSet = new Set(selectedLotBoxIds);
+    const targets =
+      selectedLotBoxIds.length > 0
+        ? availableLotBoxes.filter((b) => selectedSet.has(b.boxId))
+        : availableLotBoxes;
+    const disposableIds = targets
+      .filter((b) => {
+        const st = (b.status ?? "").toLowerCase();
+        return st !== "exported" && st !== "disposed";
+      })
+      .map((b) => b.boxId);
+    if (disposableIds.length === 0) {
+      toast.error("Không có hàng hợp lệ để tiêu hủy.");
+      return;
+    }
+    const confirmText =
+      selectedLotBoxIds.length > 0
+        ? `Xác nhận tiêu hủy ${disposableIds.length} hàng đã chọn?`
+        : `Xác nhận tiêu hủy toàn bộ ${disposableIds.length} hàng chưa xếp của lô này?`;
+    if (!window.confirm(confirmText)) return;
+
+    const toastId = toast.loading("Đang tiêu hủy hàng hết hạn...");
+    try {
+      const res = await disposeExpiredBoxes({ boxIds: disposableIds }).unwrap();
+      toast.success(
+        `${res.message}. Đã tiêu hủy ${res.disposedCount}/${res.requestedCount} hàng.`,
+        { id: toastId },
+      );
+      setSelectedLotBoxIds([]);
+      await refetchLotDetail();
+      await refetchSlots();
+    } catch (err: any) {
+      const msg =
+        err?.data?.message ||
+        err?.data?.Message ||
+        err?.data?.error ||
+        err?.data?.Error ||
+        "Tiêu hủy hàng hết hạn thất bại.";
+      toast.error(msg, { id: toastId });
+    }
+  };
+
   const disableAssign =
     isAssigning ||
     isTransferring ||
@@ -662,7 +718,9 @@ export default function PutBoxIntoSlot() {
                         </div>
                         <div>
                           <p className="text-[11px] font-medium text-slate-500">Trạng thái</p>
-                          <p className="font-semibold text-slate-900">{box.status}</p>
+                          <p className="font-semibold text-slate-900">
+                            {toVietnameseBoxStatus(box.status)}
+                          </p>
                         </div>
                         <div>
                           <p className="text-[11px] font-medium text-slate-500">Vị trí hiện tại</p>
@@ -750,7 +808,10 @@ export default function PutBoxIntoSlot() {
                   <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-sm">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="text-sm text-slate-600">
-                        Lô hàng: <span className="font-semibold text-slate-900">{lot?.lotCode || "—"}</span>
+                        Lô hàng:{" "}
+                        <span className="font-semibold text-slate-900">
+                          {lotDetail?.lotCode || lot?.lotCode || "—"}
+                        </span>
                       </div>
                       <div className="flex gap-2">
                         <button
@@ -775,7 +836,19 @@ export default function PutBoxIntoSlot() {
                     </div>
                     {isSelectedLotExpired && (
                       <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                        Lô này đã hết hạn, không thể xếp vào vị trí. Vui lòng chuyển sang quy trình xử lý hàng hết hạn.
+                        <p>
+                          Lô hàng này đã hết hạn.
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void handleDisposeExpiredFromLot()}
+                            disabled={isDisposingExpired}
+                            className="inline-flex items-center rounded-lg bg-rose-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
+                          >
+                            {isDisposingExpired ? "Đang tiêu hủy..." : "Tiêu hủy ngay"}
+                          </button>
+                        </div>
                       </div>
                     )}
                     {isFetchingLotDetail ? (
@@ -789,7 +862,7 @@ export default function PutBoxIntoSlot() {
                             <tr>
                               <th className="px-2 py-2 text-left">Chọn</th>
                               <th className="px-2 py-2 text-left">Hàng</th>
-                              <th className="px-2 py-2 text-right">KG</th>
+                              <th className="px-2 py-2 text-right">Khối lượng (kg)</th>
                               <th className="px-2 py-2 text-left">Vị trí hiện tại</th>
                             </tr>
                           </thead>
@@ -815,7 +888,9 @@ export default function PutBoxIntoSlot() {
                                     </td>
                                     <td className="px-2 py-2">
                                       <div className="font-medium text-slate-900">{b.boxCode}</div>
-                                      <div className="text-[10px] text-slate-500">{b.status}</div>
+                                      <div className="text-[10px] text-slate-500">
+                                        {toVietnameseBoxStatus(b.status)}
+                                      </div>
                                     </td>
                                     <td className="px-2 py-2 text-right">{b.weight}</td>
                                     <td className="px-2 py-2">{b.slotCode ?? "Chưa xếp"}</td>

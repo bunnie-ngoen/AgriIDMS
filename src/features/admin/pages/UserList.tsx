@@ -268,7 +268,7 @@ const UserList = () => {
   const hasNext = (data?.pageIndex ?? 1) < (data?.totalPages ?? 1);
 
   return (
-    <div className="px-5">
+    <div className="px-3 py-2 sm:px-4 lg:px-5">
       <ConfirmModal
         open={confirm.open}
         title={confirm.title}
@@ -280,8 +280,8 @@ const UserList = () => {
         onCancel={closeConfirm}
       />
 
-      <div className="bg-white rounded-[15px] p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white rounded-[15px] p-4 sm:p-6 shadow-sm">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-xl font-semibold text-slate-900">Danh sách người dùng</h1>
             <p className="text-xs text-slate-500 mt-1">Quản lý tài khoản người dùng trong hệ thống.</p>
@@ -290,7 +290,7 @@ const UserList = () => {
         </div>
 
         {/* Search bars */}
-        <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
 
           <div className="relative flex-1 min-w-[180px] max-w-sm">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -332,7 +332,7 @@ const UserList = () => {
           <button
             type="button"
             onClick={handleSearch}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
+            className="inline-flex w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
           >
             <Search size={13} />
             Tìm kiếm
@@ -340,7 +340,7 @@ const UserList = () => {
           <button
             type="button"
             onClick={handleClearSearch}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+            className="inline-flex w-full sm:w-auto items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
           >
             Xóa bộ lọc
           </button>
@@ -350,7 +350,7 @@ const UserList = () => {
         {isError && <p className="text-red-500 text-sm mb-3">Không tải được danh sách người dùng. Vui lòng thử lại.</p>}
 
         <div className="overflow-x-auto overflow-y-visible border border-slate-200 rounded-xl">
-          <table className="min-w-full text-xs md:text-sm">
+          <table className="min-w-[880px] w-full text-xs md:text-sm">
             <thead className="bg-slate-50 text-slate-600">
               <tr>
                 <th className="px-4 py-2 text-left font-medium">Tên đăng nhập</th>
@@ -403,7 +403,7 @@ const UserList = () => {
         </div>
 
         {data && data.totalPages > 1 && (
-          <div className="flex items-center justify-between mt-4 text-xs">
+          <div className="mt-4 flex flex-col gap-2 text-xs sm:flex-row sm:items-center sm:justify-between">
             <p className="text-slate-500">
               Trang {data.pageIndex} / {data.totalPages} — {data.totalItems} người dùng
             </p>

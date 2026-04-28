@@ -44,22 +44,23 @@ export default function PurchaseRequestList() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="max-w-5xl mx-auto space-y-4 px-3 py-4 sm:px-4 sm:py-5 lg:px-0 lg:py-0">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-900">Danh sách phiếu đề xuất mua</h1>
           <p className="text-sm text-slate-500">Gom nhu cầu mua và theo dõi phân bổ thành các đơn mua theo nhà cung cấp.</p>
         </div>
         <button
           onClick={() => navigate("/purchase-staff/purchase-requests/create")}
-          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 text-white px-4 py-2 text-sm font-semibold hover:bg-slate-700"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700 sm:w-auto"
         >
           <Plus size={16} /> Tạo phiếu
         </button>
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-        <table className="min-w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="min-w-[760px] w-full text-sm">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
               <th className="px-4 py-3 text-left text-xs uppercase tracking-wide text-slate-500">Mã phiếu</th>
@@ -93,6 +94,7 @@ export default function PurchaseRequestList() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

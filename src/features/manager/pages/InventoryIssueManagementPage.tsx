@@ -1,8 +1,12 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, CalendarClock, PackageX } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { useGetWarehousesQuery } from "../../admin/api/create-user.api";
 import {
+  useDisposeExpiredBoxesMutation,
   useGetDamagedBoxesQuery,
+  useLazyGetLotDetailByIdQuery,
   useGetNearExpiryDashboardQuery,
 } from "../../goods-receipt/api/goods-receipt.api";
 import { formatNearExpiryProductLines } from "../utils/nearExpiryProductDisplay";
@@ -29,6 +33,9 @@ function formatExpiryLeadTime(daysLeft: number, status: string) {
 }
 
 export default function InventoryIssueManagementPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isWarehouseRoute = location.pathname.startsWith("/warehouse");
   const [warehouseId, setWarehouseId] = useState<number>(0);
   const [days, setDays] = useState<number>(3);
 
@@ -40,6 +47,9 @@ export default function InventoryIssueManagementPage() {
       days,
       warehouseId: warehouseId > 0 ? warehouseId : undefined,
     });
+  const [loadLotDetail, { isFetching: isFetchingLotDetail }] = useLazyGetLotDetailByIdQuery();
+  const [disposeExpiredBoxes, { isLoading: isDisposingExpired }] =
+    useDisposeExpiredBoxesMutation();
 
   const expiredLots = useMemo(
     () => (nearExpiry?.lots ?? []).filter((l) => l.status === "Expired"),
@@ -51,15 +61,62 @@ export default function InventoryIssueManagementPage() {
     [nearExpiry?.lots],
   );
 
+  const handleDirectDisposeExpiredLot = async (lotId: number, lotCode: string) => {
+    const ok = window.confirm(
+      `Xác nhận tiêu hủy ngay toàn bộ box hết hạn của lô ${lotCode}?`,
+    );
+    if (!ok) return;
+    const toastId = toast.loading(`Đang tiêu hủy hàng hết hạn của lô ${lotCode}...`);
+    try {
+      const lotDetail = await loadLotDetail(lotId).unwrap();
+      const candidateBoxIds = (lotDetail.boxes ?? [])
+        .filter((b) => {
+          const st = (b.status ?? "").toLowerCase();
+          return st !== "disposed" && st !== "exported";
+        })
+        .map((b) => b.boxId);
+      if (candidateBoxIds.length === 0) {
+        toast.error("Không có box hợp lệ để tiêu hủy trong lô này.", { id: toastId });
+        return;
+      }
+      const result = await disposeExpiredBoxes({ boxIds: candidateBoxIds }).unwrap();
+      toast.success(
+        `${result.message}. Đã tiêu hủy ${result.disposedCount}/${result.requestedCount} box.`,
+        { id: toastId },
+      );
+    } catch (err: any) {
+      const msg =
+        err?.data?.message ||
+        err?.data?.Message ||
+        err?.data?.error ||
+        err?.data?.Error ||
+        "Tiêu hủy hàng hết hạn thất bại.";
+      toast.error(msg, { id: toastId });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-lg font-semibold text-slate-900">
-          Quản lý hàng hư hỏng và quá hạn
-        </h2>
-        <p className="mt-1 text-sm text-slate-600">
-          Theo dõi hàng hư hỏng và lô hàng sắp hết hạn/hết hạn để xử lý kịp thời.
-        </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">
+              Quản lý hàng hư hỏng và quá hạn
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Theo dõi hàng hư hỏng và lô hàng sắp hết hạn/hết hạn để xử lý kịp thời.
+            </p>
+          </div>
+          {isWarehouseRoute ? (
+            <button
+              type="button"
+              onClick={() => navigate("/warehouse/damage-reports/new")}
+              className="inline-flex items-center justify-center rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-700"
+            >
+              Tạo phiếu báo hỏng
+            </button>
+          ) : null}
+        </div>
 
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
@@ -149,12 +206,15 @@ export default function InventoryIssueManagementPage() {
                 <th className="px-3 py-2 text-left">Kho</th>
                 <th className="px-3 py-2 text-right">Khối lượng</th>
                 <th className="px-3 py-2 text-left">Vị trí</th>
+                {isWarehouseRoute ? (
+                  <th className="px-3 py-2 text-right">Thao tác</th>
+                ) : null}
               </tr>
             </thead>
             <tbody>
               {damagedBoxes.length === 0 ? (
                 <tr>
-                  <td className="px-3 py-4 text-center text-slate-500" colSpan={6}>
+                  <td className="px-3 py-4 text-center text-slate-500" colSpan={isWarehouseRoute ? 7 : 6}>
                     Không có hàng hư hỏng.
                   </td>
                 </tr>
@@ -170,6 +230,23 @@ export default function InventoryIssueManagementPage() {
                     <td className="px-3 py-2 text-slate-700">{b.warehouseName ?? "—"}</td>
                     <td className="px-3 py-2 text-right text-slate-700">{formatKg(b.weight)} kg</td>
                     <td className="px-3 py-2 text-slate-700">{b.slotCode ?? "Chưa xếp"}</td>
+                    {isWarehouseRoute ? (
+                      <td className="px-3 py-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(
+                              `/warehouse/damage-reports/new?qr=${encodeURIComponent(
+                                b.boxCode,
+                              )}`,
+                            )
+                          }
+                          className="inline-flex items-center rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-semibold text-rose-700 hover:bg-rose-100"
+                        >
+                          Báo hỏng thùng này
+                        </button>
+                      </td>
+                    ) : null}
                   </tr>
                 ))
               )}
@@ -183,21 +260,25 @@ export default function InventoryIssueManagementPage() {
           Danh sách lô hàng sắp hết hạn / quá hạn
         </div>
         <div className="mt-3 overflow-x-auto">
-          <table className="min-w-[980px] w-full text-sm">
+          <table className="min-w-[1120px] w-full text-sm">
             <thead className="bg-slate-50 text-slate-600">
               <tr>
                 <th className="px-3 py-2 text-left">Lô hàng</th>
                 <th className="px-3 py-2 text-left">Sản phẩm</th>
+                <th className="px-3 py-2 text-left">Kho</th>
                 <th className="px-3 py-2 text-right">Còn lại</th>
                 <th className="px-3 py-2 text-left">Hạn dùng</th>
                 <th className="px-3 py-2 text-right">Tiến độ hạn dùng</th>
                 <th className="px-3 py-2 text-left">Trạng thái</th>
+                {isWarehouseRoute ? (
+                  <th className="px-3 py-2 text-right">Xử lý</th>
+                ) : null}
               </tr>
             </thead>
             <tbody>
               {(nearExpiry?.lots ?? []).length === 0 ? (
                 <tr>
-                  <td className="px-3 py-4 text-center text-slate-500" colSpan={6}>
+                  <td className="px-3 py-4 text-center text-slate-500" colSpan={isWarehouseRoute ? 8 : 7}>
                     Không có lô hàng trong ngưỡng cảnh báo.
                   </td>
                 </tr>
@@ -215,6 +296,7 @@ export default function InventoryIssueManagementPage() {
                         ) : null}
                       </div>
                     </td>
+                    <td className="px-3 py-2 text-slate-700">{l.warehouseName || "—"}</td>
                     <td className="px-3 py-2 text-right text-slate-700">
                       {formatKg(l.remainingQuantity)} kg
                     </td>
@@ -233,6 +315,26 @@ export default function InventoryIssueManagementPage() {
                         {l.status === "Expired" ? "Quá hạn" : "Sắp hết hạn"}
                       </span>
                     </td>
+                    {isWarehouseRoute ? (
+                      <td className="px-3 py-2 text-right">
+                        {l.status === "Expired" ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void handleDirectDisposeExpiredLot(l.lotId, l.lotCode)
+                            }
+                            disabled={isDisposingExpired || isFetchingLotDetail}
+                            className="inline-flex items-center rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-semibold text-rose-700 hover:bg-rose-100"
+                          >
+                            {isDisposingExpired || isFetchingLotDetail
+                              ? "Đang tiêu hủy..."
+                              : "Tiêu hủy ngay"}
+                          </button>
+                        ) : (
+                          <span className="text-[11px] text-slate-400">Theo dõi</span>
+                        )}
+                      </td>
+                    ) : null}
                   </tr>
                   );
                 })

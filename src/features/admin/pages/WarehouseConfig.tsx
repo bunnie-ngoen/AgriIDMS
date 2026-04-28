@@ -23,7 +23,8 @@ import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 const MIN_NAME_LENGTH = 3;
 const toPositiveNumber = (value: string): number => {
-  const n = Number(value);
+  const normalized = value.replace(",", ".").trim();
+  const n = Number(normalized);
   return Number.isFinite(n) && n > 0 ? n : 0;
 };
 
@@ -380,21 +381,21 @@ const WarehouseConfig = () => {
       return;
     }
     const code = slotForm.code.trim();
-    const capacity = Number(slotForm.capacity);
     const lengthCm = toPositiveNumber(slotForm.lengthCm);
     const widthCm = toPositiveNumber(slotForm.widthCm);
     const heightCm = toPositiveNumber(slotForm.heightCm);
+    const capacity = slotVolumeM3;
     if (!selectedRackId) return;
     if (!code) {
       toast.error("Vui lòng nhập mã slot.");
       return;
     }
-    if (Number.isNaN(capacity) || capacity <= 0) {
-      toast.error("Sức chứa phải lớn hơn 0.");
-      return;
-    }
     if (lengthCm <= 0 || widthCm <= 0 || heightCm <= 0) {
       toast.error("Slot phải nhập đủ dài, rộng, cao lớn hơn 0.");
+      return;
+    }
+    if (capacity <= 0) {
+      toast.error("Không thể tính sức chứa từ kích thước đã nhập.");
       return;
     }
     const rackLengthCm = Number(selectedRack?.lengthM ?? 0) * 100;
@@ -1050,17 +1051,12 @@ const WarehouseConfig = () => {
                       Sức chứa (m³)
                     </label>
                     <input
-                      value={slotForm.capacity}
-                      onChange={(e) =>
-                        setSlotForm((prev) => ({
-                          ...prev,
-                          capacity: e.target.value,
-                        }))
-                      }
+                      value={slotVolumeM3 > 0 ? slotVolumeM3.toFixed(4) : ""}
                       type="number"
                       min={0}
                       step={0.1}
-                      className="w-full p-2 rounded-md border border-emerald-200 bg-white text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      readOnly
+                      className="w-full p-2 rounded-md border border-emerald-200 bg-slate-100 text-xs text-slate-700 focus:outline-none"
                     />
                   </div>
                 </div>

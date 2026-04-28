@@ -2,13 +2,14 @@ import { Outlet } from "react-router-dom";
 import { NavLink, useNavigate } from "react-router-dom";
 import { LayoutDashboard, FilePlus, List, LogOut, User, Menu } from "lucide-react";
 import { useState } from "react";
-import { useAppDispatch } from "../../../app/hook";
+import { useAppDispatch, useAppSelector } from "../../../app/hook";
 import { logout } from "../../auth/slices/auth.slice";
 import { persistor } from "../../../app/store";
 import { api } from "../../../shared/api";
 
 export default function PurchaseStaffLayout() {
   const dispatch = useAppDispatch();
+  const username = useAppSelector((state) => state.auth.user?.username?.trim() ?? "");
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const handleLogout = () => {
@@ -46,7 +47,9 @@ export default function PurchaseStaffLayout() {
           </div>
           <div>
             <p className="text-sm font-semibold tracking-wide">Nhân viên mua hàng</p>
-            <p className="text-[11px] text-slate-300">Đơn mua hàng</p>
+            <p className="text-[11px] text-slate-300 truncate max-w-[180px]">
+              {username ? `Tài khoản: ${username}` : "Tài khoản đăng nhập"}
+            </p>
           </div>
         </div>
 
@@ -184,7 +187,9 @@ export default function PurchaseStaffLayout() {
             <Menu size={18} />
           </button>
           <span className="text-slate-600 font-medium">Hệ thống đơn mua hàng</span>
-          <span className="w-9 lg:hidden" />
+          <span className="text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1">
+            {username ? `Xin chào, ${username}` : "Chưa có tên đăng nhập"}
+          </span>
         </header>
         <main className="flex-1 overflow-y-auto px-3 pt-3 pb-6 sm:px-4 sm:pt-4 sm:pb-8 lg:px-6 lg:pt-6 lg:pb-10">
           <Outlet />
