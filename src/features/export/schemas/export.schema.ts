@@ -26,6 +26,8 @@ export const exportPrintLineSchema = z.object({
   lineNo: z.coerce.number().int(),
   boxId: z.coerce.number().int(),
   boxCode: z.string(),
+  productVariantId: z.coerce.number().int().optional().nullable(),
+  maSo: z.string().optional(),
   lotCode: z.string(),
   productName: z.string(),
   grade: z.string(),

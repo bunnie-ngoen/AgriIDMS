@@ -25,9 +25,12 @@ function formatCurrency(value?: number): string {
   return formatNumber(value);
 }
 
-function getBoxCodeSuffix(boxCode: string): string {
-  const match = boxCode.match(/-(\d+)$/);
-  return match ? match[1] : boxCode;
+function formatMaSo(item: { maSo?: string; productVariantId?: number | null }): string {
+  if (item.maSo && item.maSo.trim() !== "") return item.maSo.trim();
+  if (item.productVariantId != null && Number.isFinite(item.productVariantId)) {
+    return `PV-${String(item.productVariantId).padStart(4, "0")}`;
+  }
+  return "N/A";
 }
 
 function padRows(rowsHtml: string[], minRows = 5): string {
@@ -56,7 +59,7 @@ export function buildExportPrintHtml(d: ExportPrintData): string {
   const totalStr = formatNumber(d.totalAmount);
   const rows = d.lines.map((x) => {
     const itemName = escHtml(x.productName);
-    const itemCode = escHtml(getBoxCodeSuffix(x.boxCode));
+    const itemCode = escHtml(formatMaSo(x));
     const unit = "kg";
     const requestedQty = formatNumber(x.requestedQuantity ?? x.actualQuantity);
     const actualQty = formatNumber(x.actualQuantity);
