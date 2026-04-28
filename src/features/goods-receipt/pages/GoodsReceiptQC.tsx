@@ -968,10 +968,10 @@ export default function GoodsReceiptQC() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-5 py-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-3 py-4 sm:px-4 sm:py-5 lg:px-5 lg:py-6">
       <div className="max-w-4xl mx-auto space-y-4">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-2">
+        <div className="mb-2 flex items-start gap-3 sm:items-center sm:gap-4">
           <button
             type="button"
             onClick={handleBackToPreviousStep}
@@ -995,7 +995,7 @@ export default function GoodsReceiptQC() {
 
         {/* Summary + approve */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div className="px-3 py-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm sm:px-4 sm:py-4 lg:px-6">
             <div>
               <span className="text-slate-500 block text-xs font-medium">
                 Nhà cung cấp
@@ -1041,7 +1041,7 @@ export default function GoodsReceiptQC() {
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
+            <table className="min-w-[1180px] w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
@@ -1147,7 +1147,7 @@ export default function GoodsReceiptQC() {
 
           {/* Kiểm tra chất lượng form */}
           {selectedDetailIdForQc && canQC && (
-            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/60">
+            <div className="px-3 py-3 border-t border-slate-100 bg-slate-50/60 sm:px-4 sm:py-4 lg:px-6">
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <h3 className="text-xs font-semibold text-slate-800">
                   Kiểm tra chất lượng cho dòng chi tiết #{selectedDetailIdForQc}
@@ -1320,9 +1320,9 @@ export default function GoodsReceiptQC() {
 
               {/* AI QC modal */}
               {isAiQcModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-                  <div className="w-full max-w-lg rounded-3xl bg-white shadow-xl border border-slate-100 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-slate-100">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-3 py-4 sm:px-4">
+                  <div className="w-full max-w-lg rounded-3xl bg-white shadow-xl border border-slate-100 overflow-hidden max-h-[90vh] overflow-y-auto">
+                    <div className="px-4 py-3 border-b border-slate-100 sm:px-6 sm:py-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <h4 className="text-sm font-semibold text-slate-900">
@@ -1345,7 +1345,7 @@ export default function GoodsReceiptQC() {
                       </div>
                     </div>
 
-                    <div className="px-6 py-4 space-y-3">
+                    <div className="px-4 py-3 space-y-3 sm:px-6 sm:py-4">
                       <div className="flex flex-wrap gap-2">
                         <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                           <Upload size={14} />
@@ -1467,7 +1467,7 @@ export default function GoodsReceiptQC() {
 
           {/* Create boxes section */}
           {canReviewApprovalStage && (
-            <div className="px-6 py-4 border-t border-slate-100 space-y-1.5 bg-slate-50/40">
+            <div className="px-3 py-3 border-t border-slate-100 space-y-1.5 bg-slate-50/40 sm:px-4 sm:py-4 lg:px-6">
                 <p className="text-xs font-semibold text-slate-700">
                 Bước 3 · Xử lý sau kiểm tra chất lượng
               </p>
@@ -1554,7 +1554,7 @@ export default function GoodsReceiptQC() {
           {receipt.status === "Approved" && (
             <div
               id="create-boxes-section"
-              className="px-6 py-4 border-t border-slate-100 bg-emerald-50/40"
+              className="px-3 py-3 border-t border-slate-100 bg-emerald-50/40 sm:px-4 sm:py-4 lg:px-6"
             >
               <h3 className="text-xs font-semibold text-slate-800 mb-2">
                 Tạo thùng từ lô
@@ -1691,7 +1691,7 @@ export default function GoodsReceiptQC() {
                   </p>
                 ) : (
                   <div className="mt-2 overflow-x-auto">
-                    <table className="min-w-full text-xs">
+                    <table className="min-w-[760px] w-full text-xs">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-200">
                           <th className="px-3 py-2 text-left font-semibold text-slate-500 uppercase tracking-wider">
@@ -1815,9 +1815,9 @@ export default function GoodsReceiptQC() {
 
         {/* Popup đổi kho khi kho hiện tại không đủ dung lượng */}
         {isWarehouseModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-            <div className="w-full max-w-lg rounded-3xl bg-white shadow-xl border border-slate-100 overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-3 py-4 sm:px-4">
+            <div className="w-full max-w-lg rounded-3xl bg-white shadow-xl border border-slate-100 overflow-hidden max-h-[90vh] overflow-y-auto">
+              <div className="px-4 py-3 border-b border-slate-100 sm:px-6 sm:py-4">
                 <h3 className="text-sm font-semibold text-slate-900">
                   Kho hiện tại không đủ dung lượng
                 </h3>
@@ -1825,7 +1825,7 @@ export default function GoodsReceiptQC() {
                   Vui lòng chọn kho khác để tiếp tục duyệt phiếu nhập.
                 </p>
               </div>
-              <div className="px-6 py-4 space-y-3">
+              <div className="px-4 py-3 space-y-3 sm:px-6 sm:py-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">
                     Chọn kho mới
@@ -1858,7 +1858,7 @@ export default function GoodsReceiptQC() {
                   )}
                 </div>
               </div>
-              <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2 bg-slate-50/60">
+              <div className="px-4 py-3 border-t border-slate-100 flex flex-wrap justify-end gap-2 bg-slate-50/60 sm:px-6 sm:py-4">
                 <button
                   type="button"
                   onClick={() => setIsWarehouseModalOpen(false)}

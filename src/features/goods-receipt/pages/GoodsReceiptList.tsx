@@ -140,9 +140,9 @@ export default function GoodsReceiptList() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-4 sm:px-6 py-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6">
       <div className="w-full max-w-[1600px] mx-auto">
-        <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center">
               <FileText size={18} className="text-emerald-600" />
@@ -159,7 +159,7 @@ export default function GoodsReceiptList() {
           <button
             type="button"
             onClick={() => navigate(`${basePath}/create`)}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl py-2.5 px-4 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl py-2.5 px-4 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 sm:w-auto"
           >
             <FilePlus2 size={16} />
             Tạo phiếu nhập
@@ -168,7 +168,7 @@ export default function GoodsReceiptList() {
 
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
           {/* Bộ lọc */}
-          <div className="px-6 py-4 border-b border-slate-100 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+          <div className="px-3 py-3 border-b border-slate-100 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3 sm:px-4 sm:py-4 lg:px-6">
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
                 Nhà cung cấp
@@ -302,7 +302,7 @@ export default function GoodsReceiptList() {
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
+              <table className="min-w-[980px] w-full text-sm">
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-100">
                     <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
@@ -385,7 +385,7 @@ export default function GoodsReceiptList() {
               </table>
 
               {/* Pagination */}
-              <div className="px-6 py-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="px-3 py-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:px-4 sm:py-4 lg:px-6">
                 <p className="text-xs text-slate-500">
                   Hiển thị{" "}
                   <span className="font-semibold text-slate-700">

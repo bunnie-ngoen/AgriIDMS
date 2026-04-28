@@ -13,6 +13,7 @@ import {
   Truck,
   User,
   Warehouse,
+  Menu,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAppDispatch } from "../../../app/hook";
@@ -36,6 +37,7 @@ export default function WarehouseStaffLayout() {
   const location = useLocation();
   const notificationRef = useRef<HTMLDivElement>(null);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const { data: notificationData, refetch: refetchNotifications } = useGetMyNotificationsQuery({
     page: 1,
@@ -193,7 +195,20 @@ export default function WarehouseStaffLayout() {
 
   return (
     <div className="h-screen flex bg-slate-100 overflow-hidden">
-      <aside className="w-72 bg-slate-900 text-slate-100 flex flex-col h-screen border-r border-slate-800 shadow-2xl shrink-0">
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 w-72 bg-slate-900 text-slate-100 flex flex-col h-screen border-r border-slate-800 shadow-2xl shrink-0 transition-transform duration-300 ease-out lg:static lg:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+        onClickCapture={(event) => {
+          if (
+            event.target instanceof HTMLElement &&
+            event.target.closest("a[href]") &&
+            window.innerWidth < 1024
+          ) {
+            setSidebarOpen(false);
+          }
+        }}
+      >
         <div className="flex items-center gap-3 px-5 h-16 border-b border-slate-800 bg-slate-950">
           <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-500 text-white shadow">
             <Warehouse size={18} />
@@ -494,13 +509,32 @@ export default function WarehouseStaffLayout() {
         </div>
       </aside>
 
+      {sidebarOpen ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-30 bg-slate-950/45 backdrop-blur-[1px] lg:hidden"
+          aria-label="Đóng menu"
+          onClick={() => setSidebarOpen(false)}
+        />
+      ) : null}
+
       <div className="flex-1 flex flex-col min-w-0">
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white/90 px-4 backdrop-blur sm:px-6">
-          <div className="min-w-0">
-            <p className="text-sm text-slate-500">Không gian kho</p>
-            <span className="text-slate-800 font-semibold">
-              Xử lý allocate, tiền mặt và xuất hàng
-            </span>
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 lg:hidden"
+              aria-label="Mở menu"
+            >
+              <Menu size={18} />
+            </button>
+            <div className="min-w-0">
+              <p className="text-sm text-slate-500">Không gian kho</p>
+              <span className="text-slate-800 font-semibold">
+                Xử lý allocate, tiền mặt và xuất hàng
+              </span>
+            </div>
           </div>
           <div className="relative shrink-0" ref={notificationRef}>
             <button
@@ -570,7 +604,7 @@ export default function WarehouseStaffLayout() {
             )}
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto px-6 pt-6 pb-10">
+        <main className="flex-1 overflow-y-auto px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:pt-6 lg:pb-10">
           <Outlet />
         </main>
       </div>

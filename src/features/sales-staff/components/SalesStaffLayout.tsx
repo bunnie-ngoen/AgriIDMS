@@ -15,6 +15,7 @@ import {
   UserCheck,
   CreditCard,
   PackageCheck,
+  Menu,
 } from "lucide-react";
 import { useAppDispatch } from "../../../app/hook";
 import { logout } from "../../auth/slices/auth.slice";
@@ -38,6 +39,7 @@ export default function SalesStaffLayout() {
   const [isPosOpen, setIsPosOpen] = useState(true);
   const [isComplaintsOpen, setIsComplaintsOpen] = useState(isComplaintsRouteActive);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
   const { data: notificationData, refetch: refetchNotifications } = useGetMyNotificationsQuery({
     page: 1,
@@ -103,7 +105,20 @@ export default function SalesStaffLayout() {
 
   return (
     <div className="h-screen flex bg-slate-100 overflow-hidden">
-      <aside className="w-72 bg-slate-900 text-slate-100 flex flex-col h-screen border-r border-slate-800 shadow-2xl shrink-0">
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 w-72 bg-slate-900 text-slate-100 flex flex-col h-screen border-r border-slate-800 shadow-2xl shrink-0 transition-transform duration-300 ease-out lg:static lg:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+        onClickCapture={(event) => {
+          if (
+            event.target instanceof HTMLElement &&
+            event.target.closest("a[href]") &&
+            window.innerWidth < 1024
+          ) {
+            setSidebarOpen(false);
+          }
+        }}
+      >
         <div className="flex items-center gap-3 px-5 h-16 border-b border-slate-800 bg-slate-950">
           <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-sky-500 text-white shadow">
             <LayoutDashboard size={18} />
@@ -344,8 +359,25 @@ export default function SalesStaffLayout() {
         </div>
       </aside>
 
+      {sidebarOpen ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-30 bg-slate-950/45 backdrop-blur-[1px] lg:hidden"
+          aria-label="Đóng menu"
+          onClick={() => setSidebarOpen(false)}
+        />
+      ) : null}
+
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         <header className="flex shrink-0 items-center justify-end border-b border-slate-200 bg-white/90 px-6 sm:px-8 py-4 backdrop-blur">
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            className="mr-auto inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 lg:hidden"
+            aria-label="Mở menu"
+          >
+            <Menu size={18} />
+          </button>
           <div className="relative" ref={notificationRef}>
             <button
               type="button"
@@ -414,7 +446,7 @@ export default function SalesStaffLayout() {
             )}
           </div>
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 sm:px-8 py-6">
+        <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6">
           <Outlet />
         </main>
       </div>

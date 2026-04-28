@@ -223,10 +223,10 @@ export default function GoodsReceiptDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-5 py-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-3 py-4 sm:px-4 sm:py-5 lg:px-5 lg:py-6">
       <div className="max-w-4xl mx-auto space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between mb-2">
+        <div className="mb-2 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4">
             <button
               type="button"
@@ -247,7 +247,7 @@ export default function GoodsReceiptDetail() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {canViewPrice && (
               <button
                 type="button"
@@ -298,7 +298,7 @@ export default function GoodsReceiptDetail() {
 
         {/* Summary card */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+          <div className="px-3 py-3 grid grid-cols-1 md:grid-cols-4 gap-4 text-sm sm:px-4 sm:py-4 lg:px-6">
             <div>
               <span className="text-slate-500 block text-xs font-medium">
                 Nhà cung cấp
@@ -344,7 +344,7 @@ export default function GoodsReceiptDetail() {
             </h2>
           </div>
           {canViewPrice && supplierSections.length > 0 && (
-            <div className="px-6 py-4 border-b border-slate-100 space-y-3 bg-slate-50/40">
+            <div className="px-3 py-3 border-b border-slate-100 space-y-3 bg-slate-50/40 sm:px-4 sm:py-4 lg:px-6">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Nhóm theo nhà cung cấp
               </h3>
@@ -381,7 +381,7 @@ export default function GoodsReceiptDetail() {
             </div>
           )}
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
+            <table className="min-w-[760px] w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
                   <th className="px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">

@@ -15,10 +15,14 @@ export type RevenueProfitReportRow = {
   exportId: number;
   exportCode: string;
   orderId: number;
+  customerUserId?: string | null;
+  customerName?: string | null;
   boxId: number;
   boxCode: string;
   lotCode: string;
   lotId: number;
+  supplierId?: number | null;
+  supplierName?: string | null;
   warehouseId?: number | null;
   warehouseName?: string | null;
   productId?: number | null;
@@ -28,6 +32,22 @@ export type RevenueProfitReportRow = {
   quantityKg: number;
   saleUnitPrice: number;
   costUnitPrice: number;
+  revenue: number;
+  cost: number;
+  profit: number;
+};
+
+export type RevenueProfitByCustomer = {
+  customerKey: string;
+  customerName: string;
+  revenue: number;
+  cost: number;
+  profit: number;
+};
+
+export type RevenueProfitBySupplier = {
+  supplierKey: string;
+  supplierName: string;
   revenue: number;
   cost: number;
   profit: number;
@@ -44,6 +64,8 @@ export type RevenueProfitReportResponse = {
   page: number;
   pageSize: number;
   totalPages: number;
+  revenueByCustomers: RevenueProfitByCustomer[];
+  revenueBySuppliers: RevenueProfitBySupplier[];
   rows: RevenueProfitReportRow[];
 };
 
@@ -81,15 +103,41 @@ export const revenueReportApi = api.injectEndpoints({
           page: Number(row.page ?? row.Page ?? 1),
           pageSize: Number(row.pageSize ?? row.PageSize ?? 50),
           totalPages: Number(row.totalPages ?? row.TotalPages ?? 1),
+          revenueByCustomers: (
+            (row.revenueByCustomers ??
+              row.RevenueByCustomers ??
+              []) as Array<Record<string, unknown>>
+          ).map((item) => ({
+            customerKey: String(item.customerKey ?? item.CustomerKey ?? ""),
+            customerName: String(item.customerName ?? item.CustomerName ?? ""),
+            revenue: Number(item.revenue ?? item.Revenue ?? 0),
+            cost: Number(item.cost ?? item.Cost ?? 0),
+            profit: Number(item.profit ?? item.Profit ?? 0),
+          })),
+          revenueBySuppliers: (
+            (row.revenueBySuppliers ??
+              row.RevenueBySuppliers ??
+              []) as Array<Record<string, unknown>>
+          ).map((item) => ({
+            supplierKey: String(item.supplierKey ?? item.SupplierKey ?? ""),
+            supplierName: String(item.supplierName ?? item.SupplierName ?? ""),
+            revenue: Number(item.revenue ?? item.Revenue ?? 0),
+            cost: Number(item.cost ?? item.Cost ?? 0),
+            profit: Number(item.profit ?? item.Profit ?? 0),
+          })),
           rows: rowsRaw.map((item) => ({
             exportedAt: String(item.exportedAt ?? item.ExportedAt ?? ""),
             exportId: Number(item.exportId ?? item.ExportId ?? 0),
             exportCode: String(item.exportCode ?? item.ExportCode ?? ""),
             orderId: Number(item.orderId ?? item.OrderId ?? 0),
+            customerUserId: String(item.customerUserId ?? item.CustomerUserId ?? "") || null,
+            customerName: String(item.customerName ?? item.CustomerName ?? "") || null,
             boxId: Number(item.boxId ?? item.BoxId ?? 0),
             boxCode: String(item.boxCode ?? item.BoxCode ?? ""),
             lotCode: String(item.lotCode ?? item.LotCode ?? ""),
             lotId: Number(item.lotId ?? item.LotId ?? 0),
+            supplierId: Number(item.supplierId ?? item.SupplierId ?? 0) || null,
+            supplierName: String(item.supplierName ?? item.SupplierName ?? "") || null,
             warehouseId: Number(item.warehouseId ?? item.WarehouseId ?? 0) || null,
             warehouseName: String(item.warehouseName ?? item.WarehouseName ?? ""),
             productId: Number(item.productId ?? item.ProductId ?? 0) || null,
@@ -139,15 +187,41 @@ export const revenueReportApi = api.injectEndpoints({
           page: Number(row.page ?? row.Page ?? 1),
           pageSize: Number(row.pageSize ?? row.PageSize ?? 50),
           totalPages: Number(row.totalPages ?? row.TotalPages ?? 1),
+          revenueByCustomers: (
+            (row.revenueByCustomers ??
+              row.RevenueByCustomers ??
+              []) as Array<Record<string, unknown>>
+          ).map((item) => ({
+            customerKey: String(item.customerKey ?? item.CustomerKey ?? ""),
+            customerName: String(item.customerName ?? item.CustomerName ?? ""),
+            revenue: Number(item.revenue ?? item.Revenue ?? 0),
+            cost: Number(item.cost ?? item.Cost ?? 0),
+            profit: Number(item.profit ?? item.Profit ?? 0),
+          })),
+          revenueBySuppliers: (
+            (row.revenueBySuppliers ??
+              row.RevenueBySuppliers ??
+              []) as Array<Record<string, unknown>>
+          ).map((item) => ({
+            supplierKey: String(item.supplierKey ?? item.SupplierKey ?? ""),
+            supplierName: String(item.supplierName ?? item.SupplierName ?? ""),
+            revenue: Number(item.revenue ?? item.Revenue ?? 0),
+            cost: Number(item.cost ?? item.Cost ?? 0),
+            profit: Number(item.profit ?? item.Profit ?? 0),
+          })),
           rows: rowsRaw.map((item) => ({
             exportedAt: String(item.exportedAt ?? item.ExportedAt ?? ""),
             exportId: Number(item.exportId ?? item.ExportId ?? 0),
             exportCode: String(item.exportCode ?? item.ExportCode ?? ""),
             orderId: Number(item.orderId ?? item.OrderId ?? 0),
+            customerUserId: String(item.customerUserId ?? item.CustomerUserId ?? "") || null,
+            customerName: String(item.customerName ?? item.CustomerName ?? "") || null,
             boxId: Number(item.boxId ?? item.BoxId ?? 0),
             boxCode: String(item.boxCode ?? item.BoxCode ?? ""),
             lotCode: String(item.lotCode ?? item.LotCode ?? ""),
             lotId: Number(item.lotId ?? item.LotId ?? 0),
+            supplierId: Number(item.supplierId ?? item.SupplierId ?? 0) || null,
+            supplierName: String(item.supplierName ?? item.SupplierName ?? "") || null,
             warehouseId: Number(item.warehouseId ?? item.WarehouseId ?? 0) || null,
             warehouseName: String(item.warehouseName ?? item.WarehouseName ?? ""),
             productId: Number(item.productId ?? item.ProductId ?? 0) || null,

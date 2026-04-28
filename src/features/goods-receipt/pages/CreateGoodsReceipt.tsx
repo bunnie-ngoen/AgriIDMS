@@ -297,9 +297,9 @@ export default function CreateGoodsReceipt() {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-5 py-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-3 py-4 sm:px-4 sm:py-5 lg:px-5 lg:py-6">
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-center gap-4 mb-6">
+        <div className="mb-5 flex items-start gap-3 sm:items-center sm:gap-4 sm:mb-6">
           <button
             type="button"
             onClick={() => navigate(basePath)}
@@ -349,7 +349,7 @@ export default function CreateGoodsReceipt() {
                 Liên kết đơn mua hàng
               </span>
             </div>
-            <div className="p-6 text-sm space-y-3">
+            <div className="p-3 text-sm space-y-3 sm:p-4 lg:p-6">
               <p className="text-xs text-slate-500">
                 Chỉ hiển thị các đơn mua đã được duyệt (Approved). Khi chọn đơn mua,
                 hệ thống sẽ tự điền nhà cung cấp tương ứng.
@@ -394,7 +394,7 @@ export default function CreateGoodsReceipt() {
                 Nhà cung cấp & chi tiết hàng nhập
               </span>
             </div>
-            <div className="p-6 space-y-4 text-sm">
+            <div className="p-3 space-y-4 text-sm sm:p-4 lg:p-6">
               <p className="text-xs text-slate-500">
                 {isMultiSupplier
                   ? "PO đa NCC: mỗi NCC là một card riêng, các dòng nhận phải theo đúng kế hoạch NCC."
@@ -433,7 +433,7 @@ export default function CreateGoodsReceipt() {
                         </span>
                       </div>
                       <div className="overflow-x-auto">
-                        <table className="min-w-full text-sm">
+                        <table className="min-w-[860px] w-full text-sm">
                           <thead>
                             <tr className="border-b border-slate-100">
                               <th className="px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Sản phẩm</th>
@@ -509,7 +509,7 @@ export default function CreateGoodsReceipt() {
               </div>
               <span className="text-sm font-semibold text-slate-700">Kho nhập</span>
             </div>
-            <div className="p-6 text-sm">
+            <div className="p-3 text-sm sm:p-4 lg:p-6">
               <label className="block text-xs font-medium text-slate-600 mb-1">
                 Kho nhập *
               </label>
@@ -559,7 +559,7 @@ export default function CreateGoodsReceipt() {
                 Thông tin vận chuyển
               </span>
             </div>
-            <div className="p-6 space-y-4 text-sm">
+            <div className="p-3 space-y-4 text-sm sm:p-4 lg:p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">
@@ -623,11 +623,11 @@ export default function CreateGoodsReceipt() {
             </div>
           )}
 
-          <div className="flex gap-3 pt-1 pb-4">
+          <div className="flex flex-col gap-2 pt-1 pb-4 sm:flex-row sm:gap-3">
             <button
               type="button"
               onClick={() => navigate(basePath)}
-              className="flex-1 rounded-2xl border border-slate-200 py-3.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 bg-white shadow-sm"
+              className="rounded-2xl border border-slate-200 py-3.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 bg-white shadow-sm sm:flex-1"
             >
               Hủy bỏ
             </button>
@@ -638,7 +638,7 @@ export default function CreateGoodsReceipt() {
                 !canSubmit ||
                 !form.formState.isValid
               }
-              className="flex-[2] rounded-2xl py-3.5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 disabled:opacity-50 flex items-center justify-center gap-2.5 transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:translate-y-0"
+              className="rounded-2xl py-3.5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 disabled:opacity-50 flex items-center justify-center gap-2.5 transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:translate-y-0 sm:flex-[2]"
             >
               {isLoading ? (
                 <>

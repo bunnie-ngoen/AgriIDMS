@@ -30,11 +30,11 @@ const ProductVariantDetail = () => {
   if (!variant) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-sky-50/30 px-5 py-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-sky-50/30 px-3 py-4 sm:px-4 sm:py-5 lg:px-5 lg:py-6">
       <div className="max-w-2xl mx-auto space-y-4">
 
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
+        <div className="mb-6 flex flex-wrap items-center gap-3 sm:mb-8 sm:flex-nowrap sm:gap-4">
           <button onClick={() => navigate(-1)}
             className="h-10 w-10 rounded-2xl border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:border-slate-300 hover:shadow-md transition-all duration-200 shadow-sm">
             <ArrowLeft size={16} />
@@ -52,7 +52,7 @@ const ProductVariantDetail = () => {
           </div>
           <button
             onClick={() => navigate(`${productVariantBasePath}/${variant.id}/edit`, { state: { variant } })}
-            className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-700 transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5">
+            className="ml-auto flex items-center gap-2 px-4 py-2 rounded-2xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-700 transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5">
             <PencilLine size={13} />
             Chỉnh sửa
           </button>
@@ -60,13 +60,13 @@ const ProductVariantDetail = () => {
 
         {/* Image + Status */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-50 flex items-center gap-3">
+          <div className="px-4 sm:px-6 py-4 border-b border-slate-50 flex items-center gap-3">
             <div className="h-7 w-7 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-sm">
               <ImageIcon size={13} className="text-white" />
             </div>
             <span className="text-sm font-semibold text-slate-700">Hình ảnh</span>
           </div>
-          <div className="p-6 flex items-center gap-6">
+          <div className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
             {variant.imageUrl ? (
               <img src={variant.imageUrl} alt={variant.productName}
                 className="w-40 h-40 rounded-2xl object-cover border-2 border-slate-200 shadow-lg" />
@@ -101,13 +101,13 @@ const ProductVariantDetail = () => {
 
         {/* Product Info */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-50 flex items-center gap-3">
+          <div className="px-4 sm:px-6 py-4 border-b border-slate-50 flex items-center gap-3">
             <div className="h-7 w-7 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
               <Tag size={13} className="text-white" />
             </div>
             <span className="text-sm font-semibold text-slate-700">Thông tin sản phẩm</span>
           </div>
-          <div className="px-6 py-2">
+          <div className="px-4 sm:px-6 py-2">
             <DetailRow label="Tên sản phẩm" value={variant.productName} accent />
             <DetailRow label="Product ID" value={`#${variant.productId}`} />
             <DetailRow label="Hàng loại" value={
@@ -120,13 +120,13 @@ const ProductVariantDetail = () => {
 
         {/* Price, ShelfLife & MinReceiptWeight */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-50 flex items-center gap-3">
+          <div className="px-4 sm:px-6 py-4 border-b border-slate-50 flex items-center gap-3">
             <div className="h-7 w-7 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-sm">
               <BadgeDollarSign size={13} className="text-white" />
             </div>
             <span className="text-sm font-semibold text-slate-700">Giá, Hạn sử dụng & Định mức nhập</span>
           </div>
-          <div className="px-6 py-2">
+          <div className="px-4 sm:px-6 py-2">
             <DetailRow label="Giá bán" value={
               <span className="text-emerald-600 font-black text-base">
                 {variant.price.toLocaleString("vi-VN")} ₫
@@ -162,7 +162,7 @@ const ProductVariantDetail = () => {
         </div>
 
         {/* Bottom action */}
-        <div className="flex gap-3 pt-1 pb-6">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-1 pb-4 sm:pb-6">
           <button onClick={() => navigate(-1)}
             className="flex-1 rounded-2xl border border-slate-200 py-3.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 transition-all duration-200 bg-white shadow-sm">
             Quay lại
