@@ -105,11 +105,11 @@ const EditProductVariant = () => {
   if (!variant) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-amber-50/30 px-5 py-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-amber-50/30 px-3 py-4 sm:px-4 sm:py-5 lg:px-5 lg:py-6">
       <div className="max-w-2xl mx-auto">
 
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
+        <div className="mb-6 flex flex-wrap items-center gap-3 sm:mb-8 sm:flex-nowrap sm:gap-4">
           <button type="button" onClick={() => navigate(-1)}
             className="h-10 w-10 rounded-2xl border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:border-slate-300 hover:shadow-md transition-all duration-200 shadow-sm">
             <ArrowLeft size={16} />
@@ -125,7 +125,7 @@ const EditProductVariant = () => {
               <span className="text-slate-500">{variant.productName}</span>
             </p>
           </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200">
+          <div className="ml-auto flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1.5">
             <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
             <span className="text-[11px] font-semibold text-amber-600">Edit</span>
           </div>
@@ -135,14 +135,14 @@ const EditProductVariant = () => {
 
           {/* Section 1 — Image */}
           <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-50 flex items-center gap-3">
+            <div className="px-4 sm:px-6 py-4 border-b border-slate-50 flex items-center gap-3">
               <div className="h-7 w-7 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-sm">
                 <ImagePlus size={13} className="text-white" />
               </div>
               <span className="text-sm font-semibold text-slate-700">Hình ảnh sản phẩm</span>
             </div>
-            <div className="p-6">
-              <div className="flex items-start gap-5">
+            <div className="p-4 sm:p-6">
+              <div className="flex flex-col items-start gap-4 sm:flex-row sm:gap-5">
                 {imagePreview ? (
                   <div className="relative group">
                     <img src={imagePreview} alt="preview"
@@ -163,12 +163,12 @@ const EditProductVariant = () => {
                     <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
                   </label>
                 )}
-                <div className="flex-1 pt-2 space-y-3">
+                <div className="w-full flex-1 pt-1 sm:pt-2 space-y-3">
                   <div className="space-y-1">
                     <p className="text-xs font-semibold text-slate-600">Thay đổi ảnh sản phẩm</p>
                     <p className="text-[11px] text-slate-400 leading-relaxed">Ảnh mới sẽ thay thế ảnh hiện tại và được lưu trên Cloudinary CDN.</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {[["Kích thước", "800 × 800px"], ["Dung lượng", "Tối đa 5MB"], ["Định dạng", "PNG, JPG, WEBP"], ["Tỉ lệ", "1:1 (vuông)"]].map(([k, v]) => (
                       <div key={k} className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-100">
                         <p className="text-[10px] text-slate-400">{k}</p>
@@ -186,13 +186,13 @@ const EditProductVariant = () => {
 
           {/* Section 2 — Sản phẩm & hàng loại */}
           <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-50 flex items-center gap-3">
+            <div className="px-4 sm:px-6 py-4 border-b border-slate-50 flex items-center gap-3">
               <div className="h-7 w-7 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
                 <Tag size={13} className="text-white" />
               </div>
               <span className="text-sm font-semibold text-slate-700">Thông tin sản phẩm</span>
             </div>
-            <div className="p-6 space-y-5">
+            <div className="p-4 sm:p-6 space-y-5">
               <Field label="Sản phẩm *" error={form.formState.errors.productId?.message}>
                 <div className="relative">
                   <select
@@ -257,14 +257,14 @@ const EditProductVariant = () => {
 
           {/* Section 3 — Price, ShelfLife & MinReceiptWeight */}
           <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-50 flex items-center gap-3">
+            <div className="px-4 sm:px-6 py-4 border-b border-slate-50 flex items-center gap-3">
               <div className="h-7 w-7 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-sm">
                 <BadgeDollarSign size={13} className="text-white" />
               </div>
               <span className="text-sm font-semibold text-slate-700">Giá, Hạn sử dụng & Quy đổi khối lượng</span>
             </div>
-            <div className="p-6">
-              <div className="grid grid-cols-2 gap-5">
+            <div className="p-4 sm:p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                 <Field label="Giá bán (VNĐ) *" error={form.formState.errors.price?.message}>
                   <div className="relative">
                     <input
@@ -328,7 +328,7 @@ const EditProductVariant = () => {
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-1 pb-6">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-1 pb-4 sm:pb-6">
             <button type="button" onClick={() => navigate(-1)}
               className="flex-1 rounded-2xl border border-slate-200 py-3.5 text-sm font-semibold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 bg-white shadow-sm">
               Hủy bỏ

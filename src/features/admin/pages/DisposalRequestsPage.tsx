@@ -102,7 +102,7 @@ export default function DisposalRequestsPage() {
                     </div>
                   </div>
                   <div className="max-h-[55vh] overflow-auto rounded-xl border border-slate-100 bg-slate-50">
-                    <table className="w-full text-xs">
+                    <table className="min-w-[760px] w-full text-xs">
                       <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 text-slate-500">
                         <tr>
                           <th className="px-3 py-2 text-left">Hàng</th>
@@ -160,7 +160,7 @@ export default function DisposalRequestsPage() {
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="min-w-[980px] w-full text-sm">
             <thead className="bg-slate-50 text-slate-600">
               <tr>
                 <th className="px-3 py-2 text-left">Mã yêu cầu</th>

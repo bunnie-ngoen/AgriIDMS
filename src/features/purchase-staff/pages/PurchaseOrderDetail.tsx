@@ -118,11 +118,11 @@ export default function PurchaseOrderDetail() {
   const suppliers = order.supplierPlans.map((p) => p.supplier.supplierName).filter(Boolean);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-5 py-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-3 py-4 sm:px-4 sm:py-5 lg:px-5 lg:py-6">
       <div className="max-w-4xl mx-auto space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-4">
+        <div className="mb-2 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex items-center gap-3 sm:gap-4">
             <button
               type="button"
               onClick={() => navigate(backLink)}
@@ -152,7 +152,7 @@ export default function PurchaseOrderDetail() {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
+          <div className="flex flex-wrap items-center gap-2 lg:justify-end">
           {canApprove && (
             <button
               type="button"
@@ -184,7 +184,7 @@ export default function PurchaseOrderDetail() {
                   Xóa
                 </button>
               ) : (
-                <div className="flex gap-2">
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                   <button
                     type="button"
                     onClick={handleDelete}
@@ -208,8 +208,8 @@ export default function PurchaseOrderDetail() {
       </div>
 
         {/* Summary card */}
-        <div className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
-          <div className="px-6 py-5 space-y-5">
+        <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+          <div className="space-y-5 px-4 py-4 sm:px-6 sm:py-5">
             <div>
               <span className="text-slate-500 block text-xs font-medium mb-2">
                 Nhà cung cấp tham gia
@@ -230,7 +230,7 @@ export default function PurchaseOrderDetail() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm border-t border-slate-100 pt-4">
+            <div className="grid grid-cols-1 gap-3 border-t border-slate-100 pt-4 text-sm sm:grid-cols-2 md:grid-cols-4 md:gap-4">
             <div>
               <span className="text-slate-500 block text-xs font-medium">Kiểu đơn</span>
               <p className="font-medium text-slate-900 mt-1">
@@ -274,11 +274,11 @@ export default function PurchaseOrderDetail() {
         </div>
 
         {/* Summary */}
-        <div className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100">
+        <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+          <div className="border-b border-slate-100 px-4 py-4 sm:px-6">
             <h2 className="text-sm font-semibold text-slate-800">Tổng quan đơn mua</h2>
           </div>
-          <div className="px-6 py-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-1 gap-3 px-4 py-4 text-sm sm:grid-cols-2 md:grid-cols-4 md:gap-4 sm:px-6">
             <div>
               <span className="text-slate-500 block text-xs font-medium">Số NCC</span>
               <p className="font-semibold text-slate-900 mt-1">{order.summary.totalSuppliers}</p>
@@ -301,8 +301,8 @@ export default function PurchaseOrderDetail() {
         </div>
 
         {/* Supplier plans */}
-        <div className="rounded-3xl border border-slate-100 bg-white shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100">
+        <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+          <div className="border-b border-slate-100 px-4 py-4 sm:px-6">
             <h2 className="text-sm font-semibold text-slate-800">
               Kế hoạch theo nhà cung cấp
             </h2>
@@ -324,7 +324,7 @@ export default function PurchaseOrderDetail() {
                   </div>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="min-w-[760px] w-full text-sm">
                     <thead>
                       <tr className="border-b border-slate-100 bg-white">
                         <th className="text-left py-2.5 px-4 font-semibold text-slate-700">Sản phẩm</th>

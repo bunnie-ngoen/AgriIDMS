@@ -133,6 +133,8 @@ const RevenueProfitReportPage = () => {
         <th>Thời gian xuất</th>
         <th>Phiếu xuất</th>
         <th>Đơn hàng</th>
+        <th>Khách hàng</th>
+        <th>Nhà cung cấp</th>
         <th>Box</th>
         <th>Lô</th>
         <th>Sản phẩm</th>
@@ -150,6 +152,8 @@ const RevenueProfitReportPage = () => {
         <td>${escape(formatDateTime(r.exportedAt))}</td>
         <td>${escape(r.exportCode)}</td>
         <td>${escape(`#${r.orderId}`)}</td>
+        <td>${escape(r.customerName || "—")}</td>
+        <td>${escape(r.supplierName || "—")}</td>
         <td>${escape(r.boxCode || `#${r.boxId}`)}</td>
         <td>${escape(r.lotCode || "—")}</td>
         <td>${escape(
@@ -435,6 +439,115 @@ const RevenueProfitReportPage = () => {
           </div>
         </div>
 
+        <div className="mb-4 grid grid-cols-1 gap-3 xl:grid-cols-2">
+          <div className="rounded-xl border border-slate-200">
+            <div className="border-b border-slate-100 px-4 py-2">
+              <p className="text-xs font-semibold text-slate-700">
+                Doanh thu theo khách hàng
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Xem nhóm khách hàng mang lại doanh thu nhiều nhất.
+              </p>
+            </div>
+            <div className="max-h-72 overflow-auto">
+              <table className="w-full min-w-[560px] text-[11px]">
+                <thead className="sticky top-0 bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Khách hàng</th>
+                    <th className="px-3 py-2 text-right">Doanh thu</th>
+                    <th className="px-3 py-2 text-right">Giá vốn</th>
+                    <th className="px-3 py-2 text-right">Lợi nhuận</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data?.revenueByCustomers ?? []).length === 0 ? (
+                    <tr>
+                      <td className="px-3 py-6 text-center text-slate-500" colSpan={4}>
+                        Chưa có dữ liệu theo khách hàng.
+                      </td>
+                    </tr>
+                  ) : (
+                    (data?.revenueByCustomers ?? []).map((item) => (
+                      <tr
+                        key={item.customerKey}
+                        className="border-t border-slate-100 hover:bg-slate-50"
+                      >
+                        <td className="px-3 py-2">{item.customerName || "—"}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {formatMoney(item.revenue)}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {formatMoney(item.cost)}
+                        </td>
+                        <td
+                          className={`px-3 py-2 text-right tabular-nums font-semibold ${
+                            item.profit >= 0 ? "text-emerald-700" : "text-rose-700"
+                          }`}
+                        >
+                          {formatMoney(item.profit)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div className="rounded-xl border border-slate-200">
+            <div className="border-b border-slate-100 px-4 py-2">
+              <p className="text-xs font-semibold text-slate-700">
+                Doanh thu theo nhà cung cấp
+              </p>
+              <p className="text-[11px] text-slate-500">
+                So sánh mức mua từ từng nhà cung cấp qua giá vốn.
+              </p>
+            </div>
+            <div className="max-h-72 overflow-auto">
+              <table className="w-full min-w-[560px] text-[11px]">
+                <thead className="sticky top-0 bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Nhà cung cấp</th>
+                    <th className="px-3 py-2 text-right">Doanh thu</th>
+                    <th className="px-3 py-2 text-right">Giá vốn</th>
+                    <th className="px-3 py-2 text-right">Lợi nhuận</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data?.revenueBySuppliers ?? []).length === 0 ? (
+                    <tr>
+                      <td className="px-3 py-6 text-center text-slate-500" colSpan={4}>
+                        Chưa có dữ liệu theo nhà cung cấp.
+                      </td>
+                    </tr>
+                  ) : (
+                    (data?.revenueBySuppliers ?? []).map((item) => (
+                      <tr
+                        key={item.supplierKey}
+                        className="border-t border-slate-100 hover:bg-slate-50"
+                      >
+                        <td className="px-3 py-2">{item.supplierName || "—"}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {formatMoney(item.revenue)}
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {formatMoney(item.cost)}
+                        </td>
+                        <td
+                          className={`px-3 py-2 text-right tabular-nums font-semibold ${
+                            item.profit >= 0 ? "text-emerald-700" : "text-rose-700"
+                          }`}
+                        >
+                          {formatMoney(item.profit)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
         <div className="rounded-xl border border-slate-200">
           <div className="border-b border-slate-100 px-4 py-2 text-xs text-slate-500">
             {isFetching
@@ -442,13 +555,15 @@ const RevenueProfitReportPage = () => {
               : `${data?.totalRows ?? 0} dòng chi tiết theo box · Trang ${data?.page ?? 1}/${data?.totalPages ?? 1}`}
           </div>
           <div className="max-h-[65vh] overflow-auto">
-            <table className="w-full min-w-[1320px] text-[11px]">
+            <table className="w-full min-w-[1520px] text-[11px]">
               <thead className="sticky top-0 bg-slate-50 text-slate-600">
                 <tr>
                   <th className="px-3 py-2 text-left">Thời gian xuất</th>
                   <th className="px-3 py-2 text-left">Phiếu xuất</th>
                   <th className="px-3 py-2 text-left">Đơn hàng</th>
+                  <th className="px-3 py-2 text-left">Khách hàng</th>
                   <th className="px-3 py-2 text-left">Chế độ</th>
+                  <th className="px-3 py-2 text-left">Nhà cung cấp</th>
                   <th className="px-3 py-2 text-left">Kho</th>
                   <th className="px-3 py-2 text-left">Box</th>
                   <th className="px-3 py-2 text-left">Lô</th>
@@ -464,7 +579,7 @@ const RevenueProfitReportPage = () => {
               <tbody>
                 {(data?.rows ?? []).length === 0 ? (
                   <tr>
-                    <td className="px-3 py-6 text-center text-slate-500" colSpan={14}>
+                    <td className="px-3 py-6 text-center text-slate-500" colSpan={16}>
                       Không có dữ liệu trong khoảng thời gian đã chọn.
                     </td>
                   </tr>
@@ -477,9 +592,11 @@ const RevenueProfitReportPage = () => {
                       <td className="px-3 py-2">{formatDateTime(r.exportedAt)}</td>
                       <td className="px-3 py-2 font-mono">{r.exportCode}</td>
                       <td className="px-3 py-2">#{r.orderId}</td>
+                      <td className="px-3 py-2">{r.customerName || "—"}</td>
                       <td className="px-3 py-2">
                         {r.exportCode === "DU_KIEN" ? "Dự kiến" : "Thực tế"}
                       </td>
+                      <td className="px-3 py-2">{r.supplierName || "—"}</td>
                       <td className="px-3 py-2">{r.warehouseName || "—"}</td>
                       <td className="px-3 py-2 font-mono">{r.boxCode || `#${r.boxId}`}</td>
                       <td className="px-3 py-2">{r.lotCode || "—"}</td>

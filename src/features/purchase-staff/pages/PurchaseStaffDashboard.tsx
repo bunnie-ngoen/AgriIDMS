@@ -8,8 +8,8 @@ export default function PurchaseStaffDashboard() {
   const navigate = useNavigate();
 
   return (
-    <div className="px-5">
-      <div className="bg-white rounded-[15px] p-6 shadow-sm">
+    <div className="px-3 sm:px-4 lg:px-5">
+      <div className="bg-white rounded-[15px] p-4 shadow-sm sm:p-5 lg:p-6">
         <div className="mb-6">
           <div className="flex items-center gap-2">
             <LayoutDashboard size={20} className="text-slate-600" />
@@ -20,24 +20,7 @@ export default function PurchaseStaffDashboard() {
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <button
-            type="button"
-            onClick={() => navigate("/purchase-staff/orders/create")}
-            className={CARD_CLASS}
-          >
-            <div className="h-12 w-12 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0 text-emerald-600">
-              <FilePlus size={22} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="font-semibold text-slate-800">Tạo đơn mua</h2>
-              <p className="text-sm text-slate-500">
-                Tạo đơn mua hàng mới với nhà cung cấp
-              </p>
-            </div>
-            <ChevronRight size={18} className="text-slate-400 shrink-0" />
-          </button>
-
+        <div className="grid gap-3 sm:grid-cols-2">
           <button
             type="button"
             onClick={() => navigate("/purchase-staff/orders")}
@@ -64,7 +47,7 @@ export default function PurchaseStaffDashboard() {
               <FilePlus size={22} />
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="font-semibold text-slate-800">Tạo đơn mua đa NCC</h2>
+              <h2 className="font-semibold text-slate-800">Tạo đơn mua hàng</h2>
               <p className="text-sm text-slate-500">
                 Tạo một đơn mua với nhiều nhà cung cấp
               </p>

@@ -28,7 +28,7 @@ function toVietnamesePoStatus(status: string): string {
 
 function renderSupplierCell(supplierName: string) {
   const suppliers = supplierName
-    .split("|")
+    .split(/[|,]/)
     .map((s) => s.trim())
     .filter(Boolean);
 
@@ -41,7 +41,7 @@ function renderSupplierCell(supplierName: string) {
       <summary className="cursor-pointer list-none inline-flex items-center gap-2 text-slate-700">
         <span className="truncate max-w-[360px]">{suppliers[0]}</span>
         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
-          +{suppliers.length - 1} NCC
+          +{suppliers.length - 1} nhà cung cấp
         </span>
       </summary>
       <div className="mt-2 w-[420px] max-w-[80vw] rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
@@ -71,7 +71,6 @@ export default function PurchaseOrderList() {
     : isManager
       ? "/manager/dashboard"
       : "/purchase-staff/dashboard";
-  const createLink = "/purchase-staff/orders/create";
   const editLink = (id: number) =>
     isAdmin
       ? `/admin/purchase-orders/${id}/edit`
@@ -203,7 +202,7 @@ export default function PurchaseOrderList() {
   const pagedList = filteredList.slice(startIndex, endIndex);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-4 sm:px-6 py-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-3 py-4 sm:px-4 sm:py-5 lg:px-6 lg:py-6">
       <div className="w-full max-w-[1600px] mx-auto">
         {/* Header tương tự CategoryList */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
@@ -230,19 +229,11 @@ export default function PurchaseOrderList() {
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={() => navigate(createLink)}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl py-3 px-5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
-              >
-                <FilePlus size={18} />
-                Tạo đơn mua
-              </button>
-              <button
-                type="button"
                 onClick={() => navigate("/purchase-staff/orders/create-multi-supplier")}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl py-3 px-5 text-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 shadow-sm"
               >
                 <FilePlus size={18} />
-                Tạo đơn mua đa NCC
+                Tạo đơn mua hàng
               </button>
             </div>
           )}
@@ -251,7 +242,7 @@ export default function PurchaseOrderList() {
         {/* Card nội dung */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
         {/* Bộ lọc trên FE */}
-        <div className="px-6 py-4 border-b border-slate-100 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+        <div className="px-3 py-3 border-b border-slate-100 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 sm:px-4 sm:py-4 lg:px-6">
           <div>
             <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
               Nhà cung cấp
@@ -343,7 +334,7 @@ export default function PurchaseOrderList() {
           <p className="text-slate-500 text-sm py-8 text-center">Không có đơn mua nào phù hợp với bộ lọc.</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
+            <table className="min-w-[860px] w-full text-sm">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-100">
                   <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
@@ -416,7 +407,7 @@ export default function PurchaseOrderList() {
 
         {/* Pagination */}
         {!isLoading && !isError && filteredList.length > 0 && (
-          <div className="px-6 py-4 border-t border-slate-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="px-3 py-3 border-t border-slate-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:px-4 sm:py-4 lg:px-6">
             <p className="text-xs text-slate-500">
               Hiển thị <span className="font-semibold text-slate-700">{startIndex + 1}</span>–
               <span className="font-semibold text-slate-700">{endIndex}</span> /{" "}

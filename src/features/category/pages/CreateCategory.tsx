@@ -60,10 +60,10 @@ export default function CreateCategory() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-5 py-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-3 py-4 sm:px-4 sm:py-5 lg:px-5 lg:py-6">
       <div className="max-w-2xl mx-auto">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
+        <div className="mb-6 flex flex-wrap items-center gap-3 sm:mb-8 sm:flex-nowrap sm:gap-4">
           <button
             type="button"
             onClick={() => navigate(categoryBasePath)}
@@ -78,7 +78,7 @@ export default function CreateCategory() {
             </div>
             <p className="text-xs text-slate-400 mt-0.5 ml-6">Thêm danh mục mới dùng cho sản phẩm</p>
           </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200">
+          <div className="ml-auto flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5">
             <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-[11px] font-semibold text-emerald-600">New</span>
           </div>
@@ -86,14 +86,14 @@ export default function CreateCategory() {
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           {/* Section — Thông tin danh mục */}
-          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-50 flex items-center gap-3">
+          <div className="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
+            <div className="flex items-center gap-3 border-b border-slate-50 px-4 py-4 sm:px-6">
               <div className="h-7 w-7 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
                 <Package size={13} className="text-white" />
               </div>
               <span className="text-sm font-semibold text-slate-700">Thông tin danh mục</span>
             </div>
-            <div className="p-6 space-y-5">
+            <div className="space-y-5 p-4 sm:p-6">
               <Field label="Tên danh mục *" error={form.formState.errors.name?.message}>
                 <input
                   {...form.register("name")}
@@ -126,7 +126,7 @@ export default function CreateCategory() {
           )}
 
           {/* Actions */}
-          <div className="flex gap-3 pt-1 pb-6">
+          <div className="flex flex-col gap-2 pt-1 pb-4 sm:flex-row sm:gap-3 sm:pb-6">
             <button
               type="button"
               onClick={() => navigate(categoryBasePath)}

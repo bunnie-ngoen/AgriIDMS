@@ -63,7 +63,15 @@ const mainMenu: MenuItem[] = [
   },
 ];
 
-export default function AdminSidebar() {
+type AdminSidebarProps = {
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
+};
+
+export default function AdminSidebar({
+  mobileOpen = false,
+  onCloseMobile,
+}: AdminSidebarProps) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -101,6 +109,10 @@ export default function AdminSidebar() {
   const isNestedParentActive = (nested: NestedMenuItem): boolean =>
     nested.children.some((c) => c.path === currentLastSegment);
 
+  const closeMobileIfNeeded = () => {
+    if (mobileOpen) onCloseMobile?.();
+  };
+
   // ── Render leaf (không có children) ──────────────────────────────────────
   const renderLeafItem = (item: MenuItem) => {
     const Icon = item.icon;
@@ -111,6 +123,7 @@ export default function AdminSidebar() {
         <NavLink to={item.path}>
           {({ isActive }) => (
             <button
+              onClick={closeMobileIfNeeded}
               className={`w-full flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-colors
               ${
                 isActive
@@ -172,6 +185,7 @@ export default function AdminSidebar() {
                   <NavLink to={child.path}>
                     {({ isActive }) => (
                       <button
+                        onClick={closeMobileIfNeeded}
                         className={`w-full flex items-center px-2 py-1.5 rounded-lg text-[10px] transition-colors
                         ${
                           isActive
@@ -249,6 +263,7 @@ export default function AdminSidebar() {
                   <NavLink to={child.path}>
                     {({ isActive }) => (
                       <button
+                        onClick={closeMobileIfNeeded}
                         className={`w-full flex items-center px-2.5 py-1.5 rounded-lg text-[11px] transition-colors
                         ${
                           isActive
@@ -275,7 +290,11 @@ export default function AdminSidebar() {
   };
 
   return (
-    <aside className="w-64 bg-[#222d32] text-slate-100 flex flex-col h-screen border-r border-[#1a2226] shadow-xl">
+    <aside
+      className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#222d32] text-slate-100 flex flex-col h-screen border-r border-[#1a2226] shadow-xl transition-transform duration-200 lg:static lg:translate-x-0 ${
+        mobileOpen ? "translate-x-0" : "-translate-x-full"
+      }`}
+    >
       {/* BRAND HEADER */}
       <div className="flex items-center gap-3 px-4 h-14 border-b border-[#1a2226] bg-[#1a2226]">
         <div className="inline-flex h-8 w-8 items-center justify-center rounded bg-sky-500 text-white">

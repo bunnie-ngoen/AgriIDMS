@@ -19,7 +19,7 @@ import {
   Ruler,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import { useAppDispatch } from "../../../../app/hook";
 import { logout } from "../../../auth/slices/auth.slice";
 import { persistor } from "../../../../app/store";
@@ -42,6 +42,11 @@ type MenuItem = {
   path?: string;
   icon: LucideIcon;
   children?: (SubMenuItem | NestedMenuItem)[];
+};
+
+type ManagerSidebarProps = {
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
 };
 
 function isNestedMenuItem(
@@ -156,7 +161,10 @@ const mainMenu: MenuItem[] = [
 
 const accountMenu: MenuItem[] = [{ name: "Hồ sơ", path: "profile", icon: Archive }];
 
-export default function ManagerSidebar() {
+export default function ManagerSidebar({
+  mobileOpen = false,
+  onCloseMobile,
+}: ManagerSidebarProps) {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -192,6 +200,14 @@ export default function ManagerSidebar() {
 
   const isNestedParentActive = (nested: NestedMenuItem): boolean =>
     nested.children.some((c) => c.path === currentLastSegment);
+
+  const handleSidebarClickCapture = (event: MouseEvent<HTMLElement>) => {
+    if (!mobileOpen) return;
+    const target = event.target as HTMLElement;
+    if (target.closest("a")) {
+      onCloseMobile?.();
+    }
+  };
 
   const renderLeafItem = (item: MenuItem) => {
     const Icon = item.icon;
@@ -361,7 +377,12 @@ export default function ManagerSidebar() {
   };
 
   return (
-    <aside className="w-64 bg-[#222d32] text-slate-100 flex flex-col h-screen border-r border-[#1a2226] shadow-xl">
+    <aside
+      onClickCapture={handleSidebarClickCapture}
+      className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#222d32] text-slate-100 flex flex-col h-screen border-r border-[#1a2226] shadow-xl transition-transform duration-200 lg:static lg:translate-x-0 ${
+        mobileOpen ? "translate-x-0" : "-translate-x-full"
+      }`}
+    >
       <div className="flex items-center gap-3 px-4 h-14 border-b border-[#1a2226] bg-[#1a2226]">
         <div className="inline-flex h-8 w-8 items-center justify-center rounded bg-sky-500 text-white">
           <LayoutDashboard size={18} />

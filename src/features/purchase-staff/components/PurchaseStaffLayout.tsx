@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, FilePlus, List, LogOut, User } from "lucide-react";
+import { LayoutDashboard, FilePlus, List, LogOut, User, Menu } from "lucide-react";
+import { useState } from "react";
 import { useAppDispatch } from "../../../app/hook";
 import { logout } from "../../auth/slices/auth.slice";
 import { persistor } from "../../../app/store";
@@ -9,6 +10,7 @@ import { api } from "../../../shared/api";
 export default function PurchaseStaffLayout() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const handleLogout = () => {
     dispatch(logout());
     dispatch(api.util.resetApiState());
@@ -18,8 +20,25 @@ export default function PurchaseStaffLayout() {
 
   return (
     <div className="h-screen flex bg-[#F4F4F5] overflow-hidden">
+      {sidebarOpen ? (
+        <button
+          type="button"
+          aria-label="Đóng menu"
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+        />
+      ) : null}
       {/* Sidebar — cùng style Admin: tối, border, icon box */}
-      <aside className="w-64 bg-[#222d32] text-slate-100 flex flex-col h-screen border-r border-[#1a2226] shadow-xl shrink-0">
+      <aside
+        onClickCapture={(e) => {
+          if (!sidebarOpen) return;
+          const target = e.target as HTMLElement;
+          if (target.closest("a")) setSidebarOpen(false);
+        }}
+        className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#222d32] text-slate-100 flex flex-col h-screen border-r border-[#1a2226] shadow-xl shrink-0 transition-transform duration-200 lg:static lg:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         {/* Brand header */}
         <div className="flex items-center gap-3 px-4 h-14 border-b border-[#1a2226] bg-[#1a2226]">
           <div className="inline-flex h-8 w-8 items-center justify-center rounded bg-sky-500 text-white">
@@ -90,31 +109,6 @@ export default function PurchaseStaffLayout() {
             </li>
             <li>
               <NavLink
-                to="/purchase-staff/orders/create"
-                className={({ isActive }) =>
-                  `w-full flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
-                    isActive
-                      ? "bg-[#1e282c] text-white border-l-4 border-sky-400"
-                      : "text-slate-200 hover:bg-[#1b2225]"
-                  }`
-                }
-              >
-                {({ isActive }) => (
-                  <>
-                    <span
-                      className={`inline-flex h-7 w-7 items-center justify-center rounded mr-3 shrink-0 ${
-                        isActive ? "bg-sky-500 text-white" : "bg-[#1f2d3a] text-slate-200"
-                      }`}
-                    >
-                      <FilePlus size={15} />
-                    </span>
-                    <span className="truncate">Tạo đơn mua</span>
-                  </>
-                )}
-              </NavLink>
-            </li>
-            <li>
-              <NavLink
                 to="/purchase-staff/orders/create-multi-supplier"
                 className={({ isActive }) =>
                   `w-full flex items-center px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
@@ -133,7 +127,7 @@ export default function PurchaseStaffLayout() {
                     >
                       <FilePlus size={15} />
                     </span>
-                    <span className="truncate">Tạo đơn mua đa NCC</span>
+                    <span className="truncate">Tạo đơn mua hàng</span>
                   </>
                 )}
               </NavLink>
@@ -180,10 +174,19 @@ export default function PurchaseStaffLayout() {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 border-b border-slate-200 bg-white flex items-center px-6 shrink-0">
+        <header className="h-14 border-b border-slate-200 bg-white flex items-center justify-between px-3 shrink-0 sm:px-4 lg:px-6">
+          <button
+            type="button"
+            onClick={() => setSidebarOpen((s) => !s)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 lg:hidden"
+            aria-label="Mở menu"
+          >
+            <Menu size={18} />
+          </button>
           <span className="text-slate-600 font-medium">Hệ thống đơn mua hàng</span>
+          <span className="w-9 lg:hidden" />
         </header>
-        <main className="flex-1 overflow-y-auto px-6 pt-6 pb-10">
+        <main className="flex-1 overflow-y-auto px-3 pt-3 pb-6 sm:px-4 sm:pt-4 sm:pb-8 lg:px-6 lg:pt-6 lg:pb-10">
           <Outlet />
         </main>
       </div>

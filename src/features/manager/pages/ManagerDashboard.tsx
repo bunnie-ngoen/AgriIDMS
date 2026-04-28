@@ -104,8 +104,8 @@ export default function ManagerDashboard() {
   const navigate = useNavigate();
 
   return (
-    <div className="px-5">
-      <div className="bg-white rounded-[15px] p-6 shadow-sm">
+    <div className="px-3 sm:px-4 lg:px-5">
+      <div className="bg-white rounded-[15px] p-4 shadow-sm sm:p-5 lg:p-6">
         <div className="mb-6">
           <div className="flex items-center gap-2">
             <LayoutDashboard size={20} className="text-slate-600" />
@@ -116,7 +116,7 @@ export default function ManagerDashboard() {
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {QUICK_LINKS.map((item) => {
             const Icon = item.icon;
             return (

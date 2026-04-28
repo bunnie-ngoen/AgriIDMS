@@ -157,7 +157,7 @@ export default function AdminHeaderQrMiniScan() {
       <div className="flex items-center gap-2">
         <input
           type="text"
-          className="border border-gray-200 p-2 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-emerald-950 w-[200px]"
+          className="border border-gray-200 p-2 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-emerald-950 w-[120px] sm:w-[170px] lg:w-[200px]"
           value={qrInput}
           onChange={(e) => setQrInput(e.target.value)}
           placeholder="Nhập/quét QR..."
@@ -219,7 +219,7 @@ export default function AdminHeaderQrMiniScan() {
 
       {/* Dropdown kết quả */}
       {isResultPanelOpen && (currentResult || isAnyFetching) ? (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[360px] bg-white border border-gray-200 rounded-xl shadow-lg p-3">
+        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[min(360px,92vw)] bg-white border border-gray-200 rounded-xl shadow-lg p-3">
           <button
             type="button"
             onClick={() => setIsResultPanelOpen(false)}

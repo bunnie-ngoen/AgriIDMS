@@ -140,7 +140,7 @@ export default function InventoryIssueManagementPage() {
           Danh sách hàng hư hỏng
         </div>
         <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="min-w-[900px] w-full text-sm">
             <thead className="bg-slate-50 text-slate-600">
               <tr>
                 <th className="px-3 py-2 text-left">Hàng</th>
@@ -183,7 +183,7 @@ export default function InventoryIssueManagementPage() {
           Danh sách lô hàng sắp hết hạn / quá hạn
         </div>
         <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="min-w-[980px] w-full text-sm">
             <thead className="bg-slate-50 text-slate-600">
               <tr>
                 <th className="px-3 py-2 text-left">Lô hàng</th>

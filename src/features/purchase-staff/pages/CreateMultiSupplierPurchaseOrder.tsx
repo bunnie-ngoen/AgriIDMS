@@ -143,17 +143,17 @@ export default function CreateMultiSupplierPurchaseOrder() {
 
     try {
       const res = await createMultiPo(payload).unwrap();
-      toast.success(res.message || "Tạo đơn mua đa nhà cung cấp thành công.");
+      toast.success(res.message || "Tạo đơn mua thành công.");
       navigate(`/purchase-staff/orders/${res.purchaseOrderId}`);
     } catch (err: unknown) {
       const e = err as { data?: { message?: string; error?: string } };
-      toast.error(e?.data?.message || e?.data?.error || "Tạo đơn mua đa nhà cung cấp thất bại.");
+      toast.error(e?.data?.message || e?.data?.error || "Tạo đơn mua thất bại.");
     }
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center gap-4">
+    <div className="max-w-5xl mx-auto space-y-4 px-3 pb-4 sm:space-y-5 sm:px-4 lg:space-y-6">
+      <div className="flex items-start gap-3 sm:items-center sm:gap-4">
         <button
           type="button"
           onClick={() => navigate("/purchase-staff/orders")}
@@ -162,15 +162,15 @@ export default function CreateMultiSupplierPurchaseOrder() {
           <ArrowLeft size={16} />
         </button>
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Tạo đơn mua đa nhà cung cấp</h1>
+          <h1 className="text-xl font-bold text-slate-900">Tạo đơn mua</h1>
           <p className="text-sm text-slate-500">Mỗi kế hoạch nhà cung cấp có giá chốt tại thời điểm đặt.</p>
         </div>
       </div>
 
       {plans.map((plan, planIdx) => (
-        <div key={`plan-${planIdx}`} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-700">Kế hoạch NCC #{planIdx + 1}</h2>
+        <div key={`plan-${planIdx}`} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm space-y-4 sm:p-4 lg:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-slate-700">Kế hoạch nhà cung cấp #{planIdx + 1}</h2>
             <button
               type="button"
               onClick={() => removePlan(planIdx)}
@@ -222,7 +222,7 @@ export default function CreateMultiSupplierPurchaseOrder() {
             {plan.details.map((line, lineIdx) => (
               <div
                 key={`line-${planIdx}-${lineIdx}`}
-                className="grid grid-cols-1 md:grid-cols-5 gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3"
+                className="grid grid-cols-1 gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3 md:grid-cols-5"
               >
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">Sản phẩm *</label>
@@ -245,20 +245,24 @@ export default function CreateMultiSupplierPurchaseOrder() {
                     type="number"
                     step="0.01"
                     min={0.01}
-                    value={line.orderedWeight}
+                    value={line.orderedWeight === 0 ? "" : line.orderedWeight}
                     onChange={(e) => updateLine(planIdx, lineIdx, "orderedWeight", Number(e.target.value))}
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                    placeholder="Nhập khối lượng"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1">Đơn giá tại lúc đặt *</label>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Đơn giá tại lúc đặt (VNĐ/kg) *
+                  </label>
                   <input
                     type="number"
                     step="0.01"
                     min={0}
-                    value={line.unitPriceAtOrder}
+                    value={line.unitPriceAtOrder === 0 ? "" : line.unitPriceAtOrder}
                     onChange={(e) => updateLine(planIdx, lineIdx, "unitPriceAtOrder", Number(e.target.value))}
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                    placeholder="Nhập đơn giá"
                   />
                 </div>
                 <div>
@@ -270,7 +274,7 @@ export default function CreateMultiSupplierPurchaseOrder() {
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                   />
                 </div>
-                <div className="grid grid-cols-[1fr_auto] gap-2">
+                <div className="grid grid-cols-[1fr_auto] gap-2 md:grid-cols-[1fr_auto]">
                   <div>
                     <label className="block text-xs font-medium text-slate-500 mb-1">Dung sai (%)</label>
                     <input
@@ -278,9 +282,10 @@ export default function CreateMultiSupplierPurchaseOrder() {
                       step="0.1"
                       min={0}
                       max={100}
-                      value={line.tolerancePercent}
+                      value={line.tolerancePercent === 0 ? "" : line.tolerancePercent}
                       onChange={(e) => updateLine(planIdx, lineIdx, "tolerancePercent", Number(e.target.value))}
                       className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                      placeholder="0 - 100"
                     />
                   </div>
                   <div className="flex items-end">
@@ -308,18 +313,18 @@ export default function CreateMultiSupplierPurchaseOrder() {
         </div>
       ))}
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:gap-3">
         <button
           type="button"
           onClick={addPlan}
-          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto"
         >
-          + Thêm kế hoạch nhà cung cấp
+          + Thêm nhà cung cấp
         </button>
         <button
           type="button"
           onClick={() => navigate("/purchase-staff/orders")}
-          className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+          className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 sm:w-auto"
         >
           Hủy
         </button>
@@ -327,10 +332,10 @@ export default function CreateMultiSupplierPurchaseOrder() {
           type="button"
           disabled={isLoading}
           onClick={handleSubmit}
-          className="rounded-xl bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50 inline-flex items-center gap-2"
+          className="rounded-xl bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50 inline-flex items-center justify-center gap-2 sm:w-auto"
         >
           {isLoading ? <Loader2 size={16} className="animate-spin" /> : null}
-          Tạo đơn mua đa NCC
+          Tạo đơn mua
         </button>
       </div>
     </div>
