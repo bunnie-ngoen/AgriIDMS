@@ -4,6 +4,7 @@ import { registerSchema, type RegisterFormValues } from "../schemas/register.sch
 import { useRegisterCustomerMutation } from "../api/auth.api";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import type { FieldPath } from "react-hook-form";
 
 const RegisterForm = () => {
   const navigate = useNavigate();
@@ -16,12 +17,55 @@ const RegisterForm = () => {
     mode: "onChange",
   });
 
+  const fieldMap: Record<string, FieldPath<RegisterFormValues>> = {
+    username: "userName",
+    userName: "userName",
+    fullname: "fullName",
+    fullName: "fullName",
+    email: "email",
+    phonenumber: "phoneNumber",
+    phoneNumber: "phoneNumber",
+    password: "password",
+    confirmpassword: "confirmPassword",
+    confirmPassword: "confirmPassword",
+    gender: "gender",
+    dob: "dob",
+    address: "address",
+  };
+
   const onSubmit = async (values: RegisterFormValues) => {
     setApiErrorMessage("");
+    form.clearErrors();
     try {
       await registerCustomer(values).unwrap();
       navigate("/login");
     } catch (e : any) {
+      const serverErrors = e?.data?.errors;
+      let hasFieldError = false;
+
+      if (serverErrors && typeof serverErrors === "object") {
+        Object.entries(serverErrors).forEach(([rawKey, rawMessages]) => {
+          const normalizedKey = rawKey.includes(".")
+            ? rawKey.split(".").pop() ?? rawKey
+            : rawKey;
+          const mappedField =
+            fieldMap[normalizedKey] ??
+            fieldMap[normalizedKey.toLowerCase()];
+          if (!mappedField) return;
+
+          const message = Array.isArray(rawMessages)
+            ? rawMessages[0]
+            : String(rawMessages ?? "");
+          if (!message) return;
+
+          form.setError(mappedField, {
+            type: "server",
+            message,
+          });
+          hasFieldError = true;
+        });
+      }
+
       const message =
         e?.data?.message ||
         e?.data?.error ||
@@ -33,7 +77,9 @@ const RegisterForm = () => {
           ? Object.values(e.data.errors).flat().join(", ")
           : null) ||
         "Đăng ký thất bại. Vui lòng kiểm tra lại thông tin.";
-      setApiErrorMessage(String(message));
+      if (!hasFieldError) {
+        setApiErrorMessage(String(message));
+      }
       console.error("Register failed:", e);
     }
   };
@@ -96,7 +142,7 @@ const RegisterForm = () => {
               </label>
               <input
                 {...form.register("userName")}
-                placeholder="nhap_ten_tai_khoan"
+                placeholder="Nhập tên tài khoản"
                 className="p-2.5 w-full bg-slate-50 rounded-xl border border-slate-200 text-xs md:text-sm
                            focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-500"
               />
@@ -131,7 +177,7 @@ const RegisterForm = () => {
               <input
                 {...form.register("email")}
                 type="email"
-                placeholder="you@example.com"
+                placeholder="nhap_email@tenmien.com"
                 className="p-2.5 w-full bg-slate-50 rounded-xl border border-slate-200 text-xs md:text-sm
                            focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-500"
               />

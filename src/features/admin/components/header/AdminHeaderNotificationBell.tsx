@@ -263,16 +263,17 @@ export default function AdminHeaderNotificationBell() {
       </button>
 
       {open ? (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[360px] max-w-[90vw] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
-          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+        <div className="fixed left-3 right-3 top-[68px] z-50 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg sm:absolute sm:left-auto sm:right-0 sm:top-[calc(100%+8px)] sm:w-[360px] sm:max-w-[90vw]">
+          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 gap-2">
             <p className="text-sm font-semibold text-gray-800">Thông báo</p>
             <button
               type="button"
               onClick={() => void handleReadAll()}
               disabled={isMarkingAllAsRead || unreadCount === 0}
-              className="text-xs font-semibold text-emerald-700 hover:underline disabled:text-gray-400"
+              className="text-[11px] sm:text-xs font-semibold text-emerald-700 hover:underline disabled:text-gray-400 whitespace-nowrap"
             >
-              Đánh dấu tất cả đã đọc
+              <span className="sm:hidden">Đã đọc hết</span>
+              <span className="hidden sm:inline">Đánh dấu tất cả đã đọc</span>
             </button>
           </div>
 

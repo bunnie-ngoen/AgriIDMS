@@ -269,10 +269,10 @@ export default function LotDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-4 sm:px-6 py-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-3 py-4 sm:px-4 sm:py-5 lg:px-5 lg:py-6">
       <div className="w-full max-w-[1400px] mx-auto space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <button
               type="button"
               onClick={() => navigate(lotBasePath)}
@@ -308,7 +308,7 @@ export default function LotDetailPage() {
           </div>
         ) : (
           <>
-            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm px-6 py-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm px-4 py-4 sm:px-6 sm:py-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
                   Mã lô
@@ -375,7 +375,7 @@ export default function LotDetailPage() {
             </div>
 
             <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+              <div className="px-4 sm:px-6 py-4 border-b border-slate-100 flex flex-wrap items-center gap-2">
                 <Package size={16} className="text-emerald-600" />
                 <h2 className="text-sm font-semibold text-slate-900">
                   Danh sách thùng thuộc lô này
@@ -402,7 +402,7 @@ export default function LotDetailPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
+                  <table className="min-w-[980px] w-full text-sm">
                     <thead>
                       <tr className="bg-slate-50/80 border-b border-slate-100">
                         <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
@@ -498,7 +498,7 @@ export default function LotDetailPage() {
                 </div>
               )}
               {boxes.length > 0 ? (
-                <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/40 flex flex-wrap items-center justify-between gap-3">
+                <div className="px-4 sm:px-6 py-3 border-t border-slate-100 bg-slate-50/40 flex flex-wrap items-center justify-between gap-3">
                   <div className="text-xs text-slate-500">
                     Hiển thị{" "}
                     <span className="font-semibold text-slate-700">

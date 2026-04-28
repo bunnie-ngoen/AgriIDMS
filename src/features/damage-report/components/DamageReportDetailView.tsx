@@ -45,7 +45,7 @@ export function DamageReportDetailView({
           <div className="text-xs text-slate-500">{DAMAGE_FORM_LABEL.product}</div>
           <div className="font-medium text-slate-900">{report.productName ?? "—"}</div>
           {report.productVariantId ? (
-            <div className="text-xs text-slate-500">Variant #{report.productVariantId}</div>
+            <div className="text-xs text-slate-500">Biến thể #{report.productVariantId}</div>
           ) : null}
         </div>
         <div>

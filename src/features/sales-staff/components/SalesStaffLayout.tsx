@@ -17,7 +17,7 @@ import {
   PackageCheck,
   Menu,
 } from "lucide-react";
-import { useAppDispatch } from "../../../app/hook";
+import { useAppDispatch, useAppSelector } from "../../../app/hook";
 import { logout } from "../../auth/slices/auth.slice";
 import { persistor } from "../../../app/store";
 import { api } from "../../../shared/api";
@@ -31,6 +31,7 @@ import { formatVietnamNotificationTime } from "../../../shared/lib/vietnamTime";
 
 export default function SalesStaffLayout() {
   const dispatch = useAppDispatch();
+  const username = useAppSelector((state) => state.auth.user?.username?.trim() ?? "");
   const navigate = useNavigate();
   const location = useLocation();
   const isComplaintsRouteActive = location.pathname.startsWith("/sales/complaints");
@@ -125,7 +126,9 @@ export default function SalesStaffLayout() {
           </div>
           <div>
             <p className="text-sm font-semibold tracking-wide">Vận hành bán hàng</p>
-            <p className="text-[11px] text-slate-400">Trung tâm xử lý đơn</p>
+            <p className="text-[11px] text-slate-400 truncate max-w-[180px]">
+              {username ? `Tài khoản: ${username}` : "Tài khoản đăng nhập"}
+            </p>
           </div>
         </div>
 
@@ -378,6 +381,9 @@ export default function SalesStaffLayout() {
           >
             <Menu size={18} />
           </button>
+          <span className="hidden sm:inline-flex mr-2 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1">
+            {username ? `Xin chào, ${username}` : "Chưa có tên đăng nhập"}
+          </span>
           <div className="relative" ref={notificationRef}>
             <button
               type="button"
@@ -394,16 +400,17 @@ export default function SalesStaffLayout() {
             </button>
 
             {notificationOpen && (
-              <div className="absolute right-0 mt-2 w-[360px] max-w-[90vw] bg-white rounded-xl shadow-lg border border-slate-100 z-30 overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <div className="fixed left-3 right-3 top-[68px] z-50 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-lg sm:absolute sm:left-auto sm:right-0 sm:top-[calc(100%+8px)] sm:mt-0 sm:w-[360px] sm:max-w-[90vw]">
+                <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between gap-2">
                   <p className="text-sm font-semibold text-slate-800">Thông báo của bạn</p>
                   <button
                     type="button"
                     onClick={handleMarkAllAsRead}
                     disabled={isMarkingAllAsRead || unreadCount === 0}
-                    className="text-xs font-semibold text-amber-700 disabled:text-slate-400 hover:underline"
+                    className="text-[11px] sm:text-xs font-semibold text-amber-700 disabled:text-slate-400 hover:underline whitespace-nowrap"
                   >
-                    Đánh dấu tất cả đã đọc
+                    <span className="sm:hidden">Đã đọc hết</span>
+                    <span className="hidden sm:inline">Đánh dấu tất cả đã đọc</span>
                   </button>
                 </div>
 

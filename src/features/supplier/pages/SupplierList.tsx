@@ -95,10 +95,10 @@ export default function SupplierList() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-4 sm:px-6 py-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-3 py-4 sm:px-4 sm:py-5 lg:px-5 lg:py-6">
       <div className="w-full max-w-[1600px] mx-auto">
         {/* Header — giống Danh sách kho */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div className="mb-6 flex flex-col gap-3 sm:gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center">
               <Building2 size={18} className="text-emerald-600" />
@@ -114,7 +114,7 @@ export default function SupplierList() {
           </div>
           <Link
             to={`${supplierBasePath}/create`}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl py-3 px-5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-700 hover:shadow-lg sm:w-auto"
           >
             <Plus size={16} />
             Thêm nhà cung cấp
@@ -124,7 +124,7 @@ export default function SupplierList() {
         {/* Card nội dung */}
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
           {/* Bộ lọc */}
-          <div className="px-6 py-4 border-b border-slate-100">
+          <div className="border-b border-slate-100 px-4 py-4 sm:px-6">
             <input
               type="text"
               value={searchText}
@@ -139,7 +139,7 @@ export default function SupplierList() {
           </div>
 
           {isError && (
-            <div className="mx-6 mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="mx-4 mt-4 flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 sm:mx-6 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-red-700">{errorMessage}</p>
               <button
                 type="button"
@@ -153,7 +153,7 @@ export default function SupplierList() {
           )}
 
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
+            <table className="min-w-[760px] w-full text-sm">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-100">
                   <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
@@ -234,7 +234,7 @@ export default function SupplierList() {
 
           {/* Phân trang */}
           {totalItems > 0 && (
-            <div className="px-6 py-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-sm">
+            <div className="border-t border-slate-100 px-4 py-4 text-sm sm:px-6 flex flex-wrap items-center justify-between gap-3">
               <p className="text-slate-500">
                 Trang {currentPage} / {totalPages} — {totalItems} NCC
               </p>

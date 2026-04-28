@@ -65,6 +65,39 @@ const formatM3 = (value: number | null | undefined) =>
     maximumFractionDigits: 2,
   });
 
+const extractVariantFromContents = (
+  contents: {
+    productVariantId?: number | null;
+    variantName?: string | null;
+    productName?: string | null;
+    boxes?: Array<{
+      productVariantId?: number | null;
+      productVariantName?: string | null;
+      productName?: string | null;
+    }>;
+  } | null | undefined,
+) => {
+  const rootVariantId = Number(contents?.productVariantId ?? 0);
+  if (rootVariantId > 0) {
+    return {
+      variantId: rootVariantId,
+      productName: contents?.productName ?? null,
+      variantName: contents?.variantName ?? null,
+    };
+  }
+
+  const firstBoxWithVariant = (contents?.boxes ?? []).find(
+    (b) => Number(b.productVariantId ?? 0) > 0,
+  );
+  if (!firstBoxWithVariant) return null;
+
+  return {
+    variantId: Number(firstBoxWithVariant.productVariantId ?? 0),
+    productName: firstBoxWithVariant.productName ?? null,
+    variantName: firstBoxWithVariant.productVariantName ?? null,
+  };
+};
+
 const translateBoxStatus = (status?: string | null) => {
   const normalized = String(status ?? "").trim().toLowerCase();
   if (!normalized) return "—";
@@ -936,7 +969,7 @@ const RackOverview = ({
       >
         <span className="font-semibold text-sm truncate">{name}</span>
         <span className="text-[10px] opacity-90 whitespace-nowrap shrink-0">
-          {formatM3(totalCurrent)}/{formatM3(totalCapacity)} ({Math.round(ratio * 100)}%)
+          {formatM3(totalCurrent)}/{formatM3(totalCapacity)} m³ ({Math.round(ratio * 100)}%)
         </span>
       </div>
       {isLoading && (
@@ -986,7 +1019,7 @@ const RackOverview = ({
                   {s.code}
                 </span>
                 <span className="text-[9px] opacity-90 mt-0.5">
-                  {formatM3(s.currentCapacity)}/{formatM3(s.capacity)} ({pct}%)
+                  {formatM3(s.currentCapacity)}/{formatM3(s.capacity)} m³ ({pct}%)
                 </span>
               </button>
             );
@@ -1221,11 +1254,16 @@ const WarehouseMap = () => {
                 subscribe: false,
               }),
             ).unwrap();
-            const variantId = Number(contents.productVariantId ?? 0);
+            const variant = extractVariantFromContents(contents);
+            const variantId = Number(variant?.variantId ?? 0);
             if (variantId > 0 && !map.has(variantId)) {
               map.set(variantId, {
                 id: variantId,
-                label: makeLabel(variantId, contents.productName, contents.variantName),
+                label: makeLabel(
+                  variantId,
+                  variant?.productName ?? contents.productName,
+                  variant?.variantName ?? contents.variantName,
+                ),
               });
             }
           } catch {
@@ -1307,7 +1345,9 @@ const WarehouseMap = () => {
                     subscribe: false,
                   }),
                 ).unwrap();
-                const contentsVariantId = Number(contents.productVariantId ?? 0);
+                const contentsVariantId = Number(
+                  extractVariantFromContents(contents)?.variantId ?? 0,
+                );
                 if (contentsVariantId === Number(selectedVariantFilterId)) {
                   matchedSet.add(slot.id);
                 }
@@ -2289,7 +2329,7 @@ const WarehouseMap = () => {
                       >
                         <span className="truncate max-w-[80%]">{slot.code}</span>
                         <span className="mt-0.5 text-[9px] opacity-90">
-                          {formatM3(slot.currentCapacity)}/{formatM3(slot.capacity)} (
+                          {formatM3(slot.currentCapacity)}/{formatM3(slot.capacity)} m³ (
                           {ratio.toFixed(0)}%)
                         </span>
                       </button>

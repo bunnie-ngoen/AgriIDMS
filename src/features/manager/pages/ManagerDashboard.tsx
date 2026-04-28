@@ -36,7 +36,7 @@ const QUICK_LINKS: QuickLink[] = [
   },
   {
     title: "Nhà cung cấp",
-    subtitle: "Danh sách NCC, tạo NCC",
+    subtitle: "Danh sách nhà cung cấp, tạo nhà cung cấp",
     path: "/manager/suppliers",
     icon: Truck,
     iconBg: "bg-amber-50",
@@ -60,7 +60,7 @@ const QUICK_LINKS: QuickLink[] = [
   },
   {
     title: "Biến thể",
-    subtitle: "Product variants",
+    subtitle: "Biến thể sản phẩm",
     path: "/manager/product-variants",
     icon: Layers,
     iconBg: "bg-slate-100",
@@ -109,10 +109,10 @@ export default function ManagerDashboard() {
         <div className="mb-6">
           <div className="flex items-center gap-2">
             <LayoutDashboard size={20} className="text-slate-600" />
-            <h1 className="text-xl font-semibold text-slate-900">Dashboard</h1>
+            <h1 className="text-xl font-semibold text-slate-900">Bảng điều khiển</h1>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Tổng quan và truy cập nhanh chức năng cho Manager.
+            Tổng quan và truy cập nhanh chức năng cho Quản lý.
           </p>
         </div>
 
@@ -135,7 +135,7 @@ export default function ManagerDashboard() {
                   <h2 className="font-semibold text-slate-800">
                     {item.title}
                   </h2>
-                  <p className="text-sm text-slate-500 truncate">
+                  <p className="text-sm leading-5 text-slate-500 whitespace-normal break-words">
                     {item.subtitle}
                   </p>
                 </div>

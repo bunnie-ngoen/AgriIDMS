@@ -50,6 +50,7 @@ export default function GoodsReceiptList() {
   const [supplierFilter, setSupplierFilter] = useState<number | 0>(0);
   const [warehouseFilter, setWarehouseFilter] = useState<number | 0>(0);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [sortDirection, setSortDirection] = useState<"DESC" | "ASC">("DESC");
   const [fromDateFilter, setFromDateFilter] = useState("");
   const [toDateFilter, setToDateFilter] = useState("");
   const [pageIndex, setPageIndex] = useState(1);
@@ -63,7 +64,8 @@ export default function GoodsReceiptList() {
 
   const filtered = useMemo(
     () =>
-      receipts.filter((r) => {
+      receipts
+        .filter((r) => {
         if (supplierFilter && r.supplierId !== supplierFilter) return false;
         if (warehouseFilter && r.warehouseId !== warehouseFilter) return false;
         if (statusFilter !== "ALL" && r.status !== statusFilter) return false;
@@ -95,12 +97,24 @@ export default function GoodsReceiptList() {
         }
 
         return true;
-      }),
+      })
+        .sort((a, b) => {
+          const aTime = a.receivedDate ? new Date(a.receivedDate).getTime() : 0;
+          const bTime = b.receivedDate ? new Date(b.receivedDate).getTime() : 0;
+
+          if (aTime !== bTime) {
+            return sortDirection === "ASC" ? aTime - bTime : bTime - aTime;
+          }
+
+          // Nếu cùng ngày nhận thì dùng id để giữ thứ tự ổn định.
+          return sortDirection === "ASC" ? a.id - b.id : b.id - a.id;
+        }),
     [
       receipts,
       supplierFilter,
       warehouseFilter,
       statusFilter,
+      sortDirection,
       fromDateFilter,
       toDateFilter,
       todayDateInput,
@@ -168,7 +182,7 @@ export default function GoodsReceiptList() {
 
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
           {/* Bộ lọc */}
-          <div className="px-3 py-3 border-b border-slate-100 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3 sm:px-4 sm:py-4 lg:px-6">
+          <div className="px-3 py-3 border-b border-slate-100 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3 sm:px-4 sm:py-4 lg:px-6">
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
                 Nhà cung cấp
@@ -222,6 +236,21 @@ export default function GoodsReceiptList() {
                     {toVietnameseReceiptStatus(status)}
                   </option>
                 ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
+                Sắp xếp
+              </label>
+              <select
+                value={sortDirection}
+                onChange={(e) =>
+                  setSortDirection(e.target.value === "ASC" ? "ASC" : "DESC")
+                }
+                className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
+              >
+                <option value="DESC">Từ trên xuống</option>
+                <option value="ASC">Từ dưới lên</option>
               </select>
             </div>
             <div>

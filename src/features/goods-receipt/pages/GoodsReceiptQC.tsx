@@ -187,7 +187,8 @@ export default function GoodsReceiptQC() {
     useUpdateGoodsReceiptWarehouseMutation();
 
   const { data: warehouses = [] } = useGetWarehousesQuery();
-  const { data: productVariants = [] } = useGetProductVariantsQuery();
+  const { data: productVariants = [], refetch: refetchProductVariants } =
+    useGetProductVariantsQuery();
   const { data: boxTypeSpecs = [] } = useGetBoxTypeSpecsQuery();
 
   // Pagination for receipt boxes table.
@@ -892,9 +893,36 @@ export default function GoodsReceiptQC() {
       toast.error("Vui lòng chọn kích cỡ thùng.");
       return;
     }
-    if (!values.boxSize || values.boxSize <= 0) {
-      toast.error("Không thể tính khối lượng thùng. Kiểm tra khối lượng riêng hoặc thể tích thùng.");
-      return;
+    let effectiveBoxSize = Number(values.boxSize || 0);
+    if (effectiveBoxSize <= 0) {
+      const refreshed = await refetchProductVariants();
+      const refreshedVariants = refreshed.data ?? productVariants;
+      const selectedVariantId = Number(selectedLot?.productVariantId ?? 0);
+      const refreshedVariant = refreshedVariants.find(
+        (v) => v.id === selectedVariantId,
+      );
+      const recomputedBoxSize =
+        selectedSpec && Number(refreshedVariant?.densityKgPerM3 ?? 0) > 0
+          ? Number(
+              (
+                selectedSpec.volumeM3 *
+                Number(refreshedVariant?.densityKgPerM3 ?? 0)
+              ).toFixed(2),
+            )
+          : 0;
+
+      if (recomputedBoxSize > 0) {
+        effectiveBoxSize = recomputedBoxSize;
+        createBoxesForm.setValue("boxSize", recomputedBoxSize, {
+          shouldDirty: true,
+          shouldValidate: true,
+        });
+      } else {
+        toast.error(
+          "Không thể tính khối lượng thùng. Vui lòng kiểm tra khối lượng riêng của biến thể sản phẩm.",
+        );
+        return;
+      }
     }
     if (Number(values.boxType) === BoxTypeEnum.Unknown) {
       toast.error("Vui lòng chọn loại thùng hợp lệ khi tạo thùng.");
@@ -905,7 +933,7 @@ export default function GoodsReceiptQC() {
     try {
       const created = await createBoxes({
         lotId: Number(values.lotId),
-        boxSize: Number(values.boxSize),
+        boxSize: effectiveBoxSize,
         boxType: values.boxType,
       }).unwrap();
       toast.success("Tạo thùng thành công.", { id: toastId });

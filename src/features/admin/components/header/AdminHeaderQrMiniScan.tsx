@@ -27,6 +27,7 @@ export default function AdminHeaderQrMiniScan() {
   const [isLoadingSlotBoxDetail, setIsLoadingSlotBoxDetail] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [isResultPanelOpen, setIsResultPanelOpen] = useState(true);
+  const [isCompactOpen, setIsCompactOpen] = useState(false);
 
   const [triggerLot, lotState] = useLazyGetLotByQrQuery();
   const [triggerBox, boxState] = useLazyGetBoxByQrQuery();
@@ -143,18 +144,27 @@ export default function AdminHeaderQrMiniScan() {
 
   return (
     <div className="relative flex items-center gap-2">
-      <select
-        value={mode}
-        onChange={(e) => setMode(e.target.value as ScanMode)}
-        className="border border-gray-200 p-2 rounded-lg bg-white text-xs focus:outline-none focus:ring-1 focus:ring-emerald-950"
-        title="Chọn loại QR"
+      <button
+        type="button"
+        onClick={() => setIsCompactOpen((v) => !v)}
+        className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 sm:hidden"
+        title="Mở quét QR"
+        aria-label="Mở quét QR"
       >
-        <option value="lot">Lô hàng</option>
-        <option value="box">Mặt hàng</option>
-        <option value="slot">Vị trí</option>
-      </select>
+        <QrCode size={16} />
+      </button>
 
-      <div className="flex items-center gap-2">
+      <div className="hidden items-center gap-2 sm:flex">
+        <select
+          value={mode}
+          onChange={(e) => setMode(e.target.value as ScanMode)}
+          className="border border-gray-200 p-2 rounded-lg bg-white text-xs focus:outline-none focus:ring-1 focus:ring-emerald-950"
+          title="Chọn loại QR"
+        >
+          <option value="lot">Lô hàng</option>
+          <option value="box">Mặt hàng</option>
+          <option value="slot">Vị trí</option>
+        </select>
         <input
           type="text"
           className="border border-gray-200 p-2 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-emerald-950 w-[120px] sm:w-[170px] lg:w-[200px]"
@@ -206,6 +216,75 @@ export default function AdminHeaderQrMiniScan() {
           <Camera size={16} />
         </button>
       </div>
+
+      {isCompactOpen ? (
+        <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-[min(360px,92vw)] rounded-xl border border-gray-200 bg-white p-3 shadow-lg sm:hidden">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-semibold text-gray-700">Tra cứu QR</p>
+            <button
+              type="button"
+              onClick={() => setIsCompactOpen(false)}
+              className="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              aria-label="Đóng bảng quét QR"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <div className="space-y-2">
+            <select
+              value={mode}
+              onChange={(e) => setMode(e.target.value as ScanMode)}
+              className="w-full rounded-lg border border-gray-200 bg-white p-2 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-950"
+              title="Chọn loại QR"
+            >
+              <option value="lot">Lô hàng</option>
+              <option value="box">Mặt hàng</option>
+              <option value="slot">Vị trí</option>
+            </select>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                className="w-full rounded-lg border border-gray-200 bg-white p-2 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-950"
+                value={qrInput}
+                onChange={(e) => setQrInput(e.target.value)}
+                placeholder="Nhập/quét QR..."
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") runScan(qrInput);
+                }}
+              />
+              <button
+                type="button"
+                className="inline-flex items-center justify-center rounded-lg bg-emerald-600 p-2 text-white hover:bg-emerald-700"
+                title="Tra cứu"
+                onClick={() => runScan(qrInput)}
+                disabled={isAnyFetching}
+              >
+                {isAnyFetching ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium hover:bg-gray-50"
+                title="Chọn ảnh có QR"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload size={14} />
+                Chọn ảnh
+              </button>
+              <button
+                type="button"
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium hover:bg-gray-50"
+                title="Quét bằng camera"
+                onClick={() => setIsCameraOpen(true)}
+              >
+                <Camera size={14} />
+                Camera
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <QrCameraScannerModal
         open={isCameraOpen}

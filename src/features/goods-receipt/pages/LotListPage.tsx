@@ -46,7 +46,7 @@ export default function LotListPage() {
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "Active" | "Blocked" | "Expired">("ALL");
   const [warehouseFilter, setWarehouseFilter] = useState("ALL");
-  const [qrFilter, setQrFilter] = useState<"ALL" | "HAS_QR" | "NO_QR">("ALL");
+  const [sortDirection, setSortDirection] = useState<"DESC" | "ASC">("DESC");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -149,24 +149,31 @@ export default function LotListPage() {
 
   const filteredLots = useMemo(() => {
     const keyword = searchText.trim().toLowerCase();
-    return lots.filter((l) => {
-      if (statusFilter !== "ALL" && l.status !== statusFilter) return false;
-      if (warehouseFilter !== "ALL" && l.warehouseName !== warehouseFilter) return false;
-      if (qrFilter === "HAS_QR" && !l.qrImageUrl) return false;
-      if (qrFilter === "NO_QR" && !!l.qrImageUrl) return false;
+    return lots
+      .filter((l) => {
+        if (statusFilter !== "ALL" && l.status !== statusFilter) return false;
+        if (warehouseFilter !== "ALL" && l.warehouseName !== warehouseFilter) return false;
 
-      if (!keyword) return true;
-      const haystack = [
-        l.lotCode,
-        l.productName,
-        l.productVariantName,
-        l.warehouseName,
-      ]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(keyword);
-    });
-  }, [lots, searchText, statusFilter, warehouseFilter, qrFilter]);
+        if (!keyword) return true;
+        const haystack = [
+          l.lotCode,
+          l.productName,
+          l.productVariantName,
+          l.warehouseName,
+        ]
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(keyword);
+      })
+      .sort((a, b) => {
+        const aTime = a.receivedDate ? new Date(a.receivedDate).getTime() : 0;
+        const bTime = b.receivedDate ? new Date(b.receivedDate).getTime() : 0;
+        if (aTime !== bTime) {
+          return sortDirection === "ASC" ? aTime - bTime : bTime - aTime;
+        }
+        return sortDirection === "ASC" ? a.lotId - b.lotId : b.lotId - a.lotId;
+      });
+  }, [lots, searchText, statusFilter, warehouseFilter, sortDirection]);
 
   const totalPages = Math.max(1, Math.ceil(filteredLots.length / pageSize));
   const pagedLots = useMemo(() => {
@@ -247,7 +254,7 @@ export default function LotListPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchText, statusFilter, warehouseFilter, qrFilter, pageSize]);
+  }, [searchText, statusFilter, warehouseFilter, sortDirection, pageSize]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -256,9 +263,9 @@ export default function LotListPage() {
   }, [currentPage, totalPages]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-4 sm:px-6 py-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-3 py-4 sm:px-4 sm:py-5 lg:px-5 lg:py-6">
       <div className="w-full max-w-[1600px] mx-auto">
-        <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center">
               <QrCode size={18} className="text-emerald-600" />
@@ -275,7 +282,7 @@ export default function LotListPage() {
         </div>
 
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="border-b border-slate-100 px-4 py-4 sm:px-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
                 Tìm kiếm
@@ -321,16 +328,17 @@ export default function LotListPage() {
             </div>
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
-                Ảnh QR
+                Sắp xếp
               </label>
               <select
-                value={qrFilter}
-                onChange={(e) => setQrFilter(e.target.value as typeof qrFilter)}
+                value={sortDirection}
+                onChange={(e) =>
+                  setSortDirection(e.target.value === "ASC" ? "ASC" : "DESC")
+                }
                 className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 focus:bg-white transition-all"
               >
-                <option value="ALL">Tất cả</option>
-                <option value="HAS_QR">Có ảnh QR</option>
-                <option value="NO_QR">Chưa có ảnh QR</option>
+                <option value="DESC">Từ trên xuống</option>
+                <option value="ASC">Từ dưới lên</option>
               </select>
             </div>
           </div>
@@ -340,7 +348,7 @@ export default function LotListPage() {
               <Loader2 size={32} className="animate-spin text-slate-400" />
             </div>
           ) : isError ? (
-            <div className="py-6 px-6">
+            <div className="py-6 px-4 sm:px-6">
               <p className="text-red-500 text-sm">
                 Không tải được danh sách lot.
               </p>
@@ -358,20 +366,26 @@ export default function LotListPage() {
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
+              <table className="min-w-[1280px] w-full text-sm">
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-100">
                     <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                       Lot
                     </th>
                     <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                      Sản phẩm / biến thể
+                      Sản phẩm
+                    </th>
+                    <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                      Biến thể
                     </th>
                     <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                       Kho
                     </th>
                     <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                      Ngày nhập / HSD
+                      Ngày nhập
+                    </th>
+                    <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                      Hạn sử dụng
                     </th>
                     <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                       QR
@@ -390,14 +404,14 @@ export default function LotListPage() {
                       <td className="px-5 py-3.5 font-medium text-slate-900">
                         {lot.lotCode}
                       </td>
-                      <td className="px-5 py-3.5 text-slate-700">
-                        <p className="font-medium">{lot.productName || "—"}</p>
-                        <p className="text-xs text-slate-500">{lot.productVariantName || "—"}</p>
-                      </td>
+                      <td className="px-5 py-3.5 text-slate-700 font-medium">{lot.productName || "—"}</td>
+                      <td className="px-5 py-3.5 text-slate-600">{lot.productVariantName || "—"}</td>
                       <td className="px-5 py-3.5 text-slate-700">{lot.warehouseName || "—"}</td>
                       <td className="px-5 py-3.5 text-slate-600">
-                        <p>{lot.receivedDate ? new Date(lot.receivedDate).toLocaleDateString("vi-VN") : "—"}</p>
-                        <p className="text-xs">{lot.expiryDate ? new Date(lot.expiryDate).toLocaleDateString("vi-VN") : "—"}</p>
+                        {lot.receivedDate ? new Date(lot.receivedDate).toLocaleDateString("vi-VN") : "—"}
+                      </td>
+                      <td className="px-5 py-3.5 text-slate-600">
+                        {lot.expiryDate ? new Date(lot.expiryDate).toLocaleDateString("vi-VN") : "—"}
                       </td>
                       <td className="px-5 py-3.5">
                         {lot.qrImageUrl ? (
@@ -443,7 +457,7 @@ export default function LotListPage() {
             </div>
           )}
           {!isLoading && !isError && filteredLots.length > 0 && (
-            <div className="px-6 py-3 border-t border-slate-100 bg-slate-50/40 flex flex-wrap items-center justify-between gap-3">
+            <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-3 sm:px-6 flex flex-wrap items-center justify-between gap-3">
               <div className="text-xs text-slate-500">
                 Hiển thị{" "}
                 <span className="font-semibold text-slate-700">

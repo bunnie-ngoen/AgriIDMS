@@ -2,10 +2,12 @@ import { useLocation, Link } from "react-router-dom";
 import AdminHeaderQrMiniScan from "./AdminHeaderQrMiniScan";
 import AdminHeaderNotificationBell from "./AdminHeaderNotificationBell";
 import { Menu } from "lucide-react";
+import { useAppSelector } from "../../../../app/hook";
 
 const ROUTE_LABELS: Record<string, string> = {
   admin: "Quản trị",
   manager: "Quản lý",
+  sales: "Bán hàng",
   warehouse: "Nhân viên kho",
   "warehouse-staff": "Nhân viên kho",
   "sales-staff": "Nhân viên bán hàng",
@@ -13,20 +15,47 @@ const ROUTE_LABELS: Record<string, string> = {
   dashboard: "Bảng điều khiển",
   profile: "Hồ sơ",
   "user-management": "Quản lý người dùng",
+  "create-user": "Tạo người dùng",
+  users: "Người dùng",
+  deleted: "Đã xóa",
+  reports: "Báo cáo",
+  "revenue-profit-specific": "Doanh thu - lợi nhuận",
   "goods-receipts": "Phiếu nhập kho",
+  print: "In phiếu",
+  qc: "Kiểm định",
   "purchase-orders": "Đơn mua hàng",
+  orders: "Đơn hàng",
   suppliers: "Nhà cung cấp",
   products: "Sản phẩm",
   "product-variants": "Biến thể sản phẩm",
   categories: "Danh mục",
   exports: "Xuất hàng",
+  shipping: "Giao hàng",
   complaints: "Khiếu nại",
+  pending: "Chờ xử lý",
+  processed: "Đã xử lý",
+  "sale-confirm": "Chờ xác nhận bán",
+  "pending-cod": "Chờ thanh toán COD",
+  "approved-export": "Đã duyệt xuất hàng",
+  "pos-create": "Tạo đơn tại quầy",
+  "unpaid-pos": "Đơn quầy chưa thanh toán",
   warehouses: "Kho",
+  map: "Sơ đồ kho",
+  config: "Cấu hình",
   lots: "Lô hàng",
   "stock-checks": "Kiểm kê",
+  putaway: "Xếp hàng vào vị trí",
+  "unassigned-inventory": "Hàng chưa xếp vị trí",
+  "inventory-issues": "Hàng hư hỏng / quá hạn",
+  "near-expiry-discount-config": "Cấu hình giảm giá cận date",
+  "variant-discount-config": "Cấu hình giảm giá biến thể",
+  "damage-discount-approvals": "Duyệt giảm giá hàng hỏng",
+  "box-type-config": "Cấu hình loại thùng",
   "disposal-requests": "Yêu cầu tiêu hủy",
   "damage-reports": "Phiếu hỏng",
   create: "Tạo mới",
+  new: "Tạo mới",
+  proposals: "Đề xuất",
   edit: "Chỉnh sửa",
   detail: "Chi tiết",
 };
@@ -47,15 +76,21 @@ type AdminHeaderProps = {
   onToggleSidebar?: () => void;
 };
 
+const HIDDEN_BREADCRUMB_SEGMENTS = new Set(["config"]);
+
 const AdminHeader = ({ onToggleSidebar }: AdminHeaderProps) => {
     const location = useLocation(); //lấy thông tin của url hiện tại 
+  const loggedInName = useAppSelector((state) => state.auth.user?.username?.trim() ?? "");
 
   const pathnames = location.pathname
     .split("/")  //["", "admin", "user-management", "create"]
     .filter((x) => x); // bỏ chuỗi rỗng
+  const displayPathnames = pathnames
+    .map((segment, index) => ({ segment, index }))
+    .filter(({ segment }) => !HIDDEN_BREADCRUMB_SEGMENTS.has(segment.trim().toLowerCase()));
     return (
-        <div className="flex justify-between p-5">
-            <div className="flex items-start gap-3">
+        <div className="flex flex-col gap-3 px-3 py-3 sm:px-4 sm:py-4 lg:flex-row lg:items-start lg:justify-between lg:px-5">
+            <div className="flex min-w-0 items-start gap-3">
                 {onToggleSidebar ? (
                   <button
                     type="button"
@@ -66,25 +101,25 @@ const AdminHeader = ({ onToggleSidebar }: AdminHeaderProps) => {
                     <Menu size={18} />
                   </button>
                 ) : null}
-            <div>
-                <div>
-                    <nav className="text-sm text-gray-500 mb-1">
-                        {pathnames.map((value, index) => {
-                            const to = "/" + pathnames.slice(0, index + 1).join("/");  //cắt mảng từ 0 - 1 thì là admin
-                            const isLast = index === pathnames.length - 1;  //lấy phần từ cuốix
+            <div className="min-w-0">
+                <div className="min-w-0">
+                    <nav className="mb-1 flex flex-wrap items-center gap-x-1 gap-y-1 text-xs sm:text-sm text-gray-500">
+                        {displayPathnames.map(({ segment, index: originalIndex }, index) => {
+                            const to = "/" + pathnames.slice(0, originalIndex + 1).join("/");
+                            const isLast = index === displayPathnames.length - 1;
 
                             return (
-                                <span key={to}>
+                                <span key={to} className="inline-flex items-center">
                                     {!isLast ? (    
                                         <>
                                             <Link to={to} className="hover:text-emerald-700">
-                                                {toVietnameseLabel(value)}
+                                                {toVietnameseLabel(segment)}
                                             </Link>
-                                            <span className="mx-2">/</span>
+                                            <span className="mx-1.5">/</span>
                                         </>
                                     ) : (
                                         <span className="font-semibold text-gray-800">
-                                            {toVietnameseLabel(value)}
+                                            {toVietnameseLabel(segment)}
                                         </span>
                                     )}
                                 </span>
@@ -92,13 +127,18 @@ const AdminHeader = ({ onToggleSidebar }: AdminHeaderProps) => {
                         })}
                     </nav>
 
-                    <h1 className="text-md font-bold text-gray-900">
-                        {formatTitle(pathnames[pathnames.length - 1]) || "Bảng điều khiển"}
+                    <h1 className="text-lg font-bold text-gray-900 leading-6">
+                        {formatTitle(displayPathnames[displayPathnames.length - 1]?.segment) || "Bảng điều khiển"}
                     </h1>
                 </div>
             </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex w-full items-center justify-end gap-2 lg:w-auto">
+              <div className="hidden sm:flex items-center rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs text-emerald-800">
+                <span className="font-medium">
+                  {loggedInName ? `Xin chào, ${loggedInName}` : "Chưa có tên đăng nhập"}
+                </span>
+              </div>
               <AdminHeaderNotificationBell />
               <AdminHeaderQrMiniScan />
             </div>

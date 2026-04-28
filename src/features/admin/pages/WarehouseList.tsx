@@ -128,10 +128,10 @@ const WarehouseList = () => {
           : "Không tải được danh sách kho. Vui lòng thử lại.";
 
   return (
-    <div className="min-h-screen min-w-0 bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-4 sm:px-6 py-6">
+    <div className="min-h-screen min-w-0 bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 px-3 py-4 sm:px-4 sm:py-5 lg:px-5 lg:py-6">
       <div className="w-full min-w-0 max-w-[1600px] mx-auto">
         {/* Header — giống Tạo kho */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div className="mb-6 flex flex-col gap-3 sm:gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center">
               <Package size={18} className="text-emerald-600" />
@@ -148,7 +148,7 @@ const WarehouseList = () => {
           {!readOnlyActions ? (
             <Link
               to={`${warehouseBasePath}/create`}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl py-3 px-5 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-700 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-700 hover:shadow-lg sm:w-auto"
             >
               <Plus size={16} />
               Thêm kho
@@ -159,7 +159,7 @@ const WarehouseList = () => {
         {/* Card nội dung */}
         <div className="min-w-0 bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
           {/* Bộ lọc */}
-          <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="border-b border-slate-100 px-4 py-4 sm:px-6 flex flex-col sm:flex-row sm:items-center gap-3">
             <input
               type="text"
               value={searchName}
@@ -190,7 +190,7 @@ const WarehouseList = () => {
           </div>
 
           {isError && (
-            <div className="mx-6 mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="mx-4 mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:mx-6">
               <p className="text-sm text-red-700">{errorMessage}</p>
               <button
                 type="button"
@@ -203,26 +203,26 @@ const WarehouseList = () => {
             </div>
           )}
 
-          <div className="w-full min-w-0 overflow-x-auto overscroll-x-contain">
-            <table className="w-full min-w-[920px] text-sm">
+          <div className="-mx-1 w-[calc(100%+0.5rem)] min-w-0 overflow-x-auto overscroll-x-contain sm:mx-0 sm:w-full">
+            <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-100">
                   <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[160px]">
                     Tên kho
                   </th>
-                  <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[260px]">
+                  <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[220px]">
                     Địa chỉ
                   </th>
                   <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[120px]">
                     Loại kho
                   </th>
-                  <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[180px]">
+                  <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[150px]">
                     Diện tích sàn
                   </th>
-                  <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[240px]">
+                  <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[200px]">
                     Tổng trong kho / Sức chứa
                   </th>
-                  <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[220px]">
+                  <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 min-w-[180px]">
                     Thao tác
                   </th>
                 </tr>
@@ -248,8 +248,8 @@ const WarehouseList = () => {
                           {warehouse.name}
                         </p>
                       </td>
-                      <td className="px-5 py-4 align-top text-slate-600 max-w-xs">
-                        <p className="line-clamp-2 leading-5">{warehouse.location}</p>
+                      <td className="px-5 py-4 align-top text-slate-600 max-w-[260px]">
+                        <p className="leading-5 whitespace-normal break-words">{warehouse.location}</p>
                       </td>
                       <td className="px-5 py-4 align-top">
                         <span
@@ -400,7 +400,7 @@ const WarehouseList = () => {
 
           {/* Phân trang */}
           {totalItems > 0 && (
-            <div className="px-6 py-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-sm">
+            <div className="px-4 py-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-sm sm:px-6">
               <p className="text-slate-500">
                 Trang {currentPage} / {totalPages} — {totalItems} kho
               </p>

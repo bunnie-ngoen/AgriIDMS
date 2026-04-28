@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { Camera, Search, Send, Upload } from "lucide-react";
 import { decodeQrFromImageFile } from "../../../../shared/lib/decodeQrFromImage";
@@ -21,6 +21,7 @@ import {
 
 export default function WarehouseDamageReportCreatePage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [qr, setQr] = useState("");
   const [box, setBox] = useState<BoxByQrResponse | null>(null);
   const [damageType, setDamageType] = useState<DamageProcessingOutcome>("CompleteDamaged");
@@ -36,6 +37,8 @@ export default function WarehouseDamageReportCreatePage() {
   const [triggerBox, { isFetching: findingBox }] = useLazyGetBoxByQrQuery();
   const [checkPending, { data: pendingData }] = useLazyHasPendingDamageForBoxQuery();
   const [createDamageReport, { isLoading: isSubmitting }] = useCreateDamageReportMutation();
+  const prefillQr = searchParams.get("qr")?.trim() ?? "";
+  const prefillLotCode = searchParams.get("lotCode")?.trim() ?? "";
 
   const damagedKg = useMemo(() => {
     const raw = damagedKgInput.trim().replace(",", ".");
@@ -53,6 +56,13 @@ export default function WarehouseDamageReportCreatePage() {
     if (!box?.id) return;
     void checkPending(box.id);
   }, [box?.id, checkPending]);
+
+  useEffect(() => {
+    if (!prefillQr) return;
+    setQr(prefillQr);
+    void loadBox(prefillQr);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillQr]);
 
   const blockReason = useMemo(() => {
     if (!box) return null;
@@ -168,6 +178,11 @@ export default function WarehouseDamageReportCreatePage() {
         <p className="mt-1 text-sm text-slate-600">
           Chọn thùng bằng QR, chọn loại hỏng, nhập lý do và gửi phiếu.
         </p>
+        {prefillLotCode ? (
+          <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Đang xử lý từ lô <span className="font-semibold">{prefillLotCode}</span>. Vui lòng quét/chọn thùng thuộc lô này để tạo phiếu.
+          </p>
+        ) : null}
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-4">

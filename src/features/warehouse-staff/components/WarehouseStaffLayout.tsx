@@ -16,10 +16,11 @@ import {
   Menu,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useAppDispatch } from "../../../app/hook";
+import { useAppDispatch, useAppSelector } from "../../../app/hook";
 import { logout } from "../../auth/slices/auth.slice";
 import { api } from "../../../shared/api";
 import { persistor } from "../../../app/store";
+import toast from "react-hot-toast";
 import {
   useGetMyNotificationsQuery,
   useGetUnreadNotificationCountQuery,
@@ -33,6 +34,7 @@ import { useGetUnassignedBoxesByWarehouseQuery } from "../../goods-receipt/api/g
 
 export default function WarehouseStaffLayout() {
   const dispatch = useAppDispatch();
+  const username = useAppSelector((state) => state.auth.user?.username?.trim() ?? "");
   const navigate = useNavigate();
   const location = useLocation();
   const notificationRef = useRef<HTMLDivElement>(null);
@@ -73,7 +75,7 @@ export default function WarehouseStaffLayout() {
       );
     });
   }, [notificationData?.items]);
-  const fallbackPutawayNotification = useMemo(() => {
+  const putawayReminder = useMemo(() => {
     if (hasServerPutawayNotification || !warehouseWithMostUnassigned) return null;
     const lotId =
       unassignedBoxes.find((b) => Number(b.lotId) > 0)?.lotId ?? null;
@@ -83,26 +85,15 @@ export default function WarehouseStaffLayout() {
     if (unassignedWeight <= 0) return null;
 
     return {
-      userNotificationId: -1,
-      notificationId: -1,
-      type: "NeedPutawayLocal",
-      message: `Kho ${warehouseWithMostUnassigned.name} còn ${unassignedWeight.toLocaleString("vi-VN")} kg hàng chưa xếp vị trí.`,
-      referenceType: "LotPendingPutaway",
-      referenceId: lotId,
+      lotId,
       warehouseId: warehouseWithMostUnassigned.id,
-      createdAt: new Date().toISOString(),
-      isRead: false,
-      readAt: null,
+      warehouseName: warehouseWithMostUnassigned.name,
+      unassignedWeight,
     };
   }, [hasServerPutawayNotification, warehouseWithMostUnassigned, unassignedBoxes]);
-  const displayedNotifications = useMemo(() => {
-    const base = notificationData?.items ?? [];
-    return fallbackPutawayNotification
-      ? [fallbackPutawayNotification, ...base]
-      : base;
-  }, [notificationData?.items, fallbackPutawayNotification]);
-  const unreadCount =
-    (unreadCountData?.unreadCount ?? 0) + (fallbackPutawayNotification ? 1 : 0);
+  const displayedNotifications = notificationData?.items ?? [];
+  const unreadCount = unreadCountData?.unreadCount ?? 0;
+  const previousUnreadCountRef = useRef<number | null>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -113,6 +104,22 @@ export default function WarehouseStaffLayout() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (previousUnreadCountRef.current === null) {
+      previousUnreadCountRef.current = unreadCount;
+      return;
+    }
+    if (unreadCount > previousUnreadCountRef.current) {
+      const newItems = unreadCount - previousUnreadCountRef.current;
+      toast.success(
+        newItems === 1
+          ? "Bạn có 1 thông báo mới."
+          : `Bạn có ${newItems} thông báo mới.`,
+      );
+    }
+    previousUnreadCountRef.current = unreadCount;
+  }, [unreadCount]);
 
   const handleNotificationClick = async (
     userNotificationId: number,
@@ -133,6 +140,14 @@ export default function WarehouseStaffLayout() {
 
     const normalizedReferenceType = referenceType ?? "";
     const normalizedType = type ?? "";
+    const isGoodsReceiptNotification =
+      normalizedReferenceType === "GoodsReceipt" ||
+      normalizedReferenceType.includes("GoodsReceipt") ||
+      normalizedType.includes("GoodsReceipt");
+    const isGoodsReceiptQcNotification =
+      normalizedReferenceType.includes("Qc") ||
+      normalizedType.includes("Qc") ||
+      normalizedType.includes("QC");
 
     if (normalizedReferenceType === "ExportReceipt" && referenceId) {
       navigate(`/warehouse/exports?exportId=${referenceId}`);
@@ -158,6 +173,17 @@ export default function WarehouseStaffLayout() {
 
     if (normalizedReferenceType.startsWith("Order")) {
       navigate(referenceId ? `/warehouse/orders?orderId=${referenceId}` : "/warehouse/orders");
+      setNotificationOpen(false);
+      return;
+    }
+
+    if (isGoodsReceiptNotification) {
+      const goodsReceiptPath = referenceId
+        ? isGoodsReceiptQcNotification
+          ? `/warehouse/goods-receipts/${referenceId}/qc`
+          : `/warehouse/goods-receipts/${referenceId}`
+        : "/warehouse/goods-receipts";
+      navigate(goodsReceiptPath);
       setNotificationOpen(false);
       return;
     }
@@ -215,11 +241,41 @@ export default function WarehouseStaffLayout() {
           </div>
           <div>
             <p className="text-sm font-semibold tracking-wide">Vận hành kho</p>
-            <p className="text-[11px] text-slate-400">Order & Payment</p>
+            <p className="text-[11px] text-slate-400 truncate max-w-[180px]">
+              {username ? `Tài khoản: ${username}` : "Tài khoản đăng nhập"}
+            </p>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 py-4">
+          {putawayReminder ? (
+            <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                Cần xếp vị trí
+              </p>
+              <p className="mt-1 text-xs text-amber-900 leading-5">
+                Kho <span className="font-semibold">{putawayReminder.warehouseName}</span> còn{" "}
+                <span className="font-semibold">
+                  {putawayReminder.unassignedWeight.toLocaleString("vi-VN")} kg
+                </span>{" "}
+                chưa xếp.
+              </p>
+              <button
+                type="button"
+                onClick={() =>
+                  navigate("/warehouse/putaway", {
+                    state: {
+                      lotId: putawayReminder.lotId,
+                      warehouseId: putawayReminder.warehouseId,
+                    },
+                  })
+                }
+                className="mt-2 inline-flex w-full items-center justify-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
+              >
+                Đi xếp vị trí ngay
+              </button>
+            </div>
+          ) : null}
           <ul className="space-y-1">
             <li>
               <NavLink
@@ -488,7 +544,7 @@ export default function WarehouseStaffLayout() {
                         }`
                       }
                     >
-                      Lập phiếu xuất kho
+                      Tạo phiếu kiểm kê
                     </NavLink>
                   </li>
                 </ul>
@@ -530,20 +586,34 @@ export default function WarehouseStaffLayout() {
               <Menu size={18} />
             </button>
             <div className="min-w-0">
-              <p className="text-sm text-slate-500">Không gian kho</p>
-              <span className="text-slate-800 font-semibold">
+              <p className="hidden text-sm text-slate-500">Không gian kho</p>
+              <span className="hidden text-slate-800 font-semibold">
                 Xử lý allocate, tiền mặt và xuất hàng
               </span>
             </div>
           </div>
-          <div className="relative shrink-0" ref={notificationRef}>
+          <div className="flex items-center gap-2">
+            <span className="hidden sm:inline-flex text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-md px-2 py-1">
+              {username ? `Xin chào, ${username}` : "Chưa có tên đăng nhập"}
+            </span>
+          </div>
+          <div className="relative shrink-0 flex items-center gap-2" ref={notificationRef}>
+            {unreadCount > 0 && !notificationOpen ? (
+              <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 border border-amber-200">
+                Mới
+              </span>
+            ) : null}
             <button
               type="button"
               onClick={() => setNotificationOpen((v) => !v)}
-              className="relative rounded-lg p-2 text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+              className={`relative rounded-lg p-2 transition-colors ${
+                unreadCount > 0
+                  ? "text-amber-700 bg-amber-50 hover:bg-amber-100"
+                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+              }`}
               aria-label="Thông báo"
             >
-              <Bell size={20} />
+              <Bell size={20} className={unreadCount > 0 ? "animate-pulse" : ""} />
               {unreadCount > 0 && (
                 <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full border border-white bg-amber-600 px-1 text-[11px] font-bold text-white">
                   {unreadCount > 99 ? "99+" : unreadCount}
@@ -552,16 +622,17 @@ export default function WarehouseStaffLayout() {
             </button>
 
             {notificationOpen && (
-              <div className="absolute right-0 z-30 mt-2 w-[360px] max-w-[90vw] overflow-hidden rounded-xl border border-slate-100 bg-white shadow-lg">
-                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+              <div className="fixed left-3 right-3 top-[68px] z-50 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-lg sm:absolute sm:left-auto sm:right-0 sm:top-[calc(100%+8px)] sm:mt-0 sm:w-[360px] sm:max-w-[90vw]">
+                <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
                   <p className="text-sm font-semibold text-slate-800">Thông báo của bạn</p>
                   <button
                     type="button"
                     onClick={handleMarkAllAsRead}
                     disabled={isMarkingAllAsRead || unreadCount === 0}
-                    className="text-xs font-semibold text-amber-700 hover:underline disabled:text-slate-400"
+                    className="text-[11px] sm:text-xs font-semibold text-amber-700 hover:underline disabled:text-slate-400 whitespace-nowrap"
                   >
-                    Đánh dấu tất cả đã đọc
+                    <span className="sm:hidden">Đã đọc hết</span>
+                    <span className="hidden sm:inline">Đánh dấu tất cả đã đọc</span>
                   </button>
                 </div>
 

@@ -24,7 +24,7 @@ export const DAMAGE_FORM_LABEL = {
   box: "Thùng",
   boxCode: "Mã thùng",
   boxId: "ID thùng",
-  product: "Sản phẩm / variant",
+  product: "Sản phẩm / biến thể",
   lot: "Lô",
   damageType: "Loại hỏng",
   damagedQty: "Khối lượng hỏng (kg)",

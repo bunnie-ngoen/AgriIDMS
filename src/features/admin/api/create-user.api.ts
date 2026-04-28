@@ -528,7 +528,13 @@ export const userApi = api.injectEndpoints({
         url: `slots/${slotId}/contents`,
       }),
       transformResponse: (raw: unknown): SlotContents => {
-        const row = (raw as Record<string, unknown>) ?? {};
+        const root = (raw as Record<string, unknown>) ?? {};
+        const rowCandidate =
+          (root.data as Record<string, unknown> | undefined) ??
+          (root.result as Record<string, unknown> | undefined) ??
+          (root.item as Record<string, unknown> | undefined);
+        const row =
+          rowCandidate && typeof rowCandidate === "object" ? rowCandidate : root;
         const boxesRaw = (row.boxes as Array<Record<string, unknown>>) ?? [];
         return {
           slotId: Number(row.slotId ?? row.SlotId ?? 0),
@@ -566,6 +572,23 @@ export const userApi = api.injectEndpoints({
             weight: Number(b.weight ?? b.Weight ?? 0),
             volumeM3: Number(b.volumeM3 ?? b.VolumeM3 ?? 0),
             status: String(b.status ?? b.Status ?? ""),
+            productVariantId:
+              Number(
+                b.productVariantId ??
+                  b.ProductVariantId ??
+                  b.ProductVariantID ??
+                  0,
+              ) || null,
+            productVariantName:
+              (b.productVariantName as string | null | undefined) ??
+              (b.ProductVariantName as string | null | undefined) ??
+              (b.variantName as string | null | undefined) ??
+              (b.VariantName as string | null | undefined) ??
+              null,
+            productName:
+              (b.productName as string | null | undefined) ??
+              (b.ProductName as string | null | undefined) ??
+              null,
             supplierName:
               (b.supplierName as string | null | undefined) ??
               (b.SupplierName as string | null | undefined) ??

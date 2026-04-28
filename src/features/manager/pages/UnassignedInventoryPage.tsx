@@ -30,6 +30,7 @@ export default function UnassignedInventoryPage() {
     data: unassignedBoxes = [],
     isFetching,
     error,
+    refetch: refetchUnassignedBoxes,
   } = useGetUnassignedBoxesByWarehouseQuery(warehouseId > 0 ? warehouseId : 0, {
     skip: warehouseId <= 0,
   });
@@ -39,7 +40,10 @@ export default function UnassignedInventoryPage() {
   const { data: damagedBoxes = [] } = useGetDamagedBoxesQuery(
     warehouseId > 0 ? warehouseId : undefined,
   );
-  const { data: expiredBoxes = [] } = useGetExpiredBoxesByWarehouseQuery(
+  const {
+    data: expiredBoxes = [],
+    refetch: refetchExpiredBoxes,
+  } = useGetExpiredBoxesByWarehouseQuery(
     warehouseId > 0 ? warehouseId : 0,
     { skip: warehouseId <= 0 },
   );
@@ -121,6 +125,7 @@ export default function UnassignedInventoryPage() {
     const toastId = toast.loading("Đang tiêu hủy box hết hạn...");
     try {
       const result = await disposeExpiredBoxes({ boxIds }).unwrap();
+      await Promise.all([refetchUnassignedBoxes(), refetchExpiredBoxes()]);
       toast.success(
         `${result.message}. Đã tiêu hủy ${result.disposedCount}/${result.requestedCount} box.`,
         { id: toastId },

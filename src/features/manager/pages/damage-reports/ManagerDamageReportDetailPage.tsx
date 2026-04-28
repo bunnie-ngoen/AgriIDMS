@@ -39,7 +39,11 @@ export default function ManagerDamageReportDetailPage() {
     return <div className="p-6 text-slate-600">Đang tải…</div>;
   }
 
-  const isPending = report.status === "Pending";
+  const normalizedStatus = String(report.status ?? "").trim().toLowerCase();
+  const isPending =
+    normalizedStatus === "pending" ||
+    normalizedStatus === "chờ duyệt" ||
+    normalizedStatus === "cho duyet";
   const req = report.requestedProcessingOutcome;
 
   const runApprove = async () => {
@@ -64,7 +68,13 @@ export default function ManagerDamageReportDetailPage() {
     } catch (err: unknown) {
       const msg =
         err && typeof err === "object" && "data" in err
-          ? String((err as { data?: { message?: string } }).data?.message ?? "")
+          ? String(
+              (err as { data?: { message?: string; detail?: string; error?: string } }).data
+                ?.message ??
+                (err as { data?: { detail?: string } }).data?.detail ??
+                (err as { data?: { error?: string } }).data?.error ??
+                "",
+            )
           : "";
       toast.error(msg || "Duyệt thất bại.");
     }
@@ -83,7 +93,13 @@ export default function ManagerDamageReportDetailPage() {
     } catch (err: unknown) {
       const msg =
         err && typeof err === "object" && "data" in err
-          ? String((err as { data?: { message?: string } }).data?.message ?? "")
+          ? String(
+              (err as { data?: { message?: string; detail?: string; error?: string } }).data
+                ?.message ??
+                (err as { data?: { detail?: string } }).data?.detail ??
+                (err as { data?: { error?: string } }).data?.error ??
+                "",
+            )
           : "";
       toast.error(msg || "Từ chối thất bại.");
     }
