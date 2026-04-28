@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Leaf, ShoppingCart } from "lucide-react";
+import { Leaf } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useGetCategoriesQuery } from "../../category/api/category.api";
 import { useGetProductsQuery } from "../../product/api/product.api";
 import { useGetHomeProductsQuery, useGetHomeProductDetailQuery } from "../api/home.api";
 import type { HomeProduct } from "../schemas/home.schema";
@@ -9,15 +8,56 @@ import { productHasActiveSaleDisplay } from "../utils/productDiscountDisplay";
 import { ROUTES } from "../../../shared/constants/routes";
 import { stripGradeSuffixFromProductName } from "../utils/productDisplayName";
 
-const VISIBLE_COUNT = 4;
+const PRODUCTS_PER_PAGE = 9;
 
 function normCategoryName(s: string | null | undefined) {
     return (s ?? "").trim().toLowerCase();
 }
 
-function isCategoryVisible(status: number | undefined) {
-    if (status == null) return true;
-    return status === 1;
+type FilterKey = "all" | "imported-fruit" | "regional-fruit" | "fresh-vegetable" | "hot-sale" | "tropical-fruit";
+
+const FILTERS: Array<{ key: FilterKey; label: string }> = [
+    { key: "all", label: "Tất cả" },
+    { key: "imported-fruit", label: "Hoa quả nhập khẩu" },
+    { key: "regional-fruit", label: "Hoa quả vùng miền" },
+    { key: "fresh-vegetable", label: "Rau củ tươi ngon" },
+    { key: "hot-sale", label: "HOT SALE" },
+    { key: "tropical-fruit", label: "Trái cây nhiệt đới" },
+];
+
+function includesAnyKeyword(value: string, keywords: string[]) {
+    return keywords.some((keyword) => value.includes(keyword));
+}
+
+function getFilterPredicate(filterKey: FilterKey, product: HomeProduct, categoryName: string) {
+    if (filterKey === "all") return true;
+    if (filterKey === "hot-sale") return productHasActiveSaleDisplay(product);
+    if (filterKey === "imported-fruit") {
+        return includesAnyKeyword(categoryName, ["nhập khẩu", "import"]);
+    }
+    if (filterKey === "regional-fruit") {
+        return includesAnyKeyword(categoryName, ["vùng miền"]);
+    }
+    if (filterKey === "fresh-vegetable") {
+        return includesAnyKeyword(categoryName, ["rau củ"]);
+    }
+    return includesAnyKeyword(categoryName, ["nhiệt đới", "trái cây nhiệt đới"]);
+}
+
+function buildPaginationItems(totalPages: number, currentPage: number) {
+    if (totalPages <= 7) {
+        return Array.from({ length: totalPages }, (_, idx) => idx + 1);
+    }
+
+    if (currentPage <= 4) {
+        return [1, 2, 3, 4, 5, "...", totalPages];
+    }
+
+    if (currentPage >= totalPages - 3) {
+        return [1, "...", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    }
+
+    return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages];
 }
 
 // ─── ProductCard ─────────────────────────────────────────────
@@ -43,20 +83,20 @@ function ProductCard({ product }: ProductCardProps) {
                 if (outOfStock) return;
                 navigate(ROUTES.PRODUCT_DETAIL.replace(":id", String(product.id)));
             }}
-            className={`relative rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm transition-all group ${
+            className={`relative h-full rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm transition-all group ${
                 outOfStock
-                    ? "cursor-not-allowed pointer-events-none opacity-[0.92]"
+                    ? "cursor-not-allowed opacity-[0.95]"
                     : "cursor-pointer hover:shadow-md hover:border-[#1a5f2a]/40"
             }`}
         >
             {/* Image */}
-            <div className="relative aspect-square bg-slate-100 overflow-hidden">
+            <div className="relative aspect-[4/3] bg-slate-100 overflow-hidden">
                 {productHasActiveSaleDisplay(product) ? (
                     <div
                         className="absolute right-2 top-2 z-10 rounded-md bg-red-600 px-2 py-1 text-[10px] font-bold uppercase leading-tight tracking-wide text-white shadow-md ring-1 ring-white/90 sm:text-[11px]"
                         title="Giảm giá"
                     >
-                        Giảm Giá
+                        GIẢM GIÁ
                     </div>
                 ) : null}
                 {product.imageUrl ? (
@@ -73,7 +113,7 @@ function ProductCard({ product }: ProductCardProps) {
                     </div>
                 )}
                 {outOfStock && (
-                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/40 backdrop-blur-[3px]">
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/25">
                         <span className="rounded-lg bg-white/95 px-4 py-2 text-sm font-bold tracking-wide text-slate-800 shadow-lg ring-1 ring-slate-200/80">
                             Không có hàng
                         </span>
@@ -82,7 +122,7 @@ function ProductCard({ product }: ProductCardProps) {
             </div>
 
             {/* Info */}
-            <div className="p-4 flex flex-col gap-2">
+            <div className="p-4 flex flex-1 flex-col gap-2">
                 <h3 className="font-semibold text-slate-900 line-clamp-2 text-sm leading-snug min-h-[2.5rem]">
                     {title}
                 </h3>
@@ -101,14 +141,13 @@ function ProductCard({ product }: ProductCardProps) {
                         if (outOfStock) return;
                         navigate(ROUTES.PRODUCT_DETAIL.replace(":id", String(product.id)));
                     }}
-                    className={`mt-1 w-full flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium ${
+                    className={`mt-auto w-full flex items-center justify-center py-2 px-3 rounded-md text-sm font-medium ${
                         outOfStock
                             ? "bg-slate-300 text-slate-500 cursor-not-allowed"
                             : "text-white bg-[#1a5f2a] hover:bg-[#145026]"
                     }`}
                     disabled={outOfStock}
                 >
-                    <ShoppingCart size={15} />
                     Xem chi tiết
                 </button>
             </div>
@@ -120,8 +159,8 @@ function ProductCard({ product }: ProductCardProps) {
 
 function ProductSkeletons() {
     return (
-        <div className="grid gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {Array.from({ length: VISIBLE_COUNT }).map((_, i) => (
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: PRODUCTS_PER_PAGE }).map((_, i) => (
                 <div
                     key={i}
                     className="rounded-xl border border-slate-200 bg-slate-50 h-80 animate-pulse"
@@ -134,11 +173,11 @@ function ProductSkeletons() {
 // ─── Main Section ─────────────────────────────────────────────
 
 export default function ProductsSection() {
-    const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+    const [selectedFilter, setSelectedFilter] = useState<FilterKey>("all");
+    const [currentPage, setCurrentPage] = useState(1);
 
     const { data: homeProducts = [], isLoading, isError } = useGetHomeProductsQuery();
     const { data: catalogProducts = [] } = useGetProductsQuery();
-    const { data: categories = [], isLoading: isCategoriesLoading } = useGetCategoriesQuery();
 
     const productIdToCategoryName = useMemo(() => {
         const m = new Map<number, string>();
@@ -151,55 +190,27 @@ export default function ProductsSection() {
     }, [catalogProducts]);
 
     const filteredProducts = useMemo(() => {
-        if (selectedCategoryId == null) return homeProducts;
-        const cat = categories.find((c) => c.id === selectedCategoryId);
-        if (!cat) return homeProducts;
-        const target = normCategoryName(cat.name);
-        return homeProducts.filter(
-            (h) => normCategoryName(productIdToCategoryName.get(h.productId)) === target,
-        );
-    }, [homeProducts, selectedCategoryId, categories, productIdToCategoryName]);
+        return homeProducts.filter((product) => {
+            const categoryName = normCategoryName(productIdToCategoryName.get(product.productId));
+            return getFilterPredicate(selectedFilter, product, categoryName);
+        });
+    }, [homeProducts, selectedFilter, productIdToCategoryName]);
 
     const list = filteredProducts;
 
-    const [startIndex, setStartIndex] = useState(0);
-    const [animating, setAnimating] = useState(false);
-    const [direction, setDirection] = useState<"left" | "right">("right");
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [selectedFilter]);
 
     useEffect(() => {
-        setStartIndex(0);
-    }, [selectedCategoryId]);
-
-    useEffect(() => {
-        setStartIndex((i) =>
-            Math.min(i, Math.max(0, list.length - VISIBLE_COUNT)),
-        );
+        const totalPages = Math.max(1, Math.ceil(list.length / PRODUCTS_PER_PAGE));
+        setCurrentPage((prev) => Math.min(prev, totalPages));
     }, [list.length]);
 
-    const canPrev = startIndex > 0;
-    const canNext = startIndex + VISIBLE_COUNT < list.length;
-    const dotCount = Math.max(0, list.length - VISIBLE_COUNT + 1);
-
-    const slide = (dir: "left" | "right") => {
-        if (animating) return;
-
-        setDirection(dir);
-        setAnimating(true);
-
-        setTimeout(() => {
-            setStartIndex((i) =>
-                dir === "right"
-                    ? Math.min(i + 1, list.length - VISIBLE_COUNT)
-                    : Math.max(i - 1, 0)
-            );
-
-            setAnimating(false);
-        }, 250);
-    };
-
-    const visibleProducts = list.slice(startIndex, startIndex + VISIBLE_COUNT);
-
-    const visibleCategories = categories.filter((c) => isCategoryVisible(c.status));
+    const totalPages = Math.max(1, Math.ceil(list.length / PRODUCTS_PER_PAGE));
+    const start = (currentPage - 1) * PRODUCTS_PER_PAGE;
+    const visibleProducts = list.slice(start, start + PRODUCTS_PER_PAGE);
+    const paginationItems = buildPaginationItems(totalPages, currentPage);
 
     return (
         <section id="san-pham" className="py-16 border-t border-slate-100 scroll-mt-20">
@@ -207,54 +218,31 @@ export default function ProductsSection() {
 
                 {/* Title */}
                 <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 text-center uppercase tracking-wide">
-                    Sản phẩm
+                    SẢN PHẨM
                 </h2>
 
                 <p className="mt-2 text-slate-600 text-center max-w-2xl mx-auto">
                     Một số sản phẩm hoa quả trong hệ thống.
                 </p>
 
-                <div className="mt-6 flex flex-wrap justify-center gap-2 overflow-x-auto pb-1">
-                    {isCategoriesLoading ? (
-                        Array.from({ length: 5 }).map((_, i) => (
-                            <div
-                                key={i}
-                                className="h-9 w-24 shrink-0 rounded-full bg-slate-100 animate-pulse"
-                            />
-                        ))
-                    ) : (
-                        <>
+                <div className="mt-6 flex flex-wrap justify-center gap-2 pb-1">
+                    {FILTERS.map((filter) => {
+                        const active = selectedFilter === filter.key;
+                        return (
                             <button
+                                key={filter.key}
                                 type="button"
-                                onClick={() => setSelectedCategoryId(null)}
+                                onClick={() => setSelectedFilter(filter.key)}
                                 className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors border ${
-                                    selectedCategoryId === null
+                                    active
                                         ? "bg-[#1a5f2a] text-white border-[#1a5f2a]"
                                         : "bg-white text-slate-700 border-slate-200 hover:border-[#1a5f2a]/50"
                                 }`}
                             >
-                                Tất cả
+                                {filter.label}
                             </button>
-                            {visibleCategories.map((c) => {
-                                const active = selectedCategoryId === c.id;
-                                return (
-                                    <button
-                                        key={c.id}
-                                        type="button"
-                                        onClick={() => setSelectedCategoryId(c.id)}
-                                        className={`shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors border max-w-[200px] truncate ${
-                                            active
-                                                ? "bg-[#1a5f2a] text-white border-[#1a5f2a]"
-                                                : "bg-white text-slate-700 border-slate-200 hover:border-[#1a5f2a]/50"
-                                        }`}
-                                        title={c.name}
-                                    >
-                                        {c.name}
-                                    </button>
-                                );
-                            })}
-                        </>
-                    )}
+                        );
+                    })}
                 </div>
 
                 <div className="mt-10">
@@ -284,33 +272,7 @@ export default function ProductsSection() {
 
                     {!isLoading && !isError && list.length > 0 && (
                         <div className="relative">
-
-                            {/* Prev Button */}
-                            <button
-                                type="button"
-                                aria-label="Sản phẩm trước"
-                                disabled={!canPrev}
-                                onClick={() => slide("left")}
-                                className={`absolute -left-5 top-[45%] -translate-y-1/2 z-10 w-10 h-10 rounded-full border bg-white shadow flex items-center justify-center transition-all
-                                    ${canPrev
-                                        ? "border-slate-200 text-slate-700 hover:bg-[#1a5f2a] hover:text-white hover:border-[#1a5f2a]"
-                                        : "border-slate-100 text-slate-300 cursor-not-allowed"
-                                    }`}
-                            >
-                                <ChevronLeft size={20} />
-                            </button>
-
-                            {/* Products */}
-                            <div
-                                className="grid gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
-                                style={{
-                                    transition: "opacity 0.25s ease, transform 0.25s ease",
-                                    opacity: animating ? 0 : 1,
-                                    transform: animating
-                                        ? `translateX(${direction === "right" ? "-16px" : "16px"})`
-                                        : "translateX(0)",
-                                }}
-                            >
+                            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                                 {visibleProducts.map((product) => (
                                     <ProductCard
                                         key={product.id}
@@ -319,40 +281,57 @@ export default function ProductsSection() {
                                 ))}
                             </div>
 
-                            {/* Next Button */}
-                            <button
-                                type="button"
-                                aria-label="Sản phẩm tiếp theo"
-                                disabled={!canNext}
-                                onClick={() => slide("right")}
-                                className={`absolute -right-5 top-[45%] -translate-y-1/2 z-10 w-10 h-10 rounded-full border bg-white shadow flex items-center justify-center transition-all
-                                    ${canNext
-                                        ? "border-slate-200 text-slate-700 hover:bg-[#1a5f2a] hover:text-white hover:border-[#1a5f2a]"
-                                        : "border-slate-100 text-slate-300 cursor-not-allowed"
-                                    }`}
-                            >
-                                <ChevronRight size={20} />
-                            </button>
-
-                            {/* Pagination Dots */}
-                            {dotCount > 1 && (
-                                <div className="mt-6 flex justify-center gap-2">
-                                    {Array.from({ length: dotCount }).map((_, i) => (
-                                        <button
-                                            key={i}
-                                            type="button"
-                                            aria-label={`Trang ${i + 1}`}
-                                            onClick={() => setStartIndex(i)}
-                                            className={`h-2 rounded-full transition-all
-                                                ${i === startIndex
-                                                    ? "w-6 bg-[#1a5f2a]"
-                                                    : "w-2 bg-slate-300 hover:bg-slate-400"
+                            {totalPages > 1 && (
+                                <div className="mt-8 flex items-center justify-center gap-2">
+                                    <button
+                                        type="button"
+                                        aria-label="Trang trước"
+                                        disabled={currentPage === 1}
+                                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                        className={`h-9 min-w-9 rounded-md border px-3 text-sm font-medium transition-colors ${
+                                            currentPage === 1
+                                                ? "cursor-not-allowed border-slate-200 text-slate-300 bg-slate-50"
+                                                : "border-slate-200 text-slate-700 bg-white hover:border-[#1a5f2a] hover:text-[#1a5f2a]"
+                                        }`}
+                                    >
+                                        &lt;
+                                    </button>
+                                    {paginationItems.map((item, idx) =>
+                                        item === "..." ? (
+                                            <span key={`ellipsis-${idx}`} className="px-1 text-slate-400">
+                                                ...
+                                            </span>
+                                        ) : (
+                                            <button
+                                                key={item}
+                                                type="button"
+                                                aria-label={`Trang ${item}`}
+                                                onClick={() => setCurrentPage(item)}
+                                                className={`h-9 min-w-9 rounded-md border px-3 text-sm font-medium transition-colors ${
+                                                    item === currentPage
+                                                        ? "bg-[#1a5f2a] text-white border-[#1a5f2a]"
+                                                        : "border-slate-200 text-slate-700 bg-white hover:border-[#1a5f2a] hover:text-[#1a5f2a]"
                                                 }`}
-                                        />
-                                    ))}
+                                            >
+                                                {item}
+                                            </button>
+                                        )
+                                    )}
+                                    <button
+                                        type="button"
+                                        aria-label="Trang sau"
+                                        disabled={currentPage === totalPages}
+                                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                        className={`h-9 min-w-9 rounded-md border px-3 text-sm font-medium transition-colors ${
+                                            currentPage === totalPages
+                                                ? "cursor-not-allowed border-slate-200 text-slate-300 bg-slate-50"
+                                                : "border-slate-200 text-slate-700 bg-white hover:border-[#1a5f2a] hover:text-[#1a5f2a]"
+                                        }`}
+                                    >
+                                        &gt;
+                                    </button>
                                 </div>
                             )}
-
                         </div>
                     )}
 
