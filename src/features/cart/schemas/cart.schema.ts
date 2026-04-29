@@ -10,6 +10,9 @@ export const cartItemSchema = z.object({
     boxWeight: z.coerce.number(),
     isPartial: z.boolean(),
     unitPrice: z.coerce.number(),
+    originalUnitPrice: z.coerce.number().optional(),
+    discountPercent: z.coerce.number().optional(),
+    discountAmount: z.coerce.number().optional(),
     // BE có thể trả sẵn; FE cũng có thể tự tính lại cho chắc.
     lineAmount: z.coerce.number().optional(),
 });

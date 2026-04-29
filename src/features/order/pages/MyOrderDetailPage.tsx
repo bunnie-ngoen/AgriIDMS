@@ -74,6 +74,12 @@ function paymentStatusTone(status?: string | null) {
     return "bg-slate-100 text-slate-700 border-slate-200";
 }
 
+function paymentTimingLabel(paymentTiming?: string | null) {
+    if (paymentTiming === "PayBefore") return "Trả trước";
+    if (paymentTiming === "PayAfter") return "Trả sau";
+    return "Chưa chọn";
+}
+
 function ReviewAction({
     orderDetailId,
     orderStatus,
@@ -232,7 +238,8 @@ export default function MyOrderDetailPage() {
     const [setOnlineOrderPaymentTiming, { isLoading: isSettingPaymentTiming }] = useSetOnlineOrderPaymentTimingMutation();
     const [cancelOrder, { isLoading: isCancellingOrder }] = useCancelOrderMutation();
 
-    const [paymentMethod, setPaymentMethod] = useState<number>(paymentMethodEnum.COD);
+    const [paymentMethod, setPaymentMethod] = useState<number | null>(null);
+    const [isEditingPaymentTiming, setIsEditingPaymentTiming] = useState(false);
     const [msg, setMsg] = useState<string>("");
 
     const total = useMemo(() => order?.totalAmount ?? 0, [order?.totalAmount]);
@@ -245,9 +252,49 @@ export default function MyOrderDetailPage() {
         order.status === "Confirmed" &&
         !isLatestPaymentPaid &&
         !isLatestPaymentActive;
+    const selectedPaymentTiming = order?.paymentTiming ?? null;
+    const hasCreatedPayment = !!latestPayment?.id;
+    const canEditPaymentTiming =
+        !!order &&
+        order.source === "Online" &&
+        order.status === "Confirmed" &&
+        !hasCreatedPayment &&
+        !isLatestPaymentPaid &&
+        !isLatestPaymentActive;
+    const allowedPaymentMethods = useMemo(() => {
+        if (selectedPaymentTiming === "PayBefore") {
+            // Theo rule hiện tại BE/FE: trả trước ưu tiên chuyển khoản.
+            return [paymentMethodEnum.BANKING];
+        }
+        if (selectedPaymentTiming === "PayAfter") {
+            return [paymentMethodEnum.COD, paymentMethodEnum.BANKING];
+        }
+        return [];
+    }, [selectedPaymentTiming]);
+    const canSubmitCreatePayment =
+        canCreatePayment &&
+        !!selectedPaymentTiming &&
+        paymentMethod != null &&
+        allowedPaymentMethods.includes(paymentMethod);
     const canCancelPayment =
         !!latestPayment &&
         isPaymentActive(latestPayment.paymentStatus);
+
+    useEffect(() => {
+        if (!selectedPaymentTiming) {
+            setIsEditingPaymentTiming(true);
+            setPaymentMethod(null);
+            return;
+        }
+        setIsEditingPaymentTiming(false);
+    }, [selectedPaymentTiming]);
+
+    useEffect(() => {
+        if (paymentMethod == null) return;
+        if (!allowedPaymentMethods.includes(paymentMethod)) {
+            setPaymentMethod(null);
+        }
+    }, [allowedPaymentMethods, paymentMethod]);
 
     useEffect(() => {
         if (!valid || !order) return;
@@ -267,7 +314,7 @@ export default function MyOrderDetailPage() {
     }, [valid, order, latestPaymentStatus, refetch, refetchPayment]);
 
     const onCreatePayment = async () => {
-        if (!valid) return;
+        if (!valid || paymentMethod == null) return;
         setMsg("");
         try {
             const res = await createPayment({ orderId, paymentMethod }).unwrap();
@@ -456,32 +503,54 @@ export default function MyOrderDetailPage() {
                             </div>
                         )}
                         <div className="mt-3 space-y-3">
-                            {order.source === "Online" &&
-                                order.status === "Confirmed" &&
-                                !order.paymentTiming && (
-                                <div className="rounded-lg border border-sky-200 bg-sky-50 p-3">
-                                    <p className="text-sm font-semibold text-sky-800">Chọn hình thức thanh toán</p>
-                                    <p className="mt-1 text-xs text-sky-700">
-                                        Đơn online sau khi sale xác nhận cần chọn trả trước hoặc trả sau.
-                                    </p>
-                                    <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => onChoosePaymentTiming(0)}
-                                            disabled={isSettingPaymentTiming}
-                                            className="rounded-lg border border-sky-300 px-3 py-2 text-sm font-semibold text-sky-800 hover:bg-sky-100 disabled:opacity-60"
-                                        >
-                                            Chọn trả trước
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => onChoosePaymentTiming(1)}
-                                            disabled={isSettingPaymentTiming}
-                                            className="rounded-lg border border-indigo-300 px-3 py-2 text-sm font-semibold text-indigo-800 hover:bg-indigo-100 disabled:opacity-60"
-                                        >
-                                            Chọn trả sau
-                                        </button>
+                            {order.source === "Online" && (
+                                <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 p-3">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div>
+                                            <p className="text-sm font-semibold text-emerald-800">Hình thức thanh toán</p>
+                                            <p className="mt-1 text-xs text-emerald-700">
+                                                {selectedPaymentTiming
+                                                    ? paymentTimingLabel(selectedPaymentTiming)
+                                                    : "Vui lòng chọn trả trước hoặc trả sau."}
+                                            </p>
+                                        </div>
+                                        {selectedPaymentTiming && (
+                                            <span className="inline-flex items-center rounded-full border border-emerald-300 bg-white px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                                                Đã chọn
+                                            </span>
+                                        )}
                                     </div>
+
+                                    {canEditPaymentTiming && selectedPaymentTiming && !isEditingPaymentTiming && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsEditingPaymentTiming(true)}
+                                            className="mt-2 text-xs font-semibold text-emerald-800 hover:underline"
+                                        >
+                                            Đổi hình thức
+                                        </button>
+                                    )}
+
+                                    {canEditPaymentTiming && (isEditingPaymentTiming || !selectedPaymentTiming) && (
+                                        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => onChoosePaymentTiming(0)}
+                                                disabled={isSettingPaymentTiming}
+                                                className="rounded-lg border border-sky-300 px-3 py-2 text-sm font-semibold text-sky-800 hover:bg-sky-100 disabled:opacity-60"
+                                            >
+                                                Chọn trả trước
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => onChoosePaymentTiming(1)}
+                                                disabled={isSettingPaymentTiming}
+                                                className="rounded-lg border border-indigo-300 px-3 py-2 text-sm font-semibold text-indigo-800 hover:bg-indigo-100 disabled:opacity-60"
+                                            >
+                                                Chọn trả sau
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                             {order.status !== "ApprovedExport" &&
@@ -506,25 +575,42 @@ export default function MyOrderDetailPage() {
                                 )}
                         </div>
                         <div className="mt-3">
-                            <label className="text-xs font-medium text-slate-700">Phương thức</label>
+                            <label className="text-xs font-medium text-slate-700">Phương thức thanh toán</label>
                             <select
-                                value={paymentMethod}
-                                onChange={(e) => setPaymentMethod(Number(e.target.value))}
-                                disabled={!canCreatePayment || isCreating}
+                                value={paymentMethod ?? ""}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    setPaymentMethod(value === "" ? null : Number(value));
+                                }}
+                                disabled={!canCreatePayment || isCreating || !selectedPaymentTiming}
                                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
                             >
-                                <option value={paymentMethodEnum.COD}>Tiền mặt</option>
-                                <option value={paymentMethodEnum.BANKING}>Chuyển khoản</option>
+                                {!selectedPaymentTiming ? (
+                                    <option value="">Vui lòng chọn hình thức thanh toán trước</option>
+                                ) : (
+                                    <option value="">Chọn phương thức thanh toán</option>
+                                )}
+                                {allowedPaymentMethods.includes(paymentMethodEnum.COD) && (
+                                    <option value={paymentMethodEnum.COD}>Tiền mặt (COD)</option>
+                                )}
+                                {allowedPaymentMethods.includes(paymentMethodEnum.BANKING) && (
+                                    <option value={paymentMethodEnum.BANKING}>Chuyển khoản ngân hàng</option>
+                                )}
                             </select>
                         </div>
                         <button
                             type="button"
                             onClick={onCreatePayment}
-                            disabled={isCreating || !canCreatePayment}
+                            disabled={isCreating || !canSubmitCreatePayment}
                             className="mt-3 w-full rounded-lg bg-[#1a5f2a] text-white px-3 py-2 text-sm font-semibold hover:bg-[#145026] disabled:opacity-60"
                         >
                             {isCreating ? "Đang tạo thanh toán..." : "Tạo thanh toán"}
                         </button>
+                        {!canSubmitCreatePayment && canCreatePayment && (
+                            <p className="mt-2 text-xs text-slate-600">
+                                Vui lòng chọn đầy đủ hình thức thanh toán và phương thức thanh toán hợp lệ trước khi tạo thanh toán.
+                            </p>
+                        )}
                         {latestPayment && (
                             <div className="mt-3 rounded-lg bg-slate-50 border border-slate-200 p-3 text-xs space-y-1">
                                 <p>Thanh toán #{latestPayment.id}</p>
