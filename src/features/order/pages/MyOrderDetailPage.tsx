@@ -253,12 +253,10 @@ export default function MyOrderDetailPage() {
         !isLatestPaymentPaid &&
         !isLatestPaymentActive;
     const selectedPaymentTiming = order?.paymentTiming ?? null;
-    const hasCreatedPayment = !!latestPayment?.id;
     const canEditPaymentTiming =
         !!order &&
         order.source === "Online" &&
         order.status === "Confirmed" &&
-        !hasCreatedPayment &&
         !isLatestPaymentPaid &&
         !isLatestPaymentActive;
     const paymentTimingLockedReason = useMemo(() => {
@@ -266,9 +264,8 @@ export default function MyOrderDetailPage() {
         if (order.status !== "Confirmed") return "Đơn không ở trạng thái cho phép đổi hình thức thanh toán.";
         if (isLatestPaymentPaid) return "Đơn đã thanh toán, không thể đổi hình thức.";
         if (isLatestPaymentActive) return "Đang có thanh toán chờ xử lý, không thể đổi hình thức.";
-        if (hasCreatedPayment) return "Đã tạo thanh toán cho đơn này, không thể đổi hình thức.";
         return "";
-    }, [order, isLatestPaymentPaid, isLatestPaymentActive, hasCreatedPayment]);
+    }, [order, isLatestPaymentPaid, isLatestPaymentActive]);
     const allowedPaymentMethods = useMemo<PaymentMethodValue[]>(() => {
         if (selectedPaymentTiming === "PayBefore") {
             // Theo rule hiện tại BE/FE: trả trước ưu tiên chuyển khoản.
