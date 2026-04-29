@@ -17,7 +17,7 @@ import {
     useCreatePaymentMutation,
     useGetLatestPaymentByOrderQuery,
 } from "../../payment/api/payment.api";
-import { paymentMethodEnum } from "../../payment/schemas/payment.schema";
+import { paymentMethodEnum, type PaymentMethodValue } from "../../payment/schemas/payment.schema";
 import {
     useCreateReviewMutation,
     useIsReviewableByOrderDetailQuery,
@@ -238,7 +238,7 @@ export default function MyOrderDetailPage() {
     const [setOnlineOrderPaymentTiming, { isLoading: isSettingPaymentTiming }] = useSetOnlineOrderPaymentTimingMutation();
     const [cancelOrder, { isLoading: isCancellingOrder }] = useCancelOrderMutation();
 
-    const [paymentMethod, setPaymentMethod] = useState<number | null>(null);
+    const [paymentMethod, setPaymentMethod] = useState<PaymentMethodValue | null>(null);
     const [isEditingPaymentTiming, setIsEditingPaymentTiming] = useState(false);
     const [msg, setMsg] = useState<string>("");
 
@@ -261,7 +261,7 @@ export default function MyOrderDetailPage() {
         !hasCreatedPayment &&
         !isLatestPaymentPaid &&
         !isLatestPaymentActive;
-    const allowedPaymentMethods = useMemo(() => {
+    const allowedPaymentMethods = useMemo<PaymentMethodValue[]>(() => {
         if (selectedPaymentTiming === "PayBefore") {
             // Theo rule hiện tại BE/FE: trả trước ưu tiên chuyển khoản.
             return [paymentMethodEnum.BANKING];
@@ -580,7 +580,7 @@ export default function MyOrderDetailPage() {
                                 value={paymentMethod ?? ""}
                                 onChange={(e) => {
                                     const value = e.target.value;
-                                    setPaymentMethod(value === "" ? null : Number(value));
+                                    setPaymentMethod(value === "" ? null : (Number(value) as PaymentMethodValue));
                                 }}
                                 disabled={!canCreatePayment || isCreating || !selectedPaymentTiming}
                                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
