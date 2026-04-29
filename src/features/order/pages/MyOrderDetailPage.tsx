@@ -261,6 +261,14 @@ export default function MyOrderDetailPage() {
         !hasCreatedPayment &&
         !isLatestPaymentPaid &&
         !isLatestPaymentActive;
+    const paymentTimingLockedReason = useMemo(() => {
+        if (!order || order.source !== "Online") return "";
+        if (order.status !== "Confirmed") return "Đơn không ở trạng thái cho phép đổi hình thức thanh toán.";
+        if (isLatestPaymentPaid) return "Đơn đã thanh toán, không thể đổi hình thức.";
+        if (isLatestPaymentActive) return "Đang có thanh toán chờ xử lý, không thể đổi hình thức.";
+        if (hasCreatedPayment) return "Đã tạo thanh toán cho đơn này, không thể đổi hình thức.";
+        return "";
+    }, [order, isLatestPaymentPaid, isLatestPaymentActive, hasCreatedPayment]);
     const allowedPaymentMethods = useMemo<PaymentMethodValue[]>(() => {
         if (selectedPaymentTiming === "PayBefore") {
             // Theo rule hiện tại BE/FE: trả trước ưu tiên chuyển khoản.
@@ -550,6 +558,11 @@ export default function MyOrderDetailPage() {
                                                 Chọn trả sau
                                             </button>
                                         </div>
+                                    )}
+                                    {!canEditPaymentTiming && selectedPaymentTiming && (
+                                        <p className="mt-2 text-xs text-emerald-800">
+                                            {paymentTimingLockedReason || "Đơn đã chọn hình thức thanh toán, không thể đổi."}
+                                        </p>
                                     )}
                                 </div>
                             )}
