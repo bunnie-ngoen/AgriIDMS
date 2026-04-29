@@ -70,6 +70,10 @@ function approvedExportActionClassName(o: OrderListItem): string {
   return "px-3 py-2 rounded-lg border border-neutral-900 bg-neutral-950 text-sm font-semibold text-white shadow-sm hover:bg-neutral-900";
 }
 
+function approvedExportPaymentActionLabel(o: OrderListItem): string {
+  return isPaymentSettled(o.latestPaymentStatus) ? "Đã thanh toán" : "Xác nhận đã thanh toán";
+}
+
 function vnd(n: number) {
   return n.toLocaleString("vi-VN");
 }
@@ -596,6 +600,10 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
         toast.error(`Không tìm thấy thanh toán cho đơn #${id}.`, { id: t });
         return;
       }
+      if (latestPayment.paymentMethod !== "COD") {
+        toast.error(`Đơn #${id} không dùng COD, không thể xác nhận tiền mặt.`, { id: t });
+        return;
+      }
       if (isPaymentSettled(latestPayment.paymentStatus)) {
         toast.success(`Đơn #${id} đã được thanh toán trước đó.`, { id: t });
         return;
@@ -610,6 +618,38 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
     } finally {
       setApprovedExportPaymentBusyOrderId(null);
     }
+  };
+
+  const renderApprovedExportDeliveryButton = (o: OrderListItem) => {
+    const disabled =
+      approvedExportDeliveryBusyOrderId === o.orderId || isShippingPendingPickupList(o);
+    return (
+      <button
+        type="button"
+        onClick={() => void handleApprovedExportDelivered(o)}
+        disabled={disabled}
+        className={`${approvedExportActionClassName(o)} min-w-[150px] px-3 py-2 text-center text-xs sm:text-sm shadow-sm transition-all active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50`}
+      >
+        {approvedExportDeliveryBusyOrderId === o.orderId ? "Đang xử lý..." : approvedExportActionLabel(o)}
+      </button>
+    );
+  };
+
+  const renderApprovedExportPaymentButton = (o: OrderListItem) => {
+    const disabled =
+      approvedExportPaymentBusyOrderId === o.orderId ||
+      isPaymentSettled(o.latestPaymentStatus) ||
+      isConfirmingCod;
+    return (
+      <button
+        type="button"
+        onClick={() => void handleApprovedExportConfirmPayment(o)}
+        disabled={disabled}
+        className="min-w-[170px] rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-center text-xs font-semibold text-emerald-700 shadow-sm transition-all active:scale-[0.99] hover:bg-emerald-100 sm:text-sm disabled:pointer-events-none disabled:opacity-50"
+      >
+        {approvedExportPaymentBusyOrderId === o.orderId ? "Đang xử lý..." : approvedExportPaymentActionLabel(o)}
+      </button>
+    );
   };
 
   const runBulkAction = async (
@@ -858,10 +898,6 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
           </thead>
           <tbody className="divide-y divide-slate-100">
             {sortedRows.map((o) => {
-              const deliveryDisabled =
-                approvedExportDeliveryBusyOrderId === o.orderId || isShippingPendingPickupList(o);
-              const paymentDisabled =
-                approvedExportPaymentBusyOrderId === o.orderId || isPaymentSettled(o.latestPaymentStatus);
               return (
                 <tr key={o.orderId} className="text-sm transition-colors hover:bg-slate-50/80">
                   <td className="py-3.5 pl-4 pr-2">
@@ -888,22 +924,8 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
                   <td className="py-3.5 pr-3 font-semibold text-slate-900">{vnd(o.totalAmount)} ₫</td>
                   <td className="py-3.5 pr-4">
                     <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void handleApprovedExportDelivered(o)}
-                        disabled={deliveryDisabled}
-                        className={`${approvedExportActionClassName(o)} min-w-[150px] px-3 py-2 text-center text-xs sm:text-sm shadow-sm transition-all active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50`}
-                      >
-                        {approvedExportActionLabel(o)}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleApprovedExportConfirmPayment(o)}
-                        disabled={paymentDisabled}
-                        className="min-w-[170px] rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-center text-xs font-semibold text-emerald-700 shadow-sm transition-all active:scale-[0.99] hover:bg-emerald-100 sm:text-sm disabled:pointer-events-none disabled:opacity-50"
-                      >
-                        {isPaymentSettled(o.latestPaymentStatus) ? "Đã thanh toán" : "Xác nhận đã thanh toán"}
-                      </button>
+                      {renderApprovedExportDeliveryButton(o)}
+                      {renderApprovedExportPaymentButton(o)}
                     </div>
                   </td>
                 </tr>
