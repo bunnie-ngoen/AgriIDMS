@@ -15,6 +15,7 @@ import {
 import {
   useConfirmCodPaymentMutation,
   useGetPendingCodPaymentsQuery,
+  useLazyGetLatestPaymentByOrderQuery,
 } from "../../payment/api/payment.api";
 import type { OrderListItem } from "../../order/schemas/order.schema";
 import type { PendingCodPaymentItem } from "../../payment/schemas/payment.schema";
@@ -22,6 +23,7 @@ import { useAuth } from "../../auth/hooks/useAuth";
 import { AUTH_ROLE } from "../../auth/constants/auth.constants";
 import type { SaleConfirmResponse } from "../../order/schemas/order.schema";
 import { paymentStatusLabelVietnam, paymentStatusTone } from "../../../shared/lib/paymentStatus";
+import { isPaymentSettled } from "../../../shared/lib/paymentStatus";
 import { orderSourceLabel, orderSourceTone } from "../../../shared/lib/orderSource";
 import { orderStatusLabel, orderStatusTone } from "../../../shared/lib/orderStatusUi";
 import { formatVietnamDateTime, parseApiDateInput } from "../../../shared/lib/vietnamTime";
@@ -210,8 +212,10 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
     useAutoProposeAllocationAsStaffMutation();
   const [confirmCodPayment, { isLoading: isConfirmingCod }] =
     useConfirmCodPaymentMutation();
+  const [getLatestPaymentByOrder] = useLazyGetLatestPaymentByOrderQuery();
   const [confirmDeliveredAsStaff] = useConfirmDeliveredAsStaffMutation();
-  const [approvedExportBusyOrderId, setApprovedExportBusyOrderId] = useState<number | null>(null);
+  const [approvedExportDeliveryBusyOrderId, setApprovedExportDeliveryBusyOrderId] = useState<number | null>(null);
+  const [approvedExportPaymentBusyOrderId, setApprovedExportPaymentBusyOrderId] = useState<number | null>(null);
 
   const filteredPendingSaleConfirm = useMemo(() => {
     const q = saleConfirmOrderIdQuery.trim();
@@ -559,11 +563,11 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
     }
   };
 
-  const handleApprovedExportRow = async (o: OrderListItem) => {
+  const handleApprovedExportDelivered = async (o: OrderListItem) => {
     const id = o.orderId;
     if (isShippingPendingPickupList(o)) return;
 
-    setApprovedExportBusyOrderId(id);
+    setApprovedExportDeliveryBusyOrderId(id);
     const t = toast.loading(`Đang xác nhận đã giao cho đơn #${id}...`);
     try {
       await confirmDeliveredAsStaff(id).unwrap();
@@ -576,7 +580,35 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
           : "";
       toast.error(msg || "Thao tác thất bại.", { id: t });
     } finally {
-      setApprovedExportBusyOrderId(null);
+      setApprovedExportDeliveryBusyOrderId(null);
+    }
+  };
+
+  const handleApprovedExportConfirmPayment = async (o: OrderListItem) => {
+    const id = o.orderId;
+    if (isPaymentSettled(o.latestPaymentStatus)) return;
+
+    setApprovedExportPaymentBusyOrderId(id);
+    const t = toast.loading(`Đang xác nhận thanh toán cho đơn #${id}...`);
+    try {
+      const latestPayment = await getLatestPaymentByOrder(id).unwrap();
+      if (!latestPayment?.id) {
+        toast.error(`Không tìm thấy thanh toán cho đơn #${id}.`, { id: t });
+        return;
+      }
+      if (isPaymentSettled(latestPayment.paymentStatus)) {
+        toast.success(`Đơn #${id} đã được thanh toán trước đó.`, { id: t });
+        return;
+      }
+
+      await confirmCodPayment(latestPayment.id).unwrap();
+      toast.success(`Đã xác nhận đã thanh toán tiền cho đơn #${id}.`, { id: t });
+      await Promise.all([refetchPendingCod(), refetchApprovedExport()]);
+    } catch (err: unknown) {
+      const msg = getApiErrorMessage(err, "Xác nhận thanh toán thất bại.");
+      toast.error(msg, { id: t });
+    } finally {
+      setApprovedExportPaymentBusyOrderId(null);
     }
   };
 
@@ -774,6 +806,109 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
                 </td>
               </tr>
             ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  const renderApprovedExportTable = (
+    rows: OrderListItem[],
+    emptyText: string,
+    isLoading: boolean,
+  ) => {
+    const sortedRows = sortOrders(rows);
+    if (isLoading) {
+      return (
+        <div className="mt-4 flex items-center justify-center gap-3 rounded-2xl border border-slate-200/80 bg-white py-14 shadow-sm ring-1 ring-slate-900/5">
+          <Loader2 className="h-6 w-6 animate-spin text-[#1a5f2a]" aria-hidden />
+          <p className="text-sm font-medium text-slate-600">Đang tải...</p>
+        </div>
+      );
+    }
+    if (sortedRows.length === 0) {
+      return (
+        <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-12 text-center">
+          <p className="text-sm font-medium text-slate-600">{emptyText}</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className={`${SALES_TABLE_SHELL} max-h-[560px] overflow-auto`}>
+        <table className="w-full min-w-[980px] bg-white">
+          <thead className="sticky top-0 z-10">
+            <tr className={SALES_TABLE_HEAD}>
+              <th className="w-10 py-3 pl-4 pr-2">
+                <input
+                  type="checkbox"
+                  checked={sortedRows.length > 0 && sortedRows.every((r) => selectedMap[r.orderId])}
+                  onChange={() => toggleSelectAllForRows(sortedRows)}
+                  className="h-4 w-4 rounded border-slate-300 text-[#1a5f2a]"
+                />
+              </th>
+              <th className="py-3 pr-3">Đơn hàng</th>
+              <th className="py-3 pr-3">Trạng thái</th>
+              <th className="py-3 pr-3">Hình thức mua</th>
+              <th className="py-3 pr-3">Ngày và giờ</th>
+              <th className="py-3 pr-3">Số sản phẩm</th>
+              <th className="py-3 pr-3">Thành tiền (VNĐ)</th>
+              <th className="py-3 pr-4 w-[360px]">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {sortedRows.map((o) => {
+              const deliveryDisabled =
+                approvedExportDeliveryBusyOrderId === o.orderId || isShippingPendingPickupList(o);
+              const paymentDisabled =
+                approvedExportPaymentBusyOrderId === o.orderId || isPaymentSettled(o.latestPaymentStatus);
+              return (
+                <tr key={o.orderId} className="text-sm transition-colors hover:bg-slate-50/80">
+                  <td className="py-3.5 pl-4 pr-2">
+                    <input
+                      type="checkbox"
+                      checked={!!selectedMap[o.orderId]}
+                      onChange={() => toggleRowSelect(o.orderId)}
+                      className="h-4 w-4 rounded border-slate-300 text-[#1a5f2a]"
+                    />
+                  </td>
+                  <td className="py-3.5 pr-3 font-semibold text-slate-900">Đơn hàng {o.orderId}</td>
+                  <td className="py-3.5 pr-3">
+                    <span className={`${STATUS_PILL} ${orderStatusTone(o.status)}`}>
+                      {orderStatusLabel(o.status)}
+                    </span>
+                  </td>
+                  <td className="py-3.5 pr-3">
+                    <span className={`${STATUS_PILL} ${orderSourceTone(o.source)}`}>
+                      {orderSourceLabel(o.source)}
+                    </span>
+                  </td>
+                  <td className="py-3.5 pr-3 tabular-nums text-slate-700">{formatVietnamDateTime(o.createdAt)}</td>
+                  <td className="py-3.5 pr-3 text-slate-700">{o.itemCount}</td>
+                  <td className="py-3.5 pr-3 font-semibold text-slate-900">{vnd(o.totalAmount)} ₫</td>
+                  <td className="py-3.5 pr-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleApprovedExportDelivered(o)}
+                        disabled={deliveryDisabled}
+                        className={`${approvedExportActionClassName(o)} min-w-[150px] px-3 py-2 text-center text-xs sm:text-sm shadow-sm transition-all active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50`}
+                      >
+                        {approvedExportActionLabel(o)}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleApprovedExportConfirmPayment(o)}
+                        disabled={paymentDisabled}
+                        className="min-w-[170px] rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-center text-xs font-semibold text-emerald-700 shadow-sm transition-all active:scale-[0.99] hover:bg-emerald-100 sm:text-sm disabled:pointer-events-none disabled:opacity-50"
+                      >
+                        {isPaymentSettled(o.latestPaymentStatus) ? "Đã thanh toán" : "Xác nhận đã thanh toán"}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -1207,17 +1342,10 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
 
         {activeQueue === "approvedExport" &&
           !isWarehouseOnly &&
-          renderOrderTable(
+          renderApprovedExportTable(
             filteredApprovedExportOrders,
             "Không có đơn cần xác nhận đã giao.",
             isLoadingApprovedExport,
-            handleApprovedExportRow,
-            (row) => approvedExportActionLabel(row),
-            false,
-            (row) => approvedExportActionClassName(row),
-            true,
-            false,
-            (row) => approvedExportBusyOrderId === row.orderId || isShippingPendingPickupList(row),
           )}
 
         <div className="mt-6 flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-5">
