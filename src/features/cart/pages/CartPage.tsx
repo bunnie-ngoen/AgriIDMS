@@ -222,6 +222,14 @@ export default function CartPage() {
                             const qty = localQty[key] ?? item.quantity;
                             const lineAmount = getLineAmount({ ...item, quantity: qty });
                             const boxLabel = item.isPartial ? "Hộp lẻ" : "Hộp đầy";
+                            const originalUnitPrice = item.originalUnitPrice ?? item.unitPrice;
+                            const safeOriginalUnitPrice = originalUnitPrice > 0 ? originalUnitPrice : item.unitPrice;
+                            const rawDiscountPercent =
+                                safeOriginalUnitPrice > 0
+                                    ? ((safeOriginalUnitPrice - item.unitPrice) / safeOriginalUnitPrice) * 100
+                                    : 0;
+                            const discountPercent = Math.max(0, Math.round(rawDiscountPercent));
+                            const hasDiscount = discountPercent > 0;
 
                             return (
                                 <div key={key} className="rounded-xl border border-slate-200 bg-white p-4">
@@ -253,9 +261,15 @@ export default function CartPage() {
                                                     <p className="text-sm text-slate-600 mt-1">
                                                         {boxLabel} - {item.boxWeight}kg · {item.grade}
                                                     </p>
-                                                    <p className="text-sm text-slate-900 font-semibold mt-2">
-                                                        {vnd(lineAmount)} ₫
-                                                    </p>
+                                                    <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                                                        <span className={hasDiscount ? "text-slate-400 line-through" : "text-slate-700"}>
+                                                            {vnd(safeOriginalUnitPrice)} đ/kg
+                                                        </span>
+                                                        <span className="inline-flex rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                                                            {hasDiscount ? `-${discountPercent}%` : "0%"}
+                                                        </span>
+                                                        <span className="font-bold text-slate-900">{vnd(item.unitPrice)} đ/kg</span>
+                                                    </div>
                                                 </div>
 
                                                 <button
@@ -269,31 +283,34 @@ export default function CartPage() {
                                                 </button>
                                             </div>
 
-                                            <div className="mt-4 flex items-center gap-3">
-                                                <div className="flex border border-slate-300 rounded-lg overflow-hidden">
-                                                    <button
-                                                        type="button"
-                                                        className="px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium"
-                                                        onClick={() => handleQtyChange(item, qty - 1)}
-                                                        disabled={isUpdating || qty <= 1}
-                                                    >
-                                                        <Minus size={16} />
-                                                    </button>
-                                                    <div className="px-4 py-2 min-w-[3rem] text-center font-medium text-slate-900 border-x border-slate-200">
-                                                        {qty}
+                                            <div className="mt-4 border-t border-slate-100 pt-3">
+                                                <p className="text-xs text-slate-500">Số lượng</p>
+                                                <div className="mt-2 flex items-center justify-between gap-3">
+                                                    <div className="flex border border-slate-300 rounded-lg overflow-hidden">
+                                                        <button
+                                                            type="button"
+                                                            className="px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium"
+                                                            onClick={() => handleQtyChange(item, qty - 1)}
+                                                            disabled={isUpdating || qty <= 1}
+                                                        >
+                                                            <Minus size={16} />
+                                                        </button>
+                                                        <div className="px-4 py-2 min-w-[3rem] text-center font-medium text-slate-900 border-x border-slate-200">
+                                                            {qty}
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            className="px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium"
+                                                            onClick={() => handleQtyChange(item, qty + 1)}
+                                                            disabled={isUpdating}
+                                                        >
+                                                            <Plus size={16} />
+                                                        </button>
                                                     </div>
-                                                    <button
-                                                        type="button"
-                                                        className="px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium"
-                                                        onClick={() => handleQtyChange(item, qty + 1)}
-                                                        disabled={isUpdating}
-                                                    >
-                                                        <Plus size={16} />
-                                                    </button>
-                                                </div>
 
-                                                <div className="text-sm text-slate-600">
-                                                    Đơn giá: {vnd(item.unitPrice)} ₫/kg
+                                                    <div className="text-sm font-semibold text-slate-900">
+                                                        {vnd(lineAmount)} đ
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

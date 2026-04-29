@@ -69,6 +69,15 @@ export default function CheckoutPage() {
         [lines],
     );
 
+    const pricingSummary = useMemo(() => {
+        const originalSubtotal = lines.reduce((sum, item) => {
+            const baseUnit = item.originalUnitPrice ?? item.unitPrice;
+            return sum + baseUnit * item.boxWeight * item.quantity;
+        }, 0);
+        const discountTotal = Math.max(0, originalSubtotal - subtotal);
+        return { originalSubtotal, discountTotal, subtotal };
+    }, [lines, subtotal]);
+
     const handlePlaceOrder = async () => {
         if (lines.length === 0 || isPlacing) return;
         setMessage(null);
@@ -266,20 +275,30 @@ export default function CheckoutPage() {
                     <h2 className="font-semibold text-slate-900">Sản phẩm</h2>
                 </div>
 
-                <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto] gap-3 px-4 py-2 text-xs font-semibold text-slate-500 uppercase border-b border-slate-100">
+                <div className="hidden sm:grid grid-cols-[1.7fr_0.8fr_0.7fr_0.9fr_0.3fr_0.9fr] gap-3 px-4 py-2 text-xs font-semibold text-slate-500 uppercase border-b border-slate-100">
                     <span>Sản phẩm</span>
-                    <span className="text-right w-28">Đơn giá</span>
-                    <span className="text-center w-20">SL</span>
-                    <span className="text-right w-32">Thành tiền</span>
+                    <span className="text-right">Đơn giá gốc</span>
+                    <span className="text-center">Giảm giá</span>
+                    <span className="text-right">Đơn giá sau giảm</span>
+                    <span className="text-center">SL</span>
+                    <span className="text-right">Thành tiền</span>
                 </div>
 
                 <ul className="divide-y divide-slate-100">
                     {lines.map((item) => {
                         const key = cartItemKey(item);
                         const line = getLineAmount(item);
+                        const originalUnitPrice = item.originalUnitPrice ?? item.unitPrice;
+                        const safeOriginalUnitPrice = originalUnitPrice > 0 ? originalUnitPrice : item.unitPrice;
+                        const rawDiscountPercent =
+                            safeOriginalUnitPrice > 0
+                                ? ((safeOriginalUnitPrice - item.unitPrice) / safeOriginalUnitPrice) * 100
+                                : 0;
+                        const discountPercent = Math.max(0, Math.round(rawDiscountPercent));
+                        const hasDiscount = discountPercent > 0;
                         const boxLabel = item.isPartial ? "Hộp lẻ" : "Hộp đầy";
                         return (
-                            <li key={key} className="p-4 flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto_auto] sm:gap-3 sm:items-center">
+                            <li key={key} className="p-4 flex flex-col sm:grid sm:grid-cols-[1.7fr_0.8fr_0.7fr_0.9fr_0.3fr_0.9fr] sm:gap-3 sm:items-center">
                                 <div className="flex gap-3 min-w-0">
                                     <div className="w-16 h-16 rounded-lg bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
                                         {item.imageUrl ? (
@@ -299,18 +318,44 @@ export default function CheckoutPage() {
                                         <p className="text-sm text-slate-600 mt-0.5">
                                             {boxLabel} · {item.boxWeight} kg · {item.grade}
                                         </p>
-                                        <p className="sm:hidden text-sm font-semibold text-slate-900 mt-2">
-                                            {vnd(line)} ₫
+                                        <p className="sm:hidden mt-2 text-xs text-slate-500">
+                                            Đơn giá gốc:{" "}
+                                            <span className={hasDiscount ? "line-through" : "font-medium text-slate-700"}>
+                                                {vnd(safeOriginalUnitPrice)} ₫/kg
+                                            </span>
+                                        </p>
+                                        <p className="sm:hidden text-xs text-slate-500">
+                                            Giảm giá:{" "}
+                                            <span className="font-medium text-emerald-700">
+                                                {hasDiscount ? `-${discountPercent}%` : "0%"}
+                                            </span>
+                                        </p>
+                                        <p className="sm:hidden text-xs text-slate-500">
+                                            Đơn giá sau giảm:{" "}
+                                            <span className="font-semibold text-slate-900">{vnd(item.unitPrice)} ₫/kg</span>
+                                        </p>
+                                        <p className="sm:hidden text-sm font-semibold text-slate-900 mt-1">
+                                            Thành tiền: {vnd(line)} ₫
                                         </p>
                                     </div>
                                 </div>
-                                <div className="hidden sm:block text-right text-sm text-slate-800 w-28">
+                                <div className="hidden sm:block text-right text-sm text-slate-500">
+                                    <span className={hasDiscount ? "line-through" : "text-slate-800"}>
+                                        {vnd(safeOriginalUnitPrice)} ₫/kg
+                                    </span>
+                                </div>
+                                <div className="hidden sm:flex justify-center">
+                                    <span className="inline-flex rounded-md bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
+                                        {hasDiscount ? `-${discountPercent}%` : "0%"}
+                                    </span>
+                                </div>
+                                <div className="hidden sm:block text-right text-sm font-semibold text-slate-900">
                                     {vnd(item.unitPrice)} ₫/kg
                                 </div>
-                                <div className="hidden sm:block text-center text-sm font-medium text-slate-900 w-20">
+                                <div className="hidden sm:block text-center text-sm font-medium text-slate-900">
                                     {item.quantity}
                                 </div>
-                                <div className="hidden sm:block text-right font-semibold text-slate-900 w-32">
+                                <div className="hidden sm:block text-right font-semibold text-slate-900">
                                     {vnd(line)} ₫
                                 </div>
                             </li>
@@ -324,8 +369,16 @@ export default function CheckoutPage() {
             <section className="rounded-xl border border-slate-200 bg-white p-5 sm:sticky sm:bottom-auto sm:top-[90px]">
                 <h2 className="text-lg font-bold text-slate-900 mb-3">Tổng thanh toán dự kiến</h2>
                 <div className="flex justify-between text-slate-700 py-2 border-b border-slate-100">
-                    <span>Tổng tiền hàng</span>
-                    <span className="font-semibold text-slate-900">{vnd(subtotal)} ₫</span>
+                    <span>Tạm tính (giá gốc)</span>
+                    <span className="font-semibold text-slate-900">{vnd(pricingSummary.originalSubtotal)} ₫</span>
+                </div>
+                <div className="flex justify-between text-slate-700 py-2 border-b border-slate-100">
+                    <span>Giảm giá</span>
+                    <span className="font-semibold text-emerald-700">- {vnd(pricingSummary.discountTotal)} ₫</span>
+                </div>
+                <div className="flex justify-between text-slate-900 py-2">
+                    <span className="font-semibold">Tổng thanh toán</span>
+                    <span className="font-bold">{vnd(pricingSummary.subtotal)} ₫</span>
                 </div>
                 <button
                     type="button"
