@@ -22,7 +22,6 @@ import { useAuth } from "../../auth/hooks/useAuth";
 import { AUTH_ROLE } from "../../auth/constants/auth.constants";
 import type { SaleConfirmResponse } from "../../order/schemas/order.schema";
 import { paymentStatusLabelVietnam, paymentStatusTone } from "../../../shared/lib/paymentStatus";
-import { isPaymentSettled } from "../../../shared/lib/paymentStatus";
 import { orderSourceLabel, orderSourceTone } from "../../../shared/lib/orderSource";
 import { orderStatusLabel, orderStatusTone } from "../../../shared/lib/orderStatusUi";
 import { formatVietnamDateTime, parseApiDateInput } from "../../../shared/lib/vietnamTime";
