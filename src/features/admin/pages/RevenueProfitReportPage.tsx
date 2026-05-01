@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Download, RefreshCcw } from "lucide-react";
+import { Download, X } from "lucide-react";
 import {
   useGetRevenueProfitSpecificReportQuery,
 } from "../api/revenue-report.api";
@@ -116,6 +116,20 @@ const RevenueProfitReportPage = () => {
     }),
     [fromDate, toDate, warehouseId, productId, productVariantId, page, pageSize],
   );
+  const comparisonCurrentPeriodQuery = useMemo(() => {
+    if (!fromDate || !toDate) return null;
+    const from = new Date(fromDate);
+    const to = new Date(toDate);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) {
+      return null;
+    }
+    return {
+      fromDate,
+      toDate,
+      page: 1,
+      pageSize: 5000,
+    };
+  }, [fromDate, toDate]);
   const previousPeriodQuery = useMemo(() => {
     if (!fromDate || !toDate) return null;
     const from = new Date(fromDate);
@@ -128,29 +142,49 @@ const RevenueProfitReportPage = () => {
     const previousTo = new Date(from.getTime() - oneDay);
     const previousFrom = new Date(previousTo.getTime() - rangeMs);
     return {
-      ...query,
       fromDate: toIsoDate(previousFrom),
       toDate: toIsoDate(previousTo),
       page: 1,
       pageSize: 5000,
     };
-  }, [fromDate, toDate, query]);
+  }, [fromDate, toDate]);
 
   const actualQuery = useGetRevenueProfitSpecificReportQuery(query);
   const data = actualQuery.data;
   const isFetching = actualQuery.isFetching;
+  const chartQuery = useMemo(
+    () => ({
+      page: 1,
+      pageSize: 5000,
+    }),
+    [],
+  );
+  const chartQueryResult = useGetRevenueProfitSpecificReportQuery(chartQuery);
+  const chartDataRows = chartQueryResult.data?.rows ?? [];
+  const comparisonCurrentPeriodResult = useGetRevenueProfitSpecificReportQuery(
+    comparisonCurrentPeriodQuery ?? undefined,
+    { skip: !comparisonCurrentPeriodQuery },
+  );
+  const comparisonCurrentData = comparisonCurrentPeriodResult.data;
   const previousPeriodResult = useGetRevenueProfitSpecificReportQuery(
     previousPeriodQuery ?? undefined,
     { skip: !previousPeriodQuery },
   );
   const previousData = previousPeriodResult.data;
-  const refetch = () => actualQuery.refetch();
+  const clearSearchFilters = () => {
+    setFromDate("");
+    setToDate(today);
+    setWarehouseId(0);
+    setProductId(0);
+    setProductVariantId(0);
+    setPage(1);
+  };
 
   const chartRows = useMemo(() => {
-    const source = data?.rows ?? [];
+    const source = chartDataRows;
 
     if (chartMode === "day") {
-      const selectedDay = chartDay || toDate || today;
+      const selectedDay = chartDay || today;
       const selectedRows = source.filter(
         (row) => toDateKey(row.exportedAt) === selectedDay,
       );
@@ -200,10 +234,20 @@ const RevenueProfitReportPage = () => {
         profit: totals.profit,
       },
     ];
-  }, [chartMode, data?.rows, chartDay, chartMonth, toDate, today]);
+  }, [chartMode, chartDataRows, chartDay, chartMonth, today]);
 
   const lotProfitRows = useMemo(() => {
     const source = data?.rows ?? [];
+    const lossByLotId = new Map<number, { disposedKg: number; stockAdjustmentLossKg: number }>();
+    const lossByLotCode = new Map<string, { disposedKg: number; stockAdjustmentLossKg: number }>();
+    (data?.lossByLots ?? []).forEach((item) => {
+      const payload = {
+        disposedKg: Number(item.disposedKg ?? 0),
+        stockAdjustmentLossKg: Number(item.stockAdjustmentLossKg ?? 0),
+      };
+      if (item.lotId > 0) lossByLotId.set(item.lotId, payload);
+      if (item.lotCode) lossByLotCode.set(item.lotCode, payload);
+    });
     const lotRemainingById = new Map<number, number>();
     const lotRemainingByCode = new Map<string, number>();
     allLots.forEach((lot) => {
@@ -224,6 +268,8 @@ const RevenueProfitReportPage = () => {
         totalKg: number;
         soldKg: number;
         unsoldKg: number;
+        disposedKg: number;
+        stockAdjustmentLossKg: number;
         revenue: number;
         cost: number;
         profit: number;
@@ -254,6 +300,16 @@ const RevenueProfitReportPage = () => {
           totalKg: row.quantityKg,
           soldKg: row.quantityKg,
           unsoldKg: Math.max(0, unsoldKg),
+          disposedKg: Number(
+            lotId > 0
+              ? lossByLotId.get(lotId)?.disposedKg ?? 0
+              : lossByLotCode.get(lotCode)?.disposedKg ?? 0,
+          ),
+          stockAdjustmentLossKg: Number(
+            lotId > 0
+              ? lossByLotId.get(lotId)?.stockAdjustmentLossKg ?? 0
+              : lossByLotCode.get(lotCode)?.stockAdjustmentLossKg ?? 0,
+          ),
           revenue: row.revenue,
           cost: row.cost,
           profit: row.profit,
@@ -262,7 +318,7 @@ const RevenueProfitReportPage = () => {
     });
 
     return Array.from(map.values()).sort((a, b) => b.profit - a.profit);
-  }, [data?.rows, allLots]);
+  }, [data?.rows, data?.lossByLots, allLots]);
 
   const topBottomProducts = useMemo(() => {
     const source = data?.rows ?? [];
@@ -500,11 +556,11 @@ const RevenueProfitReportPage = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => void refetch()}
+                  onClick={clearSearchFilters}
                   className="mt-[18px] inline-flex h-[38px] items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 >
-                  <RefreshCcw size={14} />
-                  Làm mới
+                  <X size={14} />
+                  Xóa tìm kiếm
                 </button>
                 <button
                   type="button"
@@ -558,7 +614,7 @@ const RevenueProfitReportPage = () => {
           </div>
         </div>
 
-        <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4">
           <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
             <p className="text-[11px] text-emerald-700">Tổng doanh thu</p>
             <p className="mt-1 text-sm font-semibold text-emerald-900">
@@ -586,18 +642,6 @@ const RevenueProfitReportPage = () => {
               %
             </p>
           </div>
-          <div className="rounded-xl border border-rose-100 bg-rose-50 p-3">
-            <p className="text-[11px] text-rose-700">Tiêu hủy</p>
-            <p className="mt-1 text-sm font-semibold text-rose-900">
-              {formatKg(data?.totalDisposedKg ?? 0)} kg
-            </p>
-          </div>
-          <div className="rounded-xl border border-orange-100 bg-orange-50 p-3">
-            <p className="text-[11px] text-orange-700">Hao hụt kiểm kê</p>
-            <p className="mt-1 text-sm font-semibold text-orange-900">
-              {formatKg(data?.totalStockAdjustmentLossKg ?? 0)} kg
-            </p>
-          </div>
         </div>
 
         {activeSection === "overview" ? (
@@ -619,12 +663,12 @@ const RevenueProfitReportPage = () => {
                 <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-xs">
                   <p className="text-emerald-700">Doanh thu</p>
                   <p className="mt-1 font-semibold text-emerald-900">
-                    {formatMoney(data?.totalRevenue ?? 0)}
+                    {formatMoney(comparisonCurrentData?.totalRevenue ?? 0)}
                   </p>
                   <p className="mt-1 text-emerald-800">
                     Kỳ trước: {formatMoney(previousData?.totalRevenue ?? 0)} ·{" "}
                     {formatDeltaPercent(
-                      data?.totalRevenue ?? 0,
+                      comparisonCurrentData?.totalRevenue ?? 0,
                       previousData?.totalRevenue ?? 0,
                     )}
                   </p>
@@ -632,12 +676,12 @@ const RevenueProfitReportPage = () => {
                 <div className="rounded-lg border border-amber-100 bg-amber-50 p-3 text-xs">
                   <p className="text-amber-700">Giá vốn</p>
                   <p className="mt-1 font-semibold text-amber-900">
-                    {formatMoney(data?.totalCost ?? 0)}
+                    {formatMoney(comparisonCurrentData?.totalCost ?? 0)}
                   </p>
                   <p className="mt-1 text-amber-800">
                     Kỳ trước: {formatMoney(previousData?.totalCost ?? 0)} ·{" "}
                     {formatDeltaPercent(
-                      data?.totalCost ?? 0,
+                      comparisonCurrentData?.totalCost ?? 0,
                       previousData?.totalCost ?? 0,
                     )}
                   </p>
@@ -645,12 +689,12 @@ const RevenueProfitReportPage = () => {
                 <div className="rounded-lg border border-sky-100 bg-sky-50 p-3 text-xs">
                   <p className="text-sky-700">Lợi nhuận</p>
                   <p className="mt-1 font-semibold text-sky-900">
-                    {formatMoney(data?.totalProfit ?? 0)}
+                    {formatMoney(comparisonCurrentData?.totalProfit ?? 0)}
                   </p>
                   <p className="mt-1 text-sky-800">
                     Kỳ trước: {formatMoney(previousData?.totalProfit ?? 0)} ·{" "}
                     {formatDeltaPercent(
-                      data?.totalProfit ?? 0,
+                      comparisonCurrentData?.totalProfit ?? 0,
                       previousData?.totalProfit ?? 0,
                     )}
                   </p>
@@ -1197,6 +1241,14 @@ const RevenueProfitReportPage = () => {
                 <p className="text-[11px] text-slate-500">
                   Tổng hợp doanh thu, giá vốn và lợi nhuận theo từng lô hàng.
                 </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
+                  <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 font-medium text-rose-700">
+                    Tiêu hủy: {formatKg(data?.totalDisposedKg ?? 0)} kg
+                  </span>
+                  <span className="inline-flex items-center rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 font-medium text-orange-700">
+                    Hao hụt kiểm kê: {formatKg(data?.totalStockAdjustmentLossKg ?? 0)} kg
+                  </span>
+                </div>
               </div>
               <button
                 type="button"
@@ -1215,6 +1267,8 @@ const RevenueProfitReportPage = () => {
                     <th className="px-3 py-2 text-left">Kho</th>
                     <th className="px-3 py-2 text-right">Đã bán (kg)</th>
                     <th className="px-3 py-2 text-right">Chưa bán (kg)</th>
+                    <th className="px-3 py-2 text-right">Tiêu hủy (kg)</th>
+                    <th className="px-3 py-2 text-right">Hao hụt (kg)</th>
                     <th className="px-3 py-2 text-right">Doanh thu</th>
                     <th className="px-3 py-2 text-right">Giá vốn</th>
                     <th className="px-3 py-2 text-right">Lợi nhuận</th>
@@ -1223,7 +1277,7 @@ const RevenueProfitReportPage = () => {
                 <tbody>
                   {lotProfitRows.length === 0 ? (
                     <tr>
-                      <td className="px-3 py-6 text-center text-slate-500" colSpan={8}>
+                      <td className="px-3 py-6 text-center text-slate-500" colSpan={10}>
                         Chưa có dữ liệu lô hàng trong khoảng thời gian đã chọn.
                       </td>
                     </tr>
@@ -1235,6 +1289,8 @@ const RevenueProfitReportPage = () => {
                         <td className="px-3 py-2">{row.warehouseName}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatKg(row.soldKg)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatKg(row.unsoldKg)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatKg(row.disposedKg)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">{formatKg(row.stockAdjustmentLossKg)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatMoney(row.revenue)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatMoney(row.cost)}</td>
                         <td
