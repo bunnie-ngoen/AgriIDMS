@@ -269,12 +269,12 @@ export default function CartPage() {
                                                     </p>
                                                     <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
                                                         <span className={hasDiscount ? "text-slate-400 line-through" : "text-slate-700"}>
-                                                            {vnd(safeOriginalUnitPrice)} đ/kg
+                                                            {vnd(safeOriginalUnitPrice)} VNĐ/KG
                                                         </span>
                                                         <span className="inline-flex rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
                                                             {hasDiscount ? `-${discountPercent}%` : "0%"}
                                                         </span>
-                                                        <span className="font-bold text-slate-900">{vnd(item.unitPrice)} đ/kg</span>
+                                                        <span className="font-bold text-slate-900">{vnd(item.unitPrice)} VNĐ/KG</span>
                                                     </div>
                                                 </div>
 
@@ -315,7 +315,7 @@ export default function CartPage() {
                                                     </div>
 
                                                     <div className="text-sm font-semibold text-slate-900">
-                                                        {vnd(lineAmount)} đ
+                                                        {vnd(lineAmount)} VNĐ
                                                     </div>
                                                 </div>
                                             </div>
@@ -331,7 +331,7 @@ export default function CartPage() {
                             <h2 className="text-lg font-bold text-slate-900 mb-2">Tóm tắt</h2>
                             <div className="flex items-center justify-between gap-4 text-slate-700">
                                 <span className="font-medium">Tạm tính (đã chọn)</span>
-                                <span className="text-slate-900 font-bold">{vnd(selectedTotal)} ₫</span>
+                                <span className="text-slate-900 font-bold">{vnd(selectedTotal)} VNĐ</span>
                             </div>
 
                             <button

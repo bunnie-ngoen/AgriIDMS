@@ -21,7 +21,7 @@ const FILTERS: Array<{ key: FilterKey; label: string }> = [
     { key: "imported-fruit", label: "Hoa quả nhập khẩu" },
     { key: "regional-fruit", label: "Hoa quả vùng miền" },
     { key: "fresh-vegetable", label: "Rau củ tươi ngon" },
-    { key: "hot-sale", label: "HOT SALE" },
+    { key: "hot-sale", label: "Được giảm giá" },
     { key: "tropical-fruit", label: "Trái cây nhiệt đới" },
 ];
 
@@ -130,7 +130,7 @@ function ProductCard({ product }: ProductCardProps) {
                     {product.grade === 1 ? "Loại 1" : product.grade === 2 ? "Loại 2" : product.grade === 3 ? "Loại 3" : `Hạng ${product.grade}`}
                 </p>
                 <p className="text-[#c0392b] font-bold text-base">
-                    {product.price.toLocaleString("vi-VN")} ₫/kg
+                    {product.price.toLocaleString("vi-VN")} VNĐ/KG
                 </p>
 
                 <button

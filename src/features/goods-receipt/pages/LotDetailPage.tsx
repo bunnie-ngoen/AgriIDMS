@@ -39,12 +39,26 @@ export default function LotDetailPage() {
     : isManager()
       ? "/manager/lots"
       : "/admin/lots";
+  const putawayBasePath = isWarehouseStaff()
+    ? "/warehouse/putaway"
+    : isManager()
+      ? "/manager/putaway"
+      : "/admin/putaway";
 
   const { data, isLoading, isError, refetch } = useGetLotDetailByIdQuery(lotId, {
     skip: !lotId || Number.isNaN(lotId),
   });
 
   const boxes = useMemo(() => data?.boxes ?? [], [data?.boxes]);
+  const unassignedBoxes = useMemo(
+    () => boxes.filter((b) => !b.slotId || b.slotId <= 0),
+    [boxes],
+  );
+  const hasUnassignedBoxes = unassignedBoxes.length > 0;
+  const firstUnassignedQr = useMemo(
+    () => unassignedBoxes.find((b) => b.qrCode)?.qrCode ?? "",
+    [unassignedBoxes],
+  );
   const [selectedBox, setSelectedBox] = useState<LotBoxItem | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -365,6 +379,23 @@ export default function LotDetailPage() {
                 <p className="text-slate-900 font-semibold mt-1">
                   {data.remainingQuantity} / {data.totalQuantity}
                 </p>
+                {hasUnassignedBoxes ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (firstUnassignedQr) {
+                        navigate(
+                          `${putawayBasePath}?boxQr=${encodeURIComponent(firstUnassignedQr)}&lotId=${data.lotId}`,
+                        );
+                        return;
+                      }
+                      navigate(`${putawayBasePath}?lotId=${data.lotId}`);
+                    }}
+                    className="mt-2 inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100"
+                  >
+                    Xếp hàng ({unassignedBoxes.length})
+                  </button>
+                ) : null}
               </div>
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">

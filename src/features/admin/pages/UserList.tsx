@@ -30,7 +30,7 @@ const ROLE_LABEL: Record<string, string> = {
   Manager: "Quản lý",
   PurchasingStaff: "Nhân viên thu mua",
   WarehouseStaff: "Nhân viên kho",
-  SalesStaff: "Nhân viên kinh doanh",
+  SalesStaff: "Nhân viên bán hàng",
   Customer: "Khách hàng",
 };
 
