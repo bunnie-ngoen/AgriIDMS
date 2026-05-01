@@ -78,6 +78,44 @@ export default function CheckoutPage() {
         return { originalSubtotal, discountTotal, subtotal };
     }, [lines, subtotal]);
 
+    const linePricing = useMemo(
+        () =>
+            lines.map((item) => {
+                const originalUnitPrice = item.originalUnitPrice ?? item.unitPrice;
+                const safeOriginalUnitPrice = originalUnitPrice > 0 ? originalUnitPrice : item.unitPrice;
+                const finalUnitPrice = item.unitPrice;
+                const computedDiscountPercent =
+                    safeOriginalUnitPrice > 0
+                        ? ((safeOriginalUnitPrice - finalUnitPrice) / safeOriginalUnitPrice) * 100
+                        : 0;
+                const incomingDiscountPercent = item.discountPercent != null ? Number(item.discountPercent) : 0;
+                const discountAmount = Math.max(
+                    0,
+                    item.discountAmount != null ? Number(item.discountAmount) : safeOriginalUnitPrice - finalUnitPrice,
+                );
+                const hasPriceDiscount = safeOriginalUnitPrice > finalUnitPrice;
+                const discountPercent = Math.max(
+                    0,
+                    incomingDiscountPercent > 0 ? Math.round(incomingDiscountPercent) : Math.round(computedDiscountPercent),
+                );
+                const hasDiscount =
+                    hasPriceDiscount || discountAmount > 0 || discountPercent > 0;
+                const lineDiscountAmount = hasPriceDiscount
+                    ? Math.max((safeOriginalUnitPrice - finalUnitPrice) * item.boxWeight * item.quantity, 0)
+                    : 0;
+                return { safeOriginalUnitPrice, discountPercent, hasDiscount, lineDiscountAmount };
+            }),
+        [lines],
+    );
+
+    const hasAnyDiscount = useMemo(() => linePricing.some((x) => x.hasDiscount), [linePricing]);
+    const computedDiscountTotal = useMemo(
+        () => linePricing.reduce((sum, x) => sum + x.lineDiscountAmount, 0),
+        [linePricing],
+    );
+    const totalDiscountAmount = Math.max(pricingSummary.discountTotal, computedDiscountTotal);
+    const originalSubtotalDisplay = pricingSummary.subtotal + totalDiscountAmount;
+
     const handlePlaceOrder = async () => {
         if (lines.length === 0 || isPlacing) return;
         setMessage(null);
@@ -275,30 +313,39 @@ export default function CheckoutPage() {
                     <h2 className="font-semibold text-slate-900">Sản phẩm</h2>
                 </div>
 
-                <div className="hidden sm:grid grid-cols-[1.7fr_0.8fr_0.7fr_0.9fr_0.3fr_0.9fr] gap-3 px-4 py-2 text-xs font-semibold text-slate-500 uppercase border-b border-slate-100">
-                    <span>Sản phẩm</span>
-                    <span className="text-right">Đơn giá gốc</span>
-                    <span className="text-center">Giảm giá</span>
-                    <span className="text-right">Đơn giá sau giảm</span>
-                    <span className="text-center">SL</span>
-                    <span className="text-right">Thành tiền</span>
-                </div>
+                {hasAnyDiscount ? (
+                    <div className="hidden sm:grid grid-cols-[1.7fr_0.8fr_0.7fr_0.9fr_0.3fr_0.9fr] gap-3 px-4 py-2 text-xs font-semibold text-slate-500 uppercase border-b border-slate-100">
+                        <span>Sản phẩm</span>
+                        <span className="text-right">Đơn giá gốc</span>
+                        <span className="text-center">Giảm giá</span>
+                        <span className="text-right">Đơn giá sau giảm</span>
+                        <span className="text-center">SL</span>
+                        <span className="text-right">Thành tiền</span>
+                    </div>
+                ) : (
+                    <div className="hidden sm:grid grid-cols-[1.7fr_1fr_0.3fr_0.9fr] gap-3 px-4 py-2 text-xs font-semibold text-slate-500 uppercase border-b border-slate-100">
+                        <span>Sản phẩm</span>
+                        <span className="text-right">Đơn giá</span>
+                        <span className="text-center">SL</span>
+                        <span className="text-right">Thành tiền</span>
+                    </div>
+                )}
 
                 <ul className="divide-y divide-slate-100">
-                    {lines.map((item) => {
+                    {lines.map((item, idx) => {
                         const key = cartItemKey(item);
                         const line = getLineAmount(item);
-                        const originalUnitPrice = item.originalUnitPrice ?? item.unitPrice;
-                        const safeOriginalUnitPrice = originalUnitPrice > 0 ? originalUnitPrice : item.unitPrice;
-                        const rawDiscountPercent =
-                            safeOriginalUnitPrice > 0
-                                ? ((safeOriginalUnitPrice - item.unitPrice) / safeOriginalUnitPrice) * 100
-                                : 0;
-                        const discountPercent = Math.max(0, Math.round(rawDiscountPercent));
-                        const hasDiscount = discountPercent > 0;
+                        const { safeOriginalUnitPrice, discountPercent, hasDiscount } = linePricing[idx];
                         const boxLabel = item.isPartial ? "Hộp lẻ" : "Hộp đầy";
                         return (
-                            <li key={key} className="p-4 flex flex-col sm:grid sm:grid-cols-[1.7fr_0.8fr_0.7fr_0.9fr_0.3fr_0.9fr] sm:gap-3 sm:items-center">
+                            <li
+                                key={key}
+                                className={`p-4 flex flex-col sm:grid sm:gap-3 sm:items-center ${
+                                    hasAnyDiscount
+                                        ? "sm:grid-cols-[1.7fr_0.8fr_0.7fr_0.9fr_0.3fr_0.9fr]"
+                                        : "sm:grid-cols-[1.7fr_1fr_0.3fr_0.9fr]"
+                                }`}
+                            >
                                 <div className="flex gap-3 min-w-0">
                                     <div className="w-16 h-16 rounded-lg bg-slate-100 overflow-hidden border border-slate-200 shrink-0">
                                         {item.imageUrl ? (
@@ -319,39 +366,59 @@ export default function CheckoutPage() {
                                             {boxLabel} · {item.boxWeight} kg · {item.grade}
                                         </p>
                                         <p className="sm:hidden mt-2 text-xs text-slate-500">
-                                            Đơn giá gốc:{" "}
-                                            <span className={hasDiscount ? "line-through" : "font-medium text-slate-700"}>
-                                                {vnd(safeOriginalUnitPrice)} VNĐ/KG
-                                            </span>
+                                            Đơn giá:{" "}
+                                            {hasDiscount ? (
+                                                <>
+                                                    <span className="line-through text-slate-500">{vnd(safeOriginalUnitPrice)} VNĐ/KG</span>
+                                                    <span className="ml-2 font-semibold text-slate-900">{vnd(item.unitPrice)} VNĐ/KG</span>
+                                                </>
+                                            ) : (
+                                                <span className="font-medium text-slate-700">{vnd(item.unitPrice)} VNĐ/KG</span>
+                                            )}
                                         </p>
-                                        <p className="sm:hidden text-xs text-slate-500">
-                                            Giảm giá:{" "}
-                                            <span className="font-medium text-emerald-700">
-                                                {hasDiscount ? `-${discountPercent}%` : "0%"}
-                                            </span>
-                                        </p>
-                                        <p className="sm:hidden text-xs text-slate-500">
-                                            Đơn giá sau giảm:{" "}
-                                            <span className="font-semibold text-slate-900">{vnd(item.unitPrice)} VNĐ/KG</span>
-                                        </p>
+                                        {hasDiscount ? (
+                                            <>
+                                                <p className="sm:hidden text-xs text-slate-500">
+                                                    Giảm giá: <span className="font-medium text-emerald-700">-{discountPercent}%</span>
+                                                </p>
+                                                <p className="sm:hidden text-xs text-slate-500">
+                                                    Đơn giá sau giảm:{" "}
+                                                    <span className="font-semibold text-slate-900">{vnd(item.unitPrice)} VNĐ/KG</span>
+                                                </p>
+                                            </>
+                                        ) : null}
                                         <p className="sm:hidden text-sm font-semibold text-slate-900 mt-1">
                                             Thành tiền: {vnd(line)} VNĐ
                                         </p>
                                     </div>
                                 </div>
-                                <div className="hidden sm:block text-right text-sm text-slate-500">
-                                    <span className={hasDiscount ? "line-through" : "text-slate-800"}>
-                                        {vnd(safeOriginalUnitPrice)} VNĐ/KG
-                                    </span>
-                                </div>
-                                <div className="hidden sm:flex justify-center">
-                                    <span className="inline-flex rounded-md bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
-                                        {hasDiscount ? `-${discountPercent}%` : "0%"}
-                                    </span>
-                                </div>
-                                <div className="hidden sm:block text-right text-sm font-semibold text-slate-900">
-                                    {vnd(item.unitPrice)} VNĐ/KG
-                                </div>
+                                {hasAnyDiscount ? (
+                                    <>
+                                        <div className="hidden sm:block text-right text-sm text-slate-500">
+                                            {hasDiscount ? (
+                                                <span className="line-through">{vnd(safeOriginalUnitPrice)} VNĐ/KG</span>
+                                            ) : (
+                                                <span className="text-slate-800">{vnd(item.unitPrice)} VNĐ/KG</span>
+                                            )}
+                                        </div>
+                                        <div className="hidden sm:flex justify-center">
+                                            {hasDiscount ? (
+                                                <span className="inline-flex rounded-md bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
+                                                    -{discountPercent}%
+                                                </span>
+                                            ) : (
+                                                <span className="text-slate-400">—</span>
+                                            )}
+                                        </div>
+                                        <div className="hidden sm:block text-right text-sm font-semibold text-slate-900">
+                                            {hasDiscount ? `${vnd(item.unitPrice)} VNĐ/KG` : <span className="text-slate-400">—</span>}
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="hidden sm:block text-right text-sm font-semibold text-slate-900">
+                                        {vnd(item.unitPrice)} VNĐ/KG
+                                    </div>
+                                )}
                                 <div className="hidden sm:block text-center text-sm font-medium text-slate-900">
                                     {item.quantity}
                                 </div>
@@ -370,12 +437,14 @@ export default function CheckoutPage() {
                 <h2 className="text-lg font-bold text-slate-900 mb-3">Tổng thanh toán dự kiến</h2>
                 <div className="flex justify-between text-slate-700 py-2 border-b border-slate-100">
                     <span>Tạm tính (giá gốc)</span>
-                    <span className="font-semibold text-slate-900">{vnd(pricingSummary.originalSubtotal)} VNĐ</span>
+                    <span className="font-semibold text-slate-900">{vnd(originalSubtotalDisplay)} VNĐ</span>
                 </div>
-                <div className="flex justify-between text-slate-700 py-2 border-b border-slate-100">
-                    <span>Giảm giá</span>
-                    <span className="font-semibold text-emerald-700">- {vnd(pricingSummary.discountTotal)} VNĐ</span>
-                </div>
+                {totalDiscountAmount > 0 ? (
+                    <div className="flex justify-between text-slate-700 py-2 border-b border-slate-100">
+                        <span>Giảm giá</span>
+                        <span className="font-semibold text-emerald-700">- {vnd(totalDiscountAmount)} VNĐ</span>
+                    </div>
+                ) : null}
                 <div className="flex justify-between text-slate-900 py-2">
                     <span className="font-semibold">Tổng thanh toán</span>
                     <span className="font-bold">{vnd(pricingSummary.subtotal)} VNĐ</span>

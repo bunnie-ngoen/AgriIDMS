@@ -236,13 +236,23 @@ export default function CartPage() {
                                 safeOriginalUnitPrice > 0
                                     ? ((safeOriginalUnitPrice - item.unitPrice) / safeOriginalUnitPrice) * 100
                                     : 0;
+                            const discountAmount = Math.max(
+                                0,
+                                item.discountAmount != null
+                                    ? Number(item.discountAmount)
+                                    : safeOriginalUnitPrice - item.unitPrice,
+                            );
+                            const hasPriceDiffDiscount = safeOriginalUnitPrice > item.unitPrice;
                             const discountPercent = Math.max(
                                 0,
                                 item.discountPercent != null
                                     ? Math.round(item.discountPercent)
                                     : Math.round(computedDiscountPercent),
                             );
-                            const hasDiscount = discountPercent > 0;
+                            const hasDiscount =
+                                discountPercent > 0 ||
+                                discountAmount > 0 ||
+                                hasPriceDiffDiscount;
 
                             return (
                                 <div key={key} className="rounded-xl border border-slate-200 bg-white p-4">
@@ -275,14 +285,19 @@ export default function CartPage() {
                                                         {boxLabel} - {item.boxWeight}kg · {item.grade}
                                                     </p>
                                                     <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-
-                                                        <span className={hasDiscount ? "text-slate-400 line-through" : "text-slate-700"}>
-                                                            {vnd(safeOriginalUnitPrice)} VNĐ/KG
-                                                        </span>
-                                                        <span className="inline-flex rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                                                            {hasDiscount ? `-${discountPercent}%` : "0%"}
-                                                        </span>
-                                                        <span className="font-bold text-slate-900">{vnd(item.unitPrice)} VNĐ/KG</span>
+                                                        {hasDiscount ? (
+                                                            <>
+                                                                <span className="text-slate-400 line-through">
+                                                                    {vnd(safeOriginalUnitPrice)} VNĐ/KG
+                                                                </span>
+                                                                <span className="inline-flex rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                                                                    -{discountPercent}%
+                                                                </span>
+                                                                <span className="font-bold text-slate-900">{vnd(item.unitPrice)} VNĐ/KG</span>
+                                                            </>
+                                                        ) : (
+                                                            <span className="font-bold text-slate-900">{vnd(item.unitPrice)} VNĐ/KG</span>
+                                                        )}
                                                     </div>
                                                 </div>
 
