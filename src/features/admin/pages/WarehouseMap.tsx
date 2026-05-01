@@ -17,6 +17,7 @@ import {
   useGetExpiredBoxesByWarehouseQuery,
   useDisposeExpiredBoxesMutation,
   useCreateDisposalRequestMutation,
+  useDirectDisposeBoxesMutation,
   useGetDisposeHistoryByWarehouseQuery,
   useLazyGetLotByQrQuery,
   useLazyGetBoxByQrQuery,
@@ -196,12 +197,14 @@ const DisposeReasonModal = ({
 const SlotDetailPanel = ({
   slot,
   warehouseId,
+  canDirectDispose,
   onClose,
   onTransferBox,
   className = "",
 }: {
   slot: SlotItem;
   warehouseId: number;
+  canDirectDispose: boolean;
   onClose: () => void;
   onTransferBox: (box: SlotBoxItem) => void;
   className?: string;
@@ -217,6 +220,7 @@ const SlotDetailPanel = ({
   const [disposeDecisionNowMs, setDisposeDecisionNowMs] = useState<number>(0);
   const [createDisposalRequest, createDisposalRequestState] = useCreateDisposalRequestMutation();
   const [disposeExpiredBoxes, disposeExpiredBoxesState] = useDisposeExpiredBoxesMutation();
+  const [directDisposeBoxes, directDisposeBoxesState] = useDirectDisposeBoxesMutation();
 
   const copyText = async (text: string) => {
     if (!text) return;
@@ -390,8 +394,11 @@ const SlotDetailPanel = ({
     [sortedSlotBoxes, selectedBoxIdsInSlot],
   );
   const shouldOpenRequestModal =
-    (disposeTargetBox != null && !isExpiredAt(disposeTargetBox, disposeDecisionNowMs)) ||
+    (!canDirectDispose &&
+      disposeTargetBox != null &&
+      !isExpiredAt(disposeTargetBox, disposeDecisionNowMs)) ||
     (disposeTargetBox == null &&
+      !canDirectDispose &&
       selectedBoxesInSlot.some((b) => !isExpiredAt(b, disposeDecisionNowMs)));
 
   const disposeExpiredInSlot = async (boxIds: number[]) => {
@@ -413,11 +420,17 @@ const SlotDetailPanel = ({
       const isExpired = isExpiredAt(disposeTargetBox, nowMs);
       const res = isExpired
         ? await disposeExpiredBoxes({ boxIds: [disposeTargetBox.id] }).unwrap()
-        : await createDisposalRequest({
-            warehouseId,
-            boxIds: [disposeTargetBox.id],
-            reason: disposeReason.trim() || undefined,
-          }).unwrap();
+        : canDirectDispose
+          ? await directDisposeBoxes({
+              warehouseId,
+              boxIds: [disposeTargetBox.id],
+              reason: disposeReason.trim() || undefined,
+            }).unwrap()
+          : await createDisposalRequest({
+              warehouseId,
+              boxIds: [disposeTargetBox.id],
+              reason: disposeReason.trim() || undefined,
+            }).unwrap();
       toast.success(res.message);
       setDisposeTargetBox(null);
       setDisposeReason("");
@@ -444,11 +457,17 @@ const SlotDetailPanel = ({
       const nowMs = getNowMs();
       const hasNonExpired = selectedBoxesInSlot.some((b) => !isExpiredAt(b, nowMs));
       const res = hasNonExpired
-        ? await createDisposalRequest({
-            warehouseId,
-            boxIds: selectedBoxIdsInSlot,
-            reason: disposeReason.trim() || undefined,
-          }).unwrap()
+        ? canDirectDispose
+          ? await directDisposeBoxes({
+              warehouseId,
+              boxIds: selectedBoxIdsInSlot,
+              reason: disposeReason.trim() || undefined,
+            }).unwrap()
+          : await createDisposalRequest({
+              warehouseId,
+              boxIds: selectedBoxIdsInSlot,
+              reason: disposeReason.trim() || undefined,
+            }).unwrap()
         : await disposeExpiredBoxes({
             boxIds: selectedBoxIdsInSlot,
           }).unwrap();
@@ -606,7 +625,9 @@ const SlotDetailPanel = ({
         subtitle={
           shouldOpenRequestModal
             ? "Box còn hạn sẽ tạo yêu cầu duyệt từ Admin/Quản lí."
-            : "Box hết hạn sẽ tiêu hủy trực tiếp, không cần duyệt."
+            : canDirectDispose
+              ? "Bạn có quyền tiêu hủy trực tiếp, không cần tạo yêu cầu."
+              : "Box hết hạn sẽ tiêu hủy trực tiếp, không cần duyệt."
         }
         value={disposeReason}
         onChange={setDisposeReason}
@@ -622,7 +643,8 @@ const SlotDetailPanel = ({
         }
         isSubmitting={
           createDisposalRequestState.isLoading ||
-          disposeExpiredBoxesState.isLoading
+          disposeExpiredBoxesState.isLoading ||
+          directDisposeBoxesState.isLoading
         }
         confirmLabel={shouldOpenRequestModal ? "Gửi yêu cầu" : "Tiêu hủy ngay"}
         showReasonField={shouldOpenRequestModal}
@@ -784,7 +806,8 @@ const SlotDetailPanel = ({
                               }}
                               disabled={
                                 createDisposalRequestState.isLoading ||
-                                disposeExpiredBoxesState.isLoading
+                                disposeExpiredBoxesState.isLoading ||
+                                directDisposeBoxesState.isLoading
                               }
                               className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
                               title="Tiêu hủy hàng (có ghi nhận lịch sử)"
@@ -1089,7 +1112,8 @@ const ZoneOverview = ({
 };
 
 const WarehouseMap = () => {
-  const { isManager } = useRoleGuard();
+  const { isManager, isAdmin } = useRoleGuard();
+  const canDirectDispose = isManager() || isAdmin();
   const warehouseBasePath = isManager() ? "/manager/warehouses" : "/admin/warehouses";
   const putawayBasePath = isManager() ? "/manager/putaway" : "/admin/putaway";
   const { id } = useParams<{ id: string }>();
@@ -1216,7 +1240,7 @@ const WarehouseMap = () => {
     let cancelled = false;
 
     const run = async () => {
-      if (!slots?.length) {
+      if (!zones?.length) {
         if (!cancelled) setVariantOptionsInRack([]);
         return;
       }
@@ -1231,46 +1255,75 @@ const WarehouseMap = () => {
           ? `${productName}${variantName ? ` · ${variantName}` : ""}`
           : variantName || `Variant #${variantId}`;
 
-      const slotsNeedFallback: SlotItem[] = [];
-      for (const s of slots) {
-        if (s.productVariantId && s.productVariantId > 0) {
-          if (!map.has(s.productVariantId)) {
-            map.set(s.productVariantId, {
-              id: s.productVariantId,
-              label: makeLabel(s.productVariantId, s.productName, s.productVariantName),
-            });
-          }
+      for (const zone of zones) {
+        let racksInZone: Array<{ id: number }> = [];
+        try {
+          racksInZone = await dispatch(
+            userApi.endpoints.getRacks.initiate(zone.id, {
+              forceRefetch: true,
+              subscribe: false,
+            }),
+          ).unwrap();
+        } catch {
           continue;
         }
-        slotsNeedFallback.push(s);
-      }
 
-      await Promise.all(
-        slotsNeedFallback.map(async (slot) => {
+        for (const rack of racksInZone ?? []) {
+          let slotsInRack: SlotItem[] = [];
           try {
-            const contents = await dispatch(
-              userApi.endpoints.getSlotContents.initiate(slot.id, {
+            slotsInRack = await dispatch(
+              userApi.endpoints.getSlots.initiate(rack.id, {
                 forceRefetch: true,
                 subscribe: false,
               }),
             ).unwrap();
-            const variant = extractVariantFromContents(contents);
-            const variantId = Number(variant?.variantId ?? 0);
-            if (variantId > 0 && !map.has(variantId)) {
-              map.set(variantId, {
-                id: variantId,
-                label: makeLabel(
-                  variantId,
-                  variant?.productName ?? contents.productName,
-                  variant?.variantName ?? contents.variantName,
-                ),
-              });
-            }
           } catch {
-            // skip slot errors
+            continue;
           }
-        }),
-      );
+
+          await Promise.all(
+            (slotsInRack ?? []).map(async (slot) => {
+              const slotVariantId = Number(slot.productVariantId ?? 0);
+              if (slotVariantId > 0) {
+                if (!map.has(slotVariantId)) {
+                  map.set(slotVariantId, {
+                    id: slotVariantId,
+                    label: makeLabel(
+                      slotVariantId,
+                      slot.productName,
+                      slot.productVariantName,
+                    ),
+                  });
+                }
+                return;
+              }
+
+              try {
+                const contents = await dispatch(
+                  userApi.endpoints.getSlotContents.initiate(slot.id, {
+                    forceRefetch: true,
+                    subscribe: false,
+                  }),
+                ).unwrap();
+                const variant = extractVariantFromContents(contents);
+                const variantId = Number(variant?.variantId ?? 0);
+                if (variantId > 0 && !map.has(variantId)) {
+                  map.set(variantId, {
+                    id: variantId,
+                    label: makeLabel(
+                      variantId,
+                      variant?.productName ?? contents.productName,
+                      variant?.variantName ?? contents.variantName,
+                    ),
+                  });
+                }
+              } catch {
+                // skip slot errors
+              }
+            }),
+          );
+        }
+      }
 
       if (!cancelled) {
         const options = Array.from(map.values()).sort((a, b) =>
@@ -1284,7 +1337,7 @@ const WarehouseMap = () => {
     return () => {
       cancelled = true;
     };
-  }, [dispatch, slots]);
+  }, [dispatch, zones]);
 
   useEffect(() => {
     if (!selectedVariantFilterId) return;
@@ -1670,6 +1723,7 @@ const WarehouseMap = () => {
             <SlotDetailPanel
               slot={detailSlot}
               warehouseId={warehouseId}
+              canDirectDispose={canDirectDispose}
               onClose={() => setDetailSlot(null)}
               onTransferBox={(box) => {
                 const qr = box.qrCode || "";
@@ -1977,7 +2031,7 @@ const WarehouseMap = () => {
               >
                 <option value="">
                   {!variantOptionsInRack.length
-                    ? "Rack chưa có sản phẩm"
+                    ? "Kho chưa có sản phẩm"
                     : "Chọn biến thể"}
                 </option>
                 {variantOptionsInRack.map((v) => (

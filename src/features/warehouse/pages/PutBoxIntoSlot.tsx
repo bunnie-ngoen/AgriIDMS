@@ -33,10 +33,23 @@ function toVietnameseBoxStatus(status?: string | null): string {
   const normalized = (status ?? "").trim().toLowerCase();
   if (!normalized) return "—";
   if (normalized === "stored") return "Đang lưu kho";
+  if (normalized === "reserved") return "Đang giữ";
+  if (normalized === "picking") return "Đang lấy hàng";
   if (normalized === "exported") return "Đã xuất";
   if (normalized === "disposed") return "Đã tiêu hủy";
   if (normalized === "damaged") return "Hư hỏng";
-  return status ?? "—";
+  if (normalized === "expired") return "Hết hạn";
+  return "Không xác định";
+}
+
+function isIneligibleForPutaway(status?: string | null): boolean {
+  const normalized = (status ?? "").trim().toLowerCase();
+  return (
+    normalized === "exported" ||
+    normalized === "disposed" ||
+    normalized === "expired" ||
+    normalized === "damaged"
+  );
 }
 
 export default function PutBoxIntoSlot() {
@@ -216,7 +229,9 @@ export default function PutBoxIntoSlot() {
       (lot?.warehouseId && lot.warehouseId > 0),
   );
   const lotBoxes = lotDetail?.boxes ?? [];
-  const availableLotBoxes = lotBoxes.filter((b) => !b.slotId || b.slotId <= 0);
+  const availableLotBoxes = lotBoxes.filter(
+    (b) => (!b.slotId || b.slotId <= 0) && !isIneligibleForPutaway(b.status),
+  );
   const selectedLotBoxes = availableLotBoxes.filter((b) =>
     selectedLotBoxIds.includes(b.boxId),
   );
@@ -388,6 +403,12 @@ export default function PutBoxIntoSlot() {
       );
       return;
     }
+    if (isIneligibleForPutaway(box?.status)) {
+      toast.error(
+        `Hàng đang ở trạng thái "${toVietnameseBoxStatus(box?.status)}", không thể xếp vào vị trí.`,
+      );
+      return;
+    }
     if (!selectedSlotId || selectedSlotId <= 0) {
       toast.error("Vui lòng chọn vị trí (quét QR vị trí hoặc chọn theo danh sách).");
       return;
@@ -439,9 +460,7 @@ export default function PutBoxIntoSlot() {
   };
 
   const handleSelectAllLotBoxes = () => {
-    const selectable = availableLotBoxes
-      .filter((b) => b.status?.toLowerCase() !== "exported")
-      .map((b) => b.boxId);
+    const selectable = availableLotBoxes.map((b) => b.boxId);
     setSelectedLotBoxIds(selectable);
   };
 
@@ -478,7 +497,7 @@ export default function PutBoxIntoSlot() {
     setIsBulkAssigning(true);
     try {
       const assignableBoxIds = targets
-        .filter((b) => b.status?.toLowerCase() !== "exported")
+        .filter((b) => !isIneligibleForPutaway(b.status))
         .map((b) => b.boxId);
 
       if (assignableBoxIds.length === 0) {
@@ -875,7 +894,7 @@ export default function PutBoxIntoSlot() {
                               </tr>
                             ) : (
                               availableLotBoxes.map((b) => {
-                                const disabled = b.status?.toLowerCase() === "exported";
+                                const disabled = isIneligibleForPutaway(b.status);
                                 return (
                                   <tr key={b.boxId} className="border-t border-slate-100">
                                     <td className="px-2 py-2">

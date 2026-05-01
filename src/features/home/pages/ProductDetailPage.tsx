@@ -261,7 +261,7 @@ export default function ProductDetailPage() {
                                         </p>
                                         <p className="mt-1 text-2xl font-bold tabular-nums tracking-tight text-[#b03030] sm:text-3xl lg:text-[2rem]">
                                             {product.price.toLocaleString("vi-VN")}
-                                            <span className="ml-1.5 text-lg font-semibold text-[#c0392b]/90 sm:text-xl">₫/kg</span>
+                                            <span className="ml-1.5 text-lg font-semibold text-[#c0392b]/90 sm:text-xl">VNĐ/KG</span>
                                         </p>
                                     </div>
                                     <span className="inline-flex shrink-0 items-center gap-1.5 self-start text-right text-xs leading-snug text-slate-600 sm:max-w-[12rem] sm:self-auto sm:text-[13px]">
@@ -288,7 +288,7 @@ export default function ProductDetailPage() {
                                                     −{tier.discountPercent.toLocaleString("vi-VN")}%
                                                 </span>
                                                 <span className="font-bold">
-                                                    {tier.pricePerKg.toLocaleString("vi-VN")} ₫/kg
+                                                    {tier.pricePerKg.toLocaleString("vi-VN")} VNĐ/KG
                                                 </span>
                                                 <span className="text-amber-700/90">({tier.boxCount} hộp)</span>
                                             </div>

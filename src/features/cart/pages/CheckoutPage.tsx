@@ -321,7 +321,7 @@ export default function CheckoutPage() {
                                         <p className="sm:hidden mt-2 text-xs text-slate-500">
                                             Đơn giá gốc:{" "}
                                             <span className={hasDiscount ? "line-through" : "font-medium text-slate-700"}>
-                                                {vnd(safeOriginalUnitPrice)} ₫/kg
+                                                {vnd(safeOriginalUnitPrice)} VNĐ/KG
                                             </span>
                                         </p>
                                         <p className="sm:hidden text-xs text-slate-500">
@@ -332,16 +332,16 @@ export default function CheckoutPage() {
                                         </p>
                                         <p className="sm:hidden text-xs text-slate-500">
                                             Đơn giá sau giảm:{" "}
-                                            <span className="font-semibold text-slate-900">{vnd(item.unitPrice)} ₫/kg</span>
+                                            <span className="font-semibold text-slate-900">{vnd(item.unitPrice)} VNĐ/KG</span>
                                         </p>
                                         <p className="sm:hidden text-sm font-semibold text-slate-900 mt-1">
-                                            Thành tiền: {vnd(line)} ₫
+                                            Thành tiền: {vnd(line)} VNĐ
                                         </p>
                                     </div>
                                 </div>
                                 <div className="hidden sm:block text-right text-sm text-slate-500">
                                     <span className={hasDiscount ? "line-through" : "text-slate-800"}>
-                                        {vnd(safeOriginalUnitPrice)} ₫/kg
+                                        {vnd(safeOriginalUnitPrice)} VNĐ/KG
                                     </span>
                                 </div>
                                 <div className="hidden sm:flex justify-center">
@@ -350,13 +350,13 @@ export default function CheckoutPage() {
                                     </span>
                                 </div>
                                 <div className="hidden sm:block text-right text-sm font-semibold text-slate-900">
-                                    {vnd(item.unitPrice)} ₫/kg
+                                    {vnd(item.unitPrice)} VNĐ/KG
                                 </div>
                                 <div className="hidden sm:block text-center text-sm font-medium text-slate-900">
                                     {item.quantity}
                                 </div>
                                 <div className="hidden sm:block text-right font-semibold text-slate-900">
-                                    {vnd(line)} ₫
+                                    {vnd(line)} VNĐ
                                 </div>
                             </li>
                         );
@@ -370,15 +370,15 @@ export default function CheckoutPage() {
                 <h2 className="text-lg font-bold text-slate-900 mb-3">Tổng thanh toán dự kiến</h2>
                 <div className="flex justify-between text-slate-700 py-2 border-b border-slate-100">
                     <span>Tạm tính (giá gốc)</span>
-                    <span className="font-semibold text-slate-900">{vnd(pricingSummary.originalSubtotal)} ₫</span>
+                    <span className="font-semibold text-slate-900">{vnd(pricingSummary.originalSubtotal)} VNĐ</span>
                 </div>
                 <div className="flex justify-between text-slate-700 py-2 border-b border-slate-100">
                     <span>Giảm giá</span>
-                    <span className="font-semibold text-emerald-700">- {vnd(pricingSummary.discountTotal)} ₫</span>
+                    <span className="font-semibold text-emerald-700">- {vnd(pricingSummary.discountTotal)} VNĐ</span>
                 </div>
                 <div className="flex justify-between text-slate-900 py-2">
                     <span className="font-semibold">Tổng thanh toán</span>
-                    <span className="font-bold">{vnd(pricingSummary.subtotal)} ₫</span>
+                    <span className="font-bold">{vnd(pricingSummary.subtotal)} VNĐ</span>
                 </div>
                 <button
                     type="button"
