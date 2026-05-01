@@ -196,13 +196,6 @@ export default function PublicHeader() {
           </a>
 
           <a
-            href="/#vi-sao-chon"
-            className="hidden shrink-0 rounded px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-[#1a5f2a] sm:inline"
-          >
-            Tin tức
-          </a>
-
-          <a
             href="/#lien-he"
             className="shrink-0 rounded px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-[#1a5f2a]"
           >

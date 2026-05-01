@@ -601,7 +601,7 @@ export default function MyOrderDetailPage() {
                                     <option value="">Chọn phương thức thanh toán</option>
                                 )}
                                 {allowedPaymentMethods.includes(paymentMethodEnum.COD) && (
-                                    <option value={paymentMethodEnum.COD}>Tiền mặt (COD)</option>
+                                    <option value={paymentMethodEnum.COD}>Tiền mặt </option>
                                 )}
                                 {allowedPaymentMethods.includes(paymentMethodEnum.BANKING) && (
                                     <option value={paymentMethodEnum.BANKING}>Chuyển khoản ngân hàng</option>

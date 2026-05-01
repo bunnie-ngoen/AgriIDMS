@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Plus, Trash2 } from "lucide-react";
 import { useGetHomeProductsQuery, useGetHomeProductDetailQuery } from "../../home/api/home.api";
 import type { HomeProduct } from "../../home/schemas/home.schema";
@@ -16,6 +16,19 @@ type PosFormItem = {
   boxWeight: string;
   quantity: string;
   isPartial: boolean;
+};
+
+type RecreateOrderPrefill = {
+  sourceOrderId: number;
+  fulfillmentType: 0 | 1;
+  paymentTiming?: 0 | 1;
+  customerUserId?: string;
+  customerName?: string;
+  customerPhone?: string;
+  customerAddress?: string;
+  note?: string;
+  expectedPaymentMethod?: "COD" | "BANKING";
+  items: PosFormItem[];
 };
 
 function vnd(n: number) {
@@ -173,15 +186,21 @@ function PosRow({ row, variants, updateRow, removeRow, canRemove }: PosRowProps)
 
 export default function SalesPosCreatePage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: variants = [], isLoading: isLoadingVariants } = useGetHomeProductsQuery();
   const [createPosOrder, { isLoading: isCreating }] = useCreatePosOrderMutation();
   const [autoPropose, { isLoading: isAutoProposing }] = useAutoProposeAllocationAsStaffMutation();
 
   const [rows, setRows] = useState<PosFormItem[]>([makeRow(1)]);
   const [fulfillmentType, setFulfillmentType] = useState<0 | 1>(0);
+  const [paymentTiming, setPaymentTiming] = useState<0 | 1>(0);
   const [customerUserId, setCustomerUserId] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerAddress, setCustomerAddress] = useState("");
+  const [note, setNote] = useState("");
+  const [expectedPaymentMethod, setExpectedPaymentMethod] = useState<"COD" | "BANKING">("COD");
+  const [sourceOrderId, setSourceOrderId] = useState<number | null>(null);
   const [createdOrderId, setCreatedOrderId] = useState<number | null>(null);
   const [createdTotalAmount, setCreatedTotalAmount] = useState<number | null>(null);
   const [handoffMessage, setHandoffMessage] = useState<string>("");
@@ -190,6 +209,23 @@ export default function SalesPosCreatePage() {
     () => variants,
     [variants],
   );
+
+  useEffect(() => {
+    const state = location.state as { prefillFromOrder?: RecreateOrderPrefill } | null;
+    const prefill = state?.prefillFromOrder;
+    if (!prefill) return;
+
+    setSourceOrderId(prefill.sourceOrderId);
+    setFulfillmentType(prefill.fulfillmentType);
+    setPaymentTiming(prefill.paymentTiming ?? 0);
+    setCustomerUserId(prefill.customerUserId ?? "");
+    setCustomerName(prefill.customerName ?? "");
+    setCustomerPhone(prefill.customerPhone ?? "");
+    setCustomerAddress(prefill.customerAddress ?? "");
+    setNote(prefill.note ?? "");
+    setExpectedPaymentMethod(prefill.expectedPaymentMethod ?? "COD");
+    setRows(prefill.items.length > 0 ? prefill.items : [makeRow(1)]);
+  }, [location.state]);
 
   const addRow = () => setRows((prev) => [...prev, makeRow(prev.length + 1)]);
 
@@ -232,6 +268,7 @@ export default function SalesPosCreatePage() {
     try {
       const created = await createPosOrder({
         fulfillmentType,
+        paymentTiming: fulfillmentType === 1 ? paymentTiming : undefined,
         customerUserId: customerUserId.trim() || undefined,
         customerName: customerName.trim() || undefined,
         customerPhone: customerPhone.trim() || undefined,
@@ -293,6 +330,12 @@ export default function SalesPosCreatePage() {
       </div>
 
       <form onSubmit={onSubmit} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+        {sourceOrderId ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Đang tạo lại từ đơn cũ #{sourceOrderId}. Hệ thống sẽ tạo đơn mới với mã/thời gian/trạng thái mới và kiểm
+            tra lại tồn kho, giá, giảm giá theo dữ liệu hiện tại.
+          </div>
+        ) : null}
         <div className="grid gap-3 md:grid-cols-2">
           <div>
             <label className="text-xs font-medium text-slate-600">Hình thức nhận</label>
@@ -329,6 +372,49 @@ export default function SalesPosCreatePage() {
               value={customerPhone}
               onChange={(e) => setCustomerPhone(e.target.value)}
               placeholder="Ví dụ: 09xxxxxxxx"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-600">Địa chỉ khách hàng</label>
+            <input
+              value={customerAddress}
+              onChange={(e) => setCustomerAddress(e.target.value)}
+              placeholder="Địa chỉ từ đơn cũ (chỉ để review)"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-600">Hình thức thanh toán dự kiến</label>
+            <select
+              value={expectedPaymentMethod}
+              onChange={(e) => setExpectedPaymentMethod((e.target.value as "COD" | "BANKING"))}
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+            >
+              <option value="COD">Tiền mặt (COD)</option>
+              <option value="BANKING">Chuyển khoản ngân hàng</option>
+            </select>
+          </div>
+          {fulfillmentType === 1 ? (
+            <div>
+              <label className="text-xs font-medium text-slate-600">Thanh toán dự kiến</label>
+              <select
+                value={paymentTiming}
+                onChange={(e) => setPaymentTiming(Number(e.target.value) as 0 | 1)}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+              >
+                <option value={0}>Trả trước</option>
+                <option value={1}>Trả sau</option>
+              </select>
+            </div>
+          ) : null}
+          <div className="md:col-span-2">
+            <label className="text-xs font-medium text-slate-600">Ghi chú</label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={2}
+              placeholder="Ghi chú review lại từ đơn cũ (không gửi API tạo đơn)"
               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
             />
           </div>
@@ -410,9 +496,14 @@ export default function SalesPosCreatePage() {
               onClick={() => {
                 setRows([makeRow(1)]);
                 setFulfillmentType(0);
+                setPaymentTiming(0);
                 setCustomerUserId("");
                 setCustomerName("");
                 setCustomerPhone("");
+                setCustomerAddress("");
+                setNote("");
+                setExpectedPaymentMethod("COD");
+                setSourceOrderId(null);
                 setCreatedOrderId(null);
                 setCreatedTotalAmount(null);
                 setHandoffMessage("");
