@@ -224,11 +224,17 @@ export default function CartPage() {
                             const boxLabel = item.isPartial ? "Hộp lẻ" : "Hộp đầy";
                             const originalUnitPrice = item.originalUnitPrice ?? item.unitPrice;
                             const safeOriginalUnitPrice = originalUnitPrice > 0 ? originalUnitPrice : item.unitPrice;
-                            const rawDiscountPercent =
+                            // Ưu tiên % giảm giá BE trả về; chỉ tự tính khi BE không có field này.
+                            const computedDiscountPercent =
                                 safeOriginalUnitPrice > 0
                                     ? ((safeOriginalUnitPrice - item.unitPrice) / safeOriginalUnitPrice) * 100
                                     : 0;
-                            const discountPercent = Math.max(0, Math.round(rawDiscountPercent));
+                            const discountPercent = Math.max(
+                                0,
+                                item.discountPercent != null
+                                    ? Math.round(item.discountPercent)
+                                    : Math.round(computedDiscountPercent),
+                            );
                             const hasDiscount = discountPercent > 0;
 
                             return (
@@ -334,7 +340,7 @@ export default function CartPage() {
                                 disabled={!canGoCheckout}
                                 className="mt-5 w-full inline-flex items-center justify-center gap-2 bg-slate-900 text-white px-4 py-3 rounded-lg font-bold hover:bg-black disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                                Thanh toán ({selectedItems.length} sản phẩm)
+                                Đặt hàng ({selectedItems.length} sản phẩm)
                             </button>
 
                             <button
@@ -343,7 +349,7 @@ export default function CartPage() {
                                 disabled={items.length === 0 || isFetching}
                                 className="mt-3 w-full inline-flex items-center justify-center gap-2 border border-slate-300 bg-white text-slate-800 px-4 py-2.5 rounded-lg font-semibold hover:bg-slate-50 disabled:opacity-60"
                             >
-                                Thanh toán toàn bộ giỏ
+                                Đặt hàng toàn bộ giỏ
                             </button>
                         </div>
                     </div>
