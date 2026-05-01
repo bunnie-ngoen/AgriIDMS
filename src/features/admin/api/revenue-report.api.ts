@@ -59,6 +59,8 @@ export type RevenueProfitReportResponse = {
   totalRevenue: number;
   totalCost: number;
   totalProfit: number;
+  totalDisposedKg: number;
+  totalStockAdjustmentLossKg: number;
   profitMarginPercent: number;
   totalRows: number;
   page: number;
@@ -96,6 +98,10 @@ export const revenueReportApi = api.injectEndpoints({
           totalRevenue: Number(row.totalRevenue ?? row.TotalRevenue ?? 0),
           totalCost: Number(row.totalCost ?? row.TotalCost ?? 0),
           totalProfit: Number(row.totalProfit ?? row.TotalProfit ?? 0),
+          totalDisposedKg: Number(row.totalDisposedKg ?? row.TotalDisposedKg ?? 0),
+          totalStockAdjustmentLossKg: Number(
+            row.totalStockAdjustmentLossKg ?? row.TotalStockAdjustmentLossKg ?? 0,
+          ),
           profitMarginPercent: Number(
             row.profitMarginPercent ?? row.ProfitMarginPercent ?? 0,
           ),
@@ -180,6 +186,10 @@ export const revenueReportApi = api.injectEndpoints({
           totalRevenue: Number(row.totalRevenue ?? row.TotalRevenue ?? 0),
           totalCost: Number(row.totalCost ?? row.TotalCost ?? 0),
           totalProfit: Number(row.totalProfit ?? row.TotalProfit ?? 0),
+          totalDisposedKg: Number(row.totalDisposedKg ?? row.TotalDisposedKg ?? 0),
+          totalStockAdjustmentLossKg: Number(
+            row.totalStockAdjustmentLossKg ?? row.TotalStockAdjustmentLossKg ?? 0,
+          ),
           profitMarginPercent: Number(
             row.profitMarginPercent ?? row.ProfitMarginPercent ?? 0,
           ),

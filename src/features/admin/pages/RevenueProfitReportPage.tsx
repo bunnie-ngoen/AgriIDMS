@@ -83,6 +83,8 @@ const RevenueProfitReportPage = () => {
   >(null);
   const [isSoldItemsModalOpen, setIsSoldItemsModalOpen] = useState(false);
   const [isLotProfitModalOpen, setIsLotProfitModalOpen] = useState(false);
+  const [soldItemsKeyword, setSoldItemsKeyword] = useState("");
+  const [soldItemsWarehouseFilter, setSoldItemsWarehouseFilter] = useState("");
   const [activeSection, setActiveSection] = useState<
     "overview" | "chart" | "analysis"
   >("overview");
@@ -293,6 +295,30 @@ const RevenueProfitReportPage = () => {
       bottom: [...rows].sort((a, b) => a.profit - b.profit).slice(0, 5),
     };
   }, [data?.rows]);
+
+  const filteredSoldRows = useMemo(() => {
+    const rows = data?.rows ?? [];
+    const keyword = soldItemsKeyword.trim().toLowerCase();
+    return rows.filter((r) => {
+      const byWarehouse =
+        !soldItemsWarehouseFilter || (r.warehouseName || "—") === soldItemsWarehouseFilter;
+      if (!byWarehouse) return false;
+      if (!keyword) return true;
+      const searchable = [
+        r.exportCode,
+        `#${r.orderId}`,
+        r.customerName || "",
+        r.supplierName || "",
+        r.boxCode || `#${r.boxId}`,
+        r.lotCode || "",
+        r.productName || "",
+        r.variantName || "",
+      ]
+        .join(" ")
+        .toLowerCase();
+      return searchable.includes(keyword);
+    });
+  }, [data?.rows, soldItemsKeyword, soldItemsWarehouseFilter]);
 
   const exportExcel = () => {
     const rows = data?.rows ?? [];
@@ -532,7 +558,7 @@ const RevenueProfitReportPage = () => {
           </div>
         </div>
 
-        <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+        <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3 xl:grid-cols-6">
           <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
             <p className="text-[11px] text-emerald-700">Tổng doanh thu</p>
             <p className="mt-1 text-sm font-semibold text-emerald-900">
@@ -558,6 +584,18 @@ const RevenueProfitReportPage = () => {
                 maximumFractionDigits: 2,
               })}
               %
+            </p>
+          </div>
+          <div className="rounded-xl border border-rose-100 bg-rose-50 p-3">
+            <p className="text-[11px] text-rose-700">Tiêu hủy</p>
+            <p className="mt-1 text-sm font-semibold text-rose-900">
+              {formatKg(data?.totalDisposedKg ?? 0)} kg
+            </p>
+          </div>
+          <div className="rounded-xl border border-orange-100 bg-orange-50 p-3">
+            <p className="text-[11px] text-orange-700">Hao hụt kiểm kê</p>
+            <p className="mt-1 text-sm font-semibold text-orange-900">
+              {formatKg(data?.totalStockAdjustmentLossKg ?? 0)} kg
             </p>
           </div>
         </div>
@@ -988,16 +1026,48 @@ const RevenueProfitReportPage = () => {
                 Đóng
               </button>
             </div>
+            <div className="flex flex-wrap items-end gap-2 border-b border-slate-100 bg-slate-50/40 px-4 py-2.5">
+              <div className="min-w-[220px] flex-1">
+                <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                  Tìm nhanh
+                </label>
+                <input
+                  type="text"
+                  value={soldItemsKeyword}
+                  onChange={(e) => setSoldItemsKeyword(e.target.value)}
+                  placeholder="Mã phiếu, đơn hàng, box, lô, khách hàng..."
+                  className="w-full rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs"
+                />
+              </div>
+              <div className="min-w-[180px]">
+                <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                  Kho
+                </label>
+                <select
+                  value={soldItemsWarehouseFilter}
+                  onChange={(e) => setSoldItemsWarehouseFilter(e.target.value)}
+                  className="w-full rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs"
+                >
+                  <option value="">Tất cả kho</option>
+                  {Array.from(
+                    new Set((data?.rows ?? []).map((r) => r.warehouseName || "—")),
+                  ).map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
             <div className="max-h-[70vh] overflow-auto">
-              <table className="w-full min-w-[1520px] text-[11px]">
+              <table className="w-full min-w-[1440px] text-[11px]">
                 <thead className="sticky top-0 bg-slate-50 text-slate-600">
                   <tr>
                     <th className="px-3 py-2 text-left">Thời gian xuất</th>
                     <th className="px-3 py-2 text-left">Phiếu xuất</th>
                     <th className="px-3 py-2 text-left">Đơn hàng</th>
                     <th className="px-3 py-2 text-left">Khách hàng</th>
-                    <th className="px-3 py-2 text-left">Chế độ</th>
                     <th className="px-3 py-2 text-left">Nhà cung cấp</th>
                     <th className="px-3 py-2 text-left">Kho</th>
                     <th className="px-3 py-2 text-left">Box</th>
@@ -1012,14 +1082,14 @@ const RevenueProfitReportPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {(data?.rows ?? []).length === 0 ? (
+                  {filteredSoldRows.length === 0 ? (
                     <tr>
-                      <td className="px-3 py-6 text-center text-slate-500" colSpan={16}>
+                      <td className="px-3 py-6 text-center text-slate-500" colSpan={15}>
                         Không có dữ liệu trong khoảng thời gian đã chọn.
                       </td>
                     </tr>
                   ) : (
-                    (data?.rows ?? []).map((r, idx) => (
+                    filteredSoldRows.map((r, idx) => (
                       <tr
                         key={`${r.exportId}-${r.boxId}-${idx}`}
                         className="border-t border-slate-100 hover:bg-slate-50"
@@ -1028,7 +1098,6 @@ const RevenueProfitReportPage = () => {
                         <td className="px-3 py-2 font-mono">{r.exportCode}</td>
                         <td className="px-3 py-2">#{r.orderId}</td>
                         <td className="px-3 py-2">{r.customerName || "—"}</td>
-                        <td className="px-3 py-2">Thực tế</td>
                         <td className="px-3 py-2">{r.supplierName || "—"}</td>
                         <td className="px-3 py-2">{r.warehouseName || "—"}</td>
                         <td className="px-3 py-2 font-mono">{r.boxCode || `#${r.boxId}`}</td>
