@@ -75,6 +75,9 @@ const GoodsReceiptDetailPage = lazy(
 const GoodsReceiptQCPage = lazy(
   () => import("../goods-receipt/pages/GoodsReceiptQC"),
 );
+const AiQcStandalonePage = lazy(
+  () => import("../goods-receipt/pages/AiQcStandalonePage"),
+);
 const GoodsReceiptPrintSlipPage = lazy(
   () => import("../goods-receipt/pages/GoodsReceiptPrintSlipPage"),
 );
@@ -156,6 +159,7 @@ export const managerRoutes = [
 
       // Nhap kho (Goods Receipt)
       { path: "goods-receipts", element: <GoodsReceiptListPage /> },
+      { path: "ai-qc", element: <AiQcStandalonePage /> },
       { path: "goods-receipts/create", element: <CreateGoodsReceiptPage /> },
       { path: "goods-receipts/print", element: <GoodsReceiptPrintSlipPage /> },
       { path: "goods-receipts/:id", element: <GoodsReceiptDetailPage /> },

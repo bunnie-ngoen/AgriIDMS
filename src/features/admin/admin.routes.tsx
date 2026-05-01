@@ -18,6 +18,9 @@ const DeletedUserListPage = lazy(() => import("../admin/pages/DeletedUserList"))
 const RevenueProfitReportPage = lazy(
   () => import("../admin/pages/RevenueProfitReportPage"),
 );
+const AiQcStandalonePage = lazy(
+  () => import("../goods-receipt/pages/AiQcStandalonePage"),
+);
 
 export const adminRoutes = [
   {
@@ -30,6 +33,7 @@ export const adminRoutes = [
       { path: "users", element: <UserListPage /> },
 
       { path: "profile", element: <ProfilePage /> },
+      { path: "ai-qc", element: <AiQcStandalonePage /> },
       { path: "users/deleted", element: <DeletedUserListPage /> },
       { path: "reports/revenue-profit-specific", element: <RevenueProfitReportPage /> },
     ],

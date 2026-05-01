@@ -117,7 +117,7 @@ export default function OrderReceivedPage() {
 
                     <div className="flex justify-between gap-4 pt-2 border-t border-slate-100">
                         <dt className="text-slate-600 font-medium">Tổng tiền</dt>
-                        <dd className="font-bold text-slate-900">{vnd(Number(order.totalAmount))} ₫</dd>
+                        <dd className="font-bold text-slate-900">{vnd(Number(order.totalAmount))} VNĐ</dd>
                     </div>
                 </dl>
             </div>

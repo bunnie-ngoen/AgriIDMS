@@ -4,6 +4,7 @@ import {
   CircleAlert,
   Boxes,
   ChevronRight,
+  Sparkles,
   ClipboardList,
   FileText,
   LogOut,
@@ -40,6 +41,9 @@ export default function WarehouseStaffLayout() {
   const notificationRef = useRef<HTMLDivElement>(null);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isGoodsReceiptQcPage = /^\/warehouse\/goods-receipts\/\d+\/qc\/?$/.test(
+    location.pathname,
+  );
 
   const { data: notificationData, refetch: refetchNotifications } = useGetMyNotificationsQuery({
     page: 1,
@@ -593,6 +597,17 @@ export default function WarehouseStaffLayout() {
             </div>
           </div>
           <div className="relative shrink-0 flex items-center gap-2" ref={notificationRef}>
+            {isGoodsReceiptQcPage ? (
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new Event("open-ai-qc-modal"))}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                aria-label="Kiểm tra chất lượng bằng AI"
+              >
+                <Sparkles size={14} />
+                <span className="hidden sm:inline">AI QC</span>
+              </button>
+            ) : null}
             {unreadCount > 0 && !notificationOpen ? (
               <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 border border-amber-200">
                 Mới

@@ -26,7 +26,7 @@ const roleOptions = [
   },
   {
     value: "SalesStaff",
-    label: "Nhân viên kinh doanh",
+    label: "Nhân viên bán hàng",
     description: "Quản lý đơn hàng và chăm sóc khách hàng",
   },
 ];

@@ -16,7 +16,7 @@ import {
   useUpdateBoxQrImageMutation,
 } from "../api/goods-receipt.api";
 import { uploadQrPayloadToCloudinary } from "../../../shared/lib/qrImageCloudinary";
-import { ArrowLeft, Loader2, Sparkles, Upload, Camera } from "lucide-react";
+import { ArrowLeft, Loader2, Upload, Camera } from "lucide-react";
 import toast from "react-hot-toast";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
@@ -1180,14 +1180,6 @@ export default function GoodsReceiptQC() {
                 <h3 className="text-xs font-semibold text-slate-800">
                   Kiểm tra chất lượng cho dòng chi tiết #{selectedDetailIdForQc}
                 </h3>
-                <button
-                  type="button"
-                  onClick={() => setIsAiQcModalOpen(true)}
-                  className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
-                >
-                  <Sparkles size={14} />
-                  Kiểm tra chất lượng bằng AI
-                </button>
               </div>
               <form
                 onSubmit={(e) => {

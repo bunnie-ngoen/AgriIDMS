@@ -5,7 +5,7 @@ type Props = {
 };
 
 function formatVnd(n: number): string {
-    return `${n.toLocaleString("vi-VN")} ₫/kg`;
+    return `${n.toLocaleString("vi-VN")} VNĐ/KG`;
 }
 
 /**

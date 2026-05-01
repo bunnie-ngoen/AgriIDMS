@@ -9,11 +9,10 @@ import { useGetProductVariantsQuery } from "../../product/api/product-variant.ap
 import { useGetAllLotsQuery } from "../../goods-receipt/api/goods-receipt.api";
 
 const formatMoney = (value: number) =>
-  Number(value || 0).toLocaleString("vi-VN", {
-    style: "currency",
-    currency: "VND",
+  `${Number(value || 0).toLocaleString("vi-VN", {
+    minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  });
+  })} VNĐ`;
 
 const formatDateTime = (value: string) => {
   if (!value) return "—";

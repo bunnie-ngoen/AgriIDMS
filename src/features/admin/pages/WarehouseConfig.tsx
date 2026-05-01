@@ -27,6 +27,7 @@ const toPositiveNumber = (value: string): number => {
   const n = Number(normalized);
   return Number.isFinite(n) && n > 0 ? n : 0;
 };
+const formatOneDecimal = (value: number) => value.toFixed(1);
 
 type FormMode = "idle" | "create" | "edit";
 
@@ -1051,7 +1052,7 @@ const WarehouseConfig = () => {
                       Sức chứa (m³)
                     </label>
                     <input
-                      value={slotVolumeM3 > 0 ? slotVolumeM3.toFixed(4) : ""}
+                      value={slotVolumeM3 > 0 ? formatOneDecimal(slotVolumeM3) : ""}
                       type="number"
                       min={0}
                       step={0.1}
@@ -1089,7 +1090,7 @@ const WarehouseConfig = () => {
                     className="w-full p-2 rounded-md border border-emerald-200 bg-white text-xs"
                   />
                 </div>
-                <p className="text-[11px] text-slate-600">Thể tích: {slotVolumeM3.toFixed(4)} m³</p>
+                <p className="text-[11px] text-slate-600">Thể tích: {formatOneDecimal(slotVolumeM3)} m³</p>
                 <div className="flex justify-end gap-2 pt-1">
                   <button
                     type="button"
