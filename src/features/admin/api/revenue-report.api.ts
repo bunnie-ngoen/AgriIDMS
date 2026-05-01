@@ -53,6 +53,13 @@ export type RevenueProfitBySupplier = {
   profit: number;
 };
 
+export type RevenueLossByLot = {
+  lotId: number;
+  lotCode: string;
+  disposedKg: number;
+  stockAdjustmentLossKg: number;
+};
+
 export type RevenueProfitReportResponse = {
   fromDate?: string | null;
   toDate?: string | null;
@@ -68,6 +75,7 @@ export type RevenueProfitReportResponse = {
   totalPages: number;
   revenueByCustomers: RevenueProfitByCustomer[];
   revenueBySuppliers: RevenueProfitBySupplier[];
+  lossByLots: RevenueLossByLot[];
   rows: RevenueProfitReportRow[];
 };
 
@@ -130,6 +138,16 @@ export const revenueReportApi = api.injectEndpoints({
             revenue: Number(item.revenue ?? item.Revenue ?? 0),
             cost: Number(item.cost ?? item.Cost ?? 0),
             profit: Number(item.profit ?? item.Profit ?? 0),
+          })),
+          lossByLots: (
+            (row.lossByLots ?? row.LossByLots ?? []) as Array<Record<string, unknown>>
+          ).map((item) => ({
+            lotId: Number(item.lotId ?? item.LotId ?? 0),
+            lotCode: String(item.lotCode ?? item.LotCode ?? ""),
+            disposedKg: Number(item.disposedKg ?? item.DisposedKg ?? 0),
+            stockAdjustmentLossKg: Number(
+              item.stockAdjustmentLossKg ?? item.StockAdjustmentLossKg ?? 0,
+            ),
           })),
           rows: rowsRaw.map((item) => ({
             exportedAt: String(item.exportedAt ?? item.ExportedAt ?? ""),
@@ -218,6 +236,16 @@ export const revenueReportApi = api.injectEndpoints({
             revenue: Number(item.revenue ?? item.Revenue ?? 0),
             cost: Number(item.cost ?? item.Cost ?? 0),
             profit: Number(item.profit ?? item.Profit ?? 0),
+          })),
+          lossByLots: (
+            (row.lossByLots ?? row.LossByLots ?? []) as Array<Record<string, unknown>>
+          ).map((item) => ({
+            lotId: Number(item.lotId ?? item.LotId ?? 0),
+            lotCode: String(item.lotCode ?? item.LotCode ?? ""),
+            disposedKg: Number(item.disposedKg ?? item.DisposedKg ?? 0),
+            stockAdjustmentLossKg: Number(
+              item.stockAdjustmentLossKg ?? item.StockAdjustmentLossKg ?? 0,
+            ),
           })),
           rows: rowsRaw.map((item) => ({
             exportedAt: String(item.exportedAt ?? item.ExportedAt ?? ""),
