@@ -78,9 +78,18 @@ function toYmd(d: Date): string {
 /** Ngày lịch (local) từ chuỗi API (ISO hoặc tương đương). */
 function parseCalendarDateFromApiDate(iso: string | null | undefined): Date | null {
   if (!iso || !String(iso).trim()) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const text = String(iso).trim();
+  const m = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) {
+    const y = Number(m[1]);
+    const mon = Number(m[2]);
+    const d = Number(m[3]);
+    const parsed = new Date(y, mon - 1, d);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  const fallback = new Date(text);
+  if (Number.isNaN(fallback.getTime())) return null;
+  return new Date(fallback.getFullYear(), fallback.getMonth(), fallback.getDate());
 }
 
 function formatDdMmYyyyFromYmd(ymd: string): string {
@@ -94,21 +103,24 @@ function formatDdMmYyyyFromYmd(ymd: string): string {
 /** ISO UTC: đầu ngày theo lịch local (không nhập giờ). */
 function localYmdToUtcStartIso(ymd: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
-  const [y, m, d] = ymd.split("-").map(Number);
-  return new Date(y, m - 1, d, 0, 0, 0, 0).toISOString();
+  // Lưu theo mốc UTC cố định để tránh lệch ngày khi client/server khác múi giờ.
+  return `${ymd}T00:00:00.000Z`;
 }
 
 /** ISO UTC: cuối ngày local — để EndAtUtc >= cả ngày kết thúc đã chọn khi BE so sánh DateTime. */
 function localYmdToUtcEndOfDayIso(ymd: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null;
-  const [y, m, d] = ymd.split("-").map(Number);
-  return new Date(y, m - 1, d, 23, 59, 59, 999).toISOString();
+  // Dùng 23:59:59.999 UTC của đúng ngày đã chọn để không trôi sang ngày khác khi hiển thị lại.
+  return `${ymd}T23:59:59.999Z`;
 }
 
 /** Lấy yyyy-MM-dd từ ISO đã lưu (hiển thị lại trên date input). */
 function isoToLocalYmd(iso: string | null | undefined): string {
   if (!iso) return "";
-  const d = new Date(iso);
+  const text = String(iso).trim();
+  const m = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  const d = new Date(text);
   if (Number.isNaN(d.getTime())) return "";
   return toYmd(d);
 }
@@ -246,8 +258,13 @@ export default function VariantDiscountOverrideConfigPage() {
       ...prev,
       { ...emptyItem(), priority: nextFreePriority(prev) },
     ]);
-  const removeItem = (idx: number) =>
+  const removeItem = (idx: number) => {
     setItems((prev) => prev.filter((_, i) => i !== idx));
+    toast("Đã xóa trên form, nhớ bấm Lưu để áp dụng vào hệ thống.", {
+      icon: "⚠️",
+      duration: 3000,
+    });
+  };
 
   const ensureLotsLoaded = async (productVariantId: number) => {
     if (productVariantId <= 0) return;
@@ -445,7 +462,7 @@ export default function VariantDiscountOverrideConfigPage() {
             </button>
           </div>
         </div>
-
+        
         {isFetching ? (
           <div className="mb-3 text-xs text-slate-500">Đang tải danh sách cấu hình...</div>
         ) : null}
@@ -457,6 +474,11 @@ export default function VariantDiscountOverrideConfigPage() {
         ) : null}
 
         <div className="space-y-2.5">
+          {!isFetching && items.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-600">
+              Chưa có cấu hình ghi đè giảm giá biến thể.
+            </div>
+          ) : null}
           {items.map((x, idx) => {
             const variantLots =
               x.productVariantId > 0
@@ -647,8 +669,7 @@ export default function VariantDiscountOverrideConfigPage() {
                   x.productVariantId > 0 &&
                   variantLots.length === 0 ? (
                   <p className="text-[10px] text-amber-700">
-                    Không có lot cho biến thể — không giới hạn min trên form; BE
-                    vẫn kiểm tra khi lưu nếu có dữ liệu.
+                    Biến thể này chưa có lot.
                   </p>
                 ) : lotsFetchDone &&
                   x.productVariantId > 0 &&

@@ -4,6 +4,8 @@ export const exportDetailSchema = z.object({
   id: z.coerce.number().int(),
   boxId: z.coerce.number().int(),
   boxCode: z.string(),
+  warehouseName: z.string().optional().default(""),
+  boxQrCode: z.string().nullable().optional(),
   actualQuantity: z.coerce.number(),
   boxStatus: z.string(),
 });

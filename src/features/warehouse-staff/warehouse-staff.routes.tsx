@@ -1,9 +1,9 @@
 import { lazy } from "react";
+import { Navigate } from "react-router-dom";
 
 const WarehouseStaffLayout = lazy(
   () => import("./components/WarehouseStaffLayout"),
 );
-const SalesOrdersPage = lazy(() => import("../sales-staff/pages/SalesOrdersPage"));
 const WarehouseStockChecksDashboard = lazy(
   () => import("../stock-check/pages/WarehouseStockChecksDashboard")
 );
@@ -77,9 +77,9 @@ export const warehouseStaffRoutes = [
     path: "/warehouse",
     element: <WarehouseStaffLayout />,
     children: [
-      { index: true, element: <SalesOrdersPage /> },
-      { path: "dashboard", element: <SalesOrdersPage /> },
-      { path: "orders", element: <SalesOrdersPage /> },
+      { index: true, element: <Navigate to="/warehouse/exports" replace /> },
+      { path: "dashboard", element: <Navigate to="/warehouse/exports" replace /> },
+      { path: "orders", element: <Navigate to="/warehouse/exports" replace /> },
       { path: "stock-checks", element: <WarehouseStockChecksDashboard /> },
       {
         path: "stock-checks/create",

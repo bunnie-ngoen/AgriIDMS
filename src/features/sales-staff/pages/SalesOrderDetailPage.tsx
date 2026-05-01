@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, CreditCard, Loader2, Package, Truck } from "lucide-react";
 import {
   useCancelOrderMutation,
@@ -20,6 +20,7 @@ import {
   formatVietnamDate,
   formatVietnamDateTime,
   formatVietnamTime,
+  parseApiDateInput,
 } from "../../../shared/lib/vietnamTime";
 import {
   isPaymentActive,
@@ -73,8 +74,15 @@ function paymentStatusLabel(status?: string | null) {
   return paymentStatusLabelVietnam(status);
 }
 
+function isOverdueSaleConfirm(createdAt: string): boolean {
+  const created = parseApiDateInput(createdAt);
+  if (Number.isNaN(created.getTime())) return false;
+  return Date.now() - created.getTime() > 60 * 60 * 1000;
+}
+
 export default function SalesOrderDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const orderId = Number(id);
   const valid = Number.isInteger(orderId) && orderId > 0;
 
@@ -102,6 +110,14 @@ export default function SalesOrderDetailPage() {
   const canCreatePayment = !!order && order.status === "Confirmed" && !isLatestPaymentPaid && !isLatestPaymentActive;
   const canCancelPayment = !!latestPayment && isPaymentActive(latestPayment.paymentStatus);
   const isDelivery = order?.fulfillmentType === "Delivery";
+  const canRecreateOverdueOnlineOrder =
+    !!order &&
+    order.source === "Online" &&
+    order.status === "PendingSaleConfirmation" &&
+    isOverdueSaleConfirm(order.createdAt);
+
+  const recreatePaymentMethod =
+    latestPayment?.paymentMethod === "BANKING" ? "BANKING" : "COD";
 
   useEffect(() => {
     if (!valid || !order) return;
@@ -281,6 +297,44 @@ export default function SalesOrderDetailPage() {
                   <h2 className="text-base font-bold text-slate-900">Thao tác đơn hàng</h2>
                 </div>
                 <div className="space-y-2 p-5">
+                  {canRecreateOverdueOnlineOrder && (
+                    <>
+                      <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        Đơn online đã quá 60 phút chờ sale xác nhận. Hãy tạo đơn mới từ dữ liệu hiện tại để review lại
+                        tồn kho/giá/giảm giá trước khi xử lý tiếp.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          navigate("/sales/orders/pos-create", {
+                            state: {
+                              prefillFromOrder: {
+                                sourceOrderId: order.orderId,
+                                fulfillmentType: order.fulfillmentType === "Delivery" ? 1 : 0,
+                                paymentTiming: order.paymentTiming === "PayAfter" ? 1 : 0,
+                                customerName: order.recipient?.fullName ?? "",
+                                customerPhone: order.recipient?.phone ?? "",
+                                customerAddress: order.recipient?.address ?? "",
+                                note: "",
+                                expectedPaymentMethod: recreatePaymentMethod,
+                                items: order.items.map((item, idx) => ({
+                                  key: `from-order-${order.orderId}-${idx}`,
+                                  productVariantId: String(item.productVariantId),
+                                  boxWeight: String(item.boxWeight),
+                                  quantity: String(item.quantity),
+                                  isPartial: item.isPartial,
+                                })),
+                              },
+                            },
+                          })
+                        }
+                        className={btnPrimary}
+                      >
+                        Tạo đơn mới
+                      </button>
+                    </>
+                  )}
+
                   {isDelivery && order.status === "PartiallyAllocated" && (
                     <button
                       type="button"

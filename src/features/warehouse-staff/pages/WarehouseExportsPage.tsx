@@ -48,6 +48,14 @@ function getApiErrorMessage(err: unknown, fallback: string) {
   return e?.data?.message || e?.data?.error || e?.data?.detail || e?.message || fallback;
 }
 
+function resolveQrImageUrl(value?: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  return `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(trimmed)}`;
+}
+
 /** BE có thể trả PascalCase hoặc camelCase cho enum string */
 function normalizeExportStatus(status?: string | null) {
   const s = (status ?? "").trim().replace(/\s/g, "");
@@ -771,22 +779,42 @@ export default function WarehouseExportsPage() {
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <h2 className="text-sm font-semibold text-slate-900">Chi tiết box xuất</h2>
             <div className="mt-3 overflow-auto">
-              <table className="w-full min-w-[760px] text-sm">
+              <table className="w-full min-w-[980px] table-fixed text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-xs text-slate-500">
-                    <th className="py-2 pr-3 text-left">Mã chi tiết</th>
-                    <th className="py-2 pr-3 text-left">Box</th>
-                    <th className="py-2 pr-3 text-right">Khối lượng</th>
-                    <th className="py-2 pr-3 text-left">Trạng thái box</th>
+                    <th className="w-1/6 px-3 py-2 text-left">Mã chi tiết</th>
+                    <th className="w-1/6 px-3 py-2 text-left">Box</th>
+                    <th className="w-1/6 px-3 py-2 text-left">Kho</th>
+                    <th className="w-1/6 px-3 py-2 text-left">QR box</th>
+                    <th className="w-1/6 px-3 py-2 text-center">Khối lượng</th>
+                    <th className="w-1/6 px-3 py-2 text-left">Trạng thái box</th>
                   </tr>
                 </thead>
                 <tbody>
                   {receipt.details.map((d) => (
                     <tr key={d.id} className="border-b border-slate-100">
-                      <td className="py-2 pr-3">#{d.id}</td>
-                      <td className="py-2 pr-3 font-semibold text-slate-900">{d.boxCode}</td>
-                      <td className="py-2 pr-3 text-right">{d.actualQuantity}</td>
-                      <td className="py-2 pr-3">{boxStatusLabelVietnam(d.boxStatus)}</td>
+                      <td className="px-3 py-2">#{d.id}</td>
+                      <td className="px-3 py-2 font-semibold text-slate-900">{d.boxCode}</td>
+                      <td className="px-3 py-2">{d.warehouseName || "—"}</td>
+                      <td className="px-3 py-2">
+                        {(() => {
+                          const qrUrl = resolveQrImageUrl(d.boxQrCode);
+                          if (!qrUrl) return <span className="text-slate-400">—</span>;
+                          return (
+                            <a href={qrUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2">
+                              <img
+                                src={qrUrl}
+                                alt={`QR ${d.boxCode}`}
+                                className="h-12 w-12 rounded border border-slate-200 bg-white object-contain"
+                                loading="lazy"
+                              />
+                              <span className="text-xs font-semibold text-indigo-700 hover:underline">Mở QR</span>
+                            </a>
+                          );
+                        })()}
+                      </td>
+                      <td className="px-3 py-2 text-center">{d.actualQuantity}</td>
+                      <td className="px-3 py-2">{boxStatusLabelVietnam(d.boxStatus)}</td>
                     </tr>
                   ))}
                 </tbody>

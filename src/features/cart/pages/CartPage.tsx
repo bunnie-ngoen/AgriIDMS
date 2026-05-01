@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Minus, Plus, ShoppingCart, Trash2, AlertCircle } from "lucide-react";
 
@@ -9,6 +9,7 @@ import {
     useRemoveCartItemMutation,
     useUpdateCartItemQuantityMutation,
 } from "../api/cart.api";
+import { useGetHomeProductsQuery } from "../../home/api/home.api";
 import type { CartItem } from "../schemas/cart.schema";
 import type { CheckoutNavigateState } from "../types/checkout.types";
 import { cartItemKey, getLineAmount, vnd } from "../utils/cartItem.utils";
@@ -16,6 +17,7 @@ import { cartItemKey, getLineAmount, vnd } from "../utils/cartItem.utils";
 export default function CartPage() {
     const navigate = useNavigate();
     const { data: cart, isLoading, isError, refetch, isFetching } = useGetMyCartQuery(undefined);
+    const { data: homeProducts } = useGetHomeProductsQuery();
 
     const [updateCartItemQuantity, { isLoading: isUpdating }] = useUpdateCartItemQuantityMutation();
     const [removeCartItem, { isLoading: isRemoving }] = useRemoveCartItemMutation();
@@ -42,6 +44,10 @@ export default function CartPage() {
     }, [cart?.items]);
 
     const items = cart?.items ?? [];
+    const variantBasePriceById = useMemo(
+        () => new Map((homeProducts ?? []).map((p) => [p.id, p.price])),
+        [homeProducts],
+    );
 
     const selectedItems = items.filter((item) => selectedKeys[cartItemKey(item)]);
     const selectedTotal = selectedItems.reduce((sum, item) => {
@@ -222,20 +228,31 @@ export default function CartPage() {
                             const qty = localQty[key] ?? item.quantity;
                             const lineAmount = getLineAmount({ ...item, quantity: qty });
                             const boxLabel = item.isPartial ? "Hộp lẻ" : "Hộp đầy";
-                            const originalUnitPrice = item.originalUnitPrice ?? item.unitPrice;
+                            const catalogUnitPrice = variantBasePriceById.get(item.productVariantId);
+                            const originalUnitPrice = item.originalUnitPrice ?? catalogUnitPrice ?? item.unitPrice;
                             const safeOriginalUnitPrice = originalUnitPrice > 0 ? originalUnitPrice : item.unitPrice;
                             // Ưu tiên % giảm giá BE trả về; chỉ tự tính khi BE không có field này.
                             const computedDiscountPercent =
                                 safeOriginalUnitPrice > 0
                                     ? ((safeOriginalUnitPrice - item.unitPrice) / safeOriginalUnitPrice) * 100
                                     : 0;
+                            const discountAmount = Math.max(
+                                0,
+                                item.discountAmount != null
+                                    ? Number(item.discountAmount)
+                                    : safeOriginalUnitPrice - item.unitPrice,
+                            );
+                            const hasPriceDiffDiscount = safeOriginalUnitPrice > item.unitPrice;
                             const discountPercent = Math.max(
                                 0,
                                 item.discountPercent != null
                                     ? Math.round(item.discountPercent)
                                     : Math.round(computedDiscountPercent),
                             );
-                            const hasDiscount = discountPercent > 0;
+                            const hasDiscount =
+                                discountPercent > 0 ||
+                                discountAmount > 0 ||
+                                hasPriceDiffDiscount;
 
                             return (
                                 <div key={key} className="rounded-xl border border-slate-200 bg-white p-4">
@@ -268,13 +285,19 @@ export default function CartPage() {
                                                         {boxLabel} - {item.boxWeight}kg · {item.grade}
                                                     </p>
                                                     <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                                                        <span className={hasDiscount ? "text-slate-400 line-through" : "text-slate-700"}>
-                                                            {vnd(safeOriginalUnitPrice)} VNĐ/KG
-                                                        </span>
-                                                        <span className="inline-flex rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                                                            {hasDiscount ? `-${discountPercent}%` : "0%"}
-                                                        </span>
-                                                        <span className="font-bold text-slate-900">{vnd(item.unitPrice)} VNĐ/KG</span>
+                                                        {hasDiscount ? (
+                                                            <>
+                                                                <span className="text-slate-400 line-through">
+                                                                    {vnd(safeOriginalUnitPrice)} VNĐ/KG
+                                                                </span>
+                                                                <span className="inline-flex rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                                                                    -{discountPercent}%
+                                                                </span>
+                                                                <span className="font-bold text-slate-900">{vnd(item.unitPrice)} VNĐ/KG</span>
+                                                            </>
+                                                        ) : (
+                                                            <span className="font-bold text-slate-900">{vnd(item.unitPrice)} VNĐ/KG</span>
+                                                        )}
                                                     </div>
                                                 </div>
 

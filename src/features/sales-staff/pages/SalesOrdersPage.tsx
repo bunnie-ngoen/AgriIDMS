@@ -15,7 +15,6 @@ import {
 import {
   useConfirmCodPaymentMutation,
   useGetPendingCodPaymentsQuery,
-  useLazyGetLatestPaymentByOrderQuery,
 } from "../../payment/api/payment.api";
 import type { OrderListItem } from "../../order/schemas/order.schema";
 import type { PendingCodPaymentItem } from "../../payment/schemas/payment.schema";
@@ -43,6 +42,7 @@ const SALES_CLEAR_BTN =
   "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition-all hover:border-slate-300 hover:bg-slate-50 active:scale-[0.99]";
 const STATUS_PILL =
   "inline-flex items-center rounded-full border px-2 py-1 text-xs font-semibold";
+const SALE_CONFIRM_TIMEOUT_MINUTES = 60;
 
 function getApiErrorMessage(err: unknown, fallback: string) {
   const e = err as {
@@ -70,16 +70,18 @@ function approvedExportActionClassName(o: OrderListItem): string {
   return "px-3 py-2 rounded-lg border border-neutral-900 bg-neutral-950 text-sm font-semibold text-white shadow-sm hover:bg-neutral-900";
 }
 
-function approvedExportPaymentActionLabel(o: OrderListItem): string {
-  return isPaymentSettled(o.latestPaymentStatus) ? "Đã thanh toán" : "Xác nhận đã thanh toán";
-}
-
 function vnd(n: number) {
   return n.toLocaleString("vi-VN");
 }
 
 function paymentStatusLabel(status: string) {
   return paymentStatusLabelVietnam(status);
+}
+
+function isSaleConfirmExpired(createdAt: string): boolean {
+  const created = parseApiDateInput(createdAt);
+  if (Number.isNaN(created.getTime())) return false;
+  return Date.now() - created.getTime() > SALE_CONFIRM_TIMEOUT_MINUTES * 60 * 1000;
 }
 
 type QueueKey =
@@ -148,6 +150,7 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
     Record<number, SaleConfirmResponse>
   >({});
   const [recentSaleConfirmedCards, setRecentSaleConfirmedCards] = useState<SaleConfirmPreviewCard[]>([]);
+  const [recreatedSaleConfirmByOrderId, setRecreatedSaleConfirmByOrderId] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     if (forcedQueue && activeQueue !== forcedQueue) {
@@ -216,10 +219,8 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
     useAutoProposeAllocationAsStaffMutation();
   const [confirmCodPayment, { isLoading: isConfirmingCod }] =
     useConfirmCodPaymentMutation();
-  const [getLatestPaymentByOrder] = useLazyGetLatestPaymentByOrderQuery();
   const [confirmDeliveredAsStaff] = useConfirmDeliveredAsStaffMutation();
   const [approvedExportDeliveryBusyOrderId, setApprovedExportDeliveryBusyOrderId] = useState<number | null>(null);
-  const [approvedExportPaymentBusyOrderId, setApprovedExportPaymentBusyOrderId] = useState<number | null>(null);
 
   const filteredPendingSaleConfirm = useMemo(() => {
     const q = saleConfirmOrderIdQuery.trim();
@@ -439,12 +440,24 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
           ].slice(0, 5),
         );
       }
+      setRecreatedSaleConfirmByOrderId((prev) => {
+        if (!prev[id]) return prev;
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
       await refetchPendingSaleConfirm();
       await refetchPendingWarehouseConfirm();
     } catch (err: unknown) {
       const msg = getApiErrorMessage(err, `Sale-confirm đơn #${id} thất bại`);
       toast.error(msg, { id: t });
     }
+  };
+
+  const handleRecreateForSaleReview = (orderId: number) => {
+    setRecreatedSaleConfirmByOrderId((prev) => ({ ...prev, [orderId]: true }));
+    toast("Đã bật chế độ review lại đơn. Vui lòng kiểm tra đơn rồi bấm Xác nhận.", { icon: "ℹ️" });
+    navigate(`/sales/orders/${orderId}`);
   };
 
   const renderSaleConfirmCards = (
@@ -487,6 +500,9 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
             <tbody className="divide-y divide-slate-100">
               {sortedRows.map((o) => {
                 const feedback = saleConfirmFeedbackByOrderId[o.orderId];
+                const expired = isSaleConfirmExpired(o.createdAt);
+                const recreated = !!recreatedSaleConfirmByOrderId[o.orderId];
+                const canConfirmThisOrder = canSaleConfirm && (!expired || recreated);
                 return (
                   <tr key={o.orderId} className="text-sm transition-colors hover:bg-slate-50/80">
                     <td className="py-3.5 pl-4 pr-3 font-semibold text-slate-900">Đơn hàng {o.orderId}</td>
@@ -508,11 +524,26 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
                         <button
                           type="button"
                           onClick={() => handleSaleConfirm(o.orderId)}
-                          disabled={isConfirming || !canSaleConfirm}
+                          disabled={isConfirming || !canConfirmThisOrder}
+                          title={!canConfirmThisOrder ? "Đơn đã quá 60 phút. Hãy bấm Tạo lại đơn để review trước." : undefined}
                           className="rounded-xl border border-neutral-900 bg-neutral-950 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-neutral-900 disabled:opacity-50"
                         >
                           Xác nhận
                         </button>
+                        {expired && !recreated ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRecreateForSaleReview(o.orderId)}
+                            className="rounded-xl border border-indigo-300 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 shadow-sm hover:bg-indigo-100"
+                          >
+                            Tạo lại đơn
+                          </button>
+                        ) : null}
+                        {expired ? (
+                          <span className="inline-flex rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
+                            Quá 60'
+                          </span>
+                        ) : null}
                         {feedback && (
                           <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
                             Đã xác nhận
@@ -588,38 +619,6 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
     }
   };
 
-  const handleApprovedExportConfirmPayment = async (o: OrderListItem) => {
-    const id = o.orderId;
-    if (isPaymentSettled(o.latestPaymentStatus)) return;
-
-    setApprovedExportPaymentBusyOrderId(id);
-    const t = toast.loading(`Đang xác nhận thanh toán cho đơn #${id}...`);
-    try {
-      const latestPayment = await getLatestPaymentByOrder(id).unwrap();
-      if (!latestPayment?.id) {
-        toast.error(`Không tìm thấy thanh toán cho đơn #${id}.`, { id: t });
-        return;
-      }
-      if (latestPayment.paymentMethod !== "COD") {
-        toast.error(`Đơn #${id} không dùng COD, không thể xác nhận tiền mặt.`, { id: t });
-        return;
-      }
-      if (isPaymentSettled(latestPayment.paymentStatus)) {
-        toast.success(`Đơn #${id} đã được thanh toán trước đó.`, { id: t });
-        return;
-      }
-
-      await confirmCodPayment(latestPayment.id).unwrap();
-      toast.success(`Đã xác nhận đã thanh toán tiền cho đơn #${id}.`, { id: t });
-      await Promise.all([refetchPendingCod(), refetchApprovedExport()]);
-    } catch (err: unknown) {
-      const msg = getApiErrorMessage(err, "Xác nhận thanh toán thất bại.");
-      toast.error(msg, { id: t });
-    } finally {
-      setApprovedExportPaymentBusyOrderId(null);
-    }
-  };
-
   const renderApprovedExportDeliveryButton = (o: OrderListItem) => {
     const disabled =
       approvedExportDeliveryBusyOrderId === o.orderId || isShippingPendingPickupList(o);
@@ -631,23 +630,6 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
         className={`${approvedExportActionClassName(o)} min-w-[150px] px-3 py-2 text-center text-xs sm:text-sm shadow-sm transition-all active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50`}
       >
         {approvedExportDeliveryBusyOrderId === o.orderId ? "Đang xử lý..." : approvedExportActionLabel(o)}
-      </button>
-    );
-  };
-
-  const renderApprovedExportPaymentButton = (o: OrderListItem) => {
-    const disabled =
-      approvedExportPaymentBusyOrderId === o.orderId ||
-      isPaymentSettled(o.latestPaymentStatus) ||
-      isConfirmingCod;
-    return (
-      <button
-        type="button"
-        onClick={() => void handleApprovedExportConfirmPayment(o)}
-        disabled={disabled}
-        className="min-w-[170px] rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-center text-xs font-semibold text-emerald-700 shadow-sm transition-all active:scale-[0.99] hover:bg-emerald-100 sm:text-sm disabled:pointer-events-none disabled:opacity-50"
-      >
-        {approvedExportPaymentBusyOrderId === o.orderId ? "Đang xử lý..." : approvedExportPaymentActionLabel(o)}
       </button>
     );
   };
@@ -816,7 +798,15 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {rows.map((p) => (
+            {rows.map((p) => {
+              const canConfirmOrderStatus =
+                p.orderStatus === "ApprovedExport" || p.orderStatus === "Delivered";
+              const canConfirmThisPayment = canConfirmCod && canConfirmOrderStatus;
+              const disableReason =
+                !canConfirmOrderStatus
+                  ? "Chỉ xác nhận khi đơn đã duyệt xuất hoặc đã giao hàng."
+                  : "Bạn không có quyền xác nhận thanh toán.";
+              return (
               <tr key={p.paymentId} className="text-sm transition-colors hover:bg-slate-50/80">
                 <td className="w-20 py-3.5 pl-3 pr-6 text-left font-semibold tabular-nums text-slate-900 whitespace-nowrap lg:w-[5.5rem]">
                   {p.paymentId}
@@ -838,14 +828,18 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
                   <button
                     type="button"
                     onClick={() => handleConfirmCod(p.paymentId, p.orderId)}
-                    disabled={isConfirmingCod || !canConfirmCod}
+                    disabled={isConfirmingCod || !canConfirmThisPayment}
+                    title={!canConfirmThisPayment ? disableReason : undefined}
                     className="rounded-xl border border-neutral-900 bg-neutral-950 px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-black/10 transition-all hover:bg-neutral-900 disabled:pointer-events-none disabled:opacity-50"
                   >
                     Xác nhận
                   </button>
+                  {!canConfirmThisPayment && !canConfirmOrderStatus ? (
+                    <p className="mt-1 text-[11px] text-amber-700">Chưa tới bước xác nhận tiền</p>
+                  ) : null}
                 </td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>
@@ -925,7 +919,6 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
                   <td className="py-3.5 pr-4">
                     <div className="flex flex-wrap items-center gap-2">
                       {renderApprovedExportDeliveryButton(o)}
-                      {renderApprovedExportPaymentButton(o)}
                     </div>
                   </td>
                 </tr>
