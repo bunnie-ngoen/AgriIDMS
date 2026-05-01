@@ -51,7 +51,11 @@ export default function LotDetailPage() {
 
   const boxes = useMemo(() => data?.boxes ?? [], [data?.boxes]);
   const unassignedBoxes = useMemo(
-    () => boxes.filter((b) => !b.slotId || b.slotId <= 0),
+    () =>
+      boxes.filter((b) => {
+        const normalizedStatus = (b.status ?? "").trim().toLowerCase();
+        return (!b.slotId || b.slotId <= 0) && normalizedStatus === "stored";
+      }),
     [boxes],
   );
   const hasUnassignedBoxes = unassignedBoxes.length > 0;

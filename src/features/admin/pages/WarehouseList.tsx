@@ -10,6 +10,7 @@ import EditWarehouseModal from "../components/EditWarehouseModal";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 
 const PAGE_SIZE = 10;
+const MAX_SLOT_UTILIZATION = 0.8;
 const formatVolume = (value: number | undefined) =>
   Number(value ?? 0).toLocaleString("vi-VN", {
     minimumFractionDigits: 0,
@@ -292,8 +293,9 @@ const WarehouseList = () => {
                           const storedInSlots = Number(warehouse.storedInSlotsWeight ?? 0);
                           const unassigned = Number(warehouse.unassignedStockWeight ?? 0);
                           const occupied = storedInSlots + unassigned;
-                          const capacity = Number(warehouse.totalCapacity ?? 0);
-                          const capacityUnset = capacity <= 0;
+                          const rawCapacity = Number(warehouse.totalCapacity ?? 0);
+                          const capacity = rawCapacity * MAX_SLOT_UTILIZATION;
+                          const capacityUnset = rawCapacity <= 0;
                           const overflow = capacityUnset
                             ? 0
                             : Math.max(0, occupied - capacity);
@@ -323,6 +325,11 @@ const WarehouseList = () => {
                               </>
                             )}
                           </span>
+                          {!capacityUnset && (
+                            <span className="text-[11px] text-slate-500">
+                              Sức chứa vận hành 80% từ tổng slot: {formatVolume(rawCapacity)} m³
+                            </span>
+                          )}
                           {(storedInSlots > 0 || unassigned > 0) && (
                           <div className="flex flex-wrap justify-end gap-1">
                             <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">

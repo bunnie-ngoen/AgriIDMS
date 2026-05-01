@@ -647,7 +647,7 @@ const SlotDetailPanel = ({
           directDisposeBoxesState.isLoading
         }
         confirmLabel={shouldOpenRequestModal ? "Gửi yêu cầu" : "Tiêu hủy ngay"}
-        showReasonField={shouldOpenRequestModal || canDirectDispose}
+        showReasonField={shouldOpenRequestModal}
       />
 
       {isBoxesModalOpen && contents && contents.boxCount > 0 && (
