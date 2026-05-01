@@ -390,7 +390,7 @@ export default function MyOrdersPage() {
                                             <th className="px-4 py-3">Mã đơn</th>
                                             <th className="px-4 py-3">Ngày và giờ</th>
                                             <th className="px-4 py-3">Trạng thái đơn</th>
-                                            <th className="px-4 py-3">Trình trạng thanh toán</th>
+                                            <th className="px-4 py-3">Tình trạng thanh toán</th>
                                             <th className="px-4 py-3">Số sản phẩm</th>
                                             <th className="px-4 py-3">Thành tiền (VNĐ)</th>
                                             <th className="px-4 py-3">Thao tác</th>
