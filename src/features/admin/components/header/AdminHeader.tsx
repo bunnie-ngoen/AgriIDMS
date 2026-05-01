@@ -108,7 +108,6 @@ const AdminHeader = ({ onToggleSidebar }: AdminHeaderProps) => {
   const AI_QC_BASE_URL =
     (import.meta as any)?.env?.VITE_AI_QC_BASE_URL || "http://localhost:8000";
   const [isAiQcModalOpen, setIsAiQcModalOpen] = useState(false);
-  const [aiQcImageFile, setAiQcImageFile] = useState<File | null>(null);
   const [aiQcImagePreview, setAiQcImagePreview] = useState("");
   const [aiQcResult, setAiQcResult] = useState<AiQcResponse | null>(null);
   const [isAiQcRunning, setIsAiQcRunning] = useState(false);
@@ -225,7 +224,6 @@ const AdminHeader = ({ onToggleSidebar }: AdminHeaderProps) => {
     );
     if (!blob) return;
     const file = new File([blob], `qc-${Date.now()}.jpg`, { type: "image/jpeg" });
-    setAiQcImageFile(file);
     if (aiQcImagePreview) URL.revokeObjectURL(aiQcImagePreview);
     setAiQcImagePreview(URL.createObjectURL(file));
     await runAiQc(file);
@@ -324,7 +322,6 @@ const AdminHeader = ({ onToggleSidebar }: AdminHeaderProps) => {
                       onChange={async (e) => {
                         const f = e.target.files?.[0] ?? null;
                         if (!f) return;
-                        setAiQcImageFile(f);
                         if (aiQcImagePreview) URL.revokeObjectURL(aiQcImagePreview);
                         setAiQcImagePreview(URL.createObjectURL(f));
                         await runAiQc(f);
