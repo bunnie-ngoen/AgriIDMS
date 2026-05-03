@@ -188,35 +188,6 @@ const toMonthKey = (value: string) => {
   return `${year}-${month}`;
 };
 
-const toIsoDate = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
-/**
- * Chuỗi `YYYY-MM-DD` từ input type=date — parse theo lịch local (tránh UTC làm lệch ngày khi tính kỳ trước).
- */
-const parseFilterDateLocal = (value: string): Date | null => {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
-  if (!m) return null;
-  const y = Number(m[1]);
-  const mo = Number(m[2]);
-  const d = Number(m[3]);
-  if (!y || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
-  const dt = new Date(y, mo - 1, d);
-  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
-  return dt;
-};
-
-const formatDeltaPercent = (current: number, previous: number) => {
-  if (previous === 0 && current === 0) return "0%";
-  if (previous === 0) return "—";
-  const pct = ((current - previous) / Math.abs(previous)) * 100;
-  return `${pct.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`;
-};
-
 const toBucketLabel = (isoDate: string, mode: "day" | "month") => {
   const d = new Date(isoDate);
   if (Number.isNaN(d.getTime())) return "Không rõ";
@@ -335,6 +306,8 @@ const RevenueProfitReportPage = () => {
   const [activeSection, setActiveSection] = useState<
     "overview" | "chart" | "analysis"
   >("overview");
+  const [chartWarehouseId, setChartWarehouseId] = useState<number | 0>(0);
+  const [chartProductVariantId, setChartProductVariantId] = useState<number | 0>(0);
   const chartDayPickerRef = useRef<HTMLInputElement | null>(null);
   const chartMonthPickerRef = useRef<HTMLInputElement | null>(null);
 
@@ -409,7 +382,7 @@ const RevenueProfitReportPage = () => {
     [productVariants, productId],
   );
 
-  /** Chỉ phục vụ ô Tổng quan (KPI + so sánh kỳ). */
+  /** Chỉ phục vụ ô Tổng quan (KPI). */
   const overviewQuery = useMemo(
     () => ({
       fromDate: fromDate || undefined,
@@ -422,37 +395,30 @@ const RevenueProfitReportPage = () => {
     }),
     [fromDate, toDate, warehouseId, productId, productVariantId],
   );
-  const previousPeriodQuery = useMemo(() => {
-    if (!fromDate || !toDate) return null;
-    const from = parseFilterDateLocal(fromDate);
-    const to = parseFilterDateLocal(toDate);
-    if (!from || !to || from > to) {
-      return null;
-    }
-    const oneDay = 24 * 60 * 60 * 1000;
-    /** Cùng số ngày lịch inclusive với [fromDate, toDate] gửi API (đêm → đêm). */
-    const rangeMs = to.getTime() - from.getTime();
-    const previousTo = new Date(from.getTime() - oneDay);
-    const previousFrom = new Date(previousTo.getTime() - rangeMs);
-    return {
-      fromDate: toIsoDate(previousFrom),
-      toDate: toIsoDate(previousTo),
-      warehouseId: warehouseId || undefined,
-      productId: productId || undefined,
-      productVariantId: productVariantId || undefined,
-      page: 1,
-      pageSize: 500,
-    };
-  }, [fromDate, toDate, warehouseId, productId, productVariantId]);
 
   const overviewResult = useGetRevenueProfitSpecificReportQuery(overviewQuery);
   const overviewData = overviewResult.data;
 
-  /** Biểu đồ + phân tích chi tiết: không áp dụng bộ lọc tổng quan. */
+  /** Biểu đồ: lọc theo kho / biến thể (tab riêng). */
+  const chartReportQuery = useMemo(
+    () => ({
+      warehouseId: chartWarehouseId || undefined,
+      productVariantId: chartProductVariantId || undefined,
+      page: 1,
+      pageSize: 5000,
+    }),
+    [chartWarehouseId, chartProductVariantId],
+  );
+  const chartReportResult = useGetRevenueProfitSpecificReportQuery(chartReportQuery, {
+    skip: activeSection !== "chart",
+  });
+  const chartDataRows = chartReportResult.data?.rows ?? [];
+  const chartReportFetching = chartReportResult.isFetching;
+
+  /** Phân tích chi tiết: dữ liệu toàn hệ thống, không theo bộ lọc biểu đồ. */
   const broadReportQuery = useMemo(() => ({ page: 1, pageSize: 5000 }), []);
   const broadReportResult = useGetRevenueProfitSpecificReportQuery(broadReportQuery);
   const broadData = broadReportResult.data;
-  const chartDataRows = broadData?.rows ?? [];
 
   const soldListQuery = useMemo(
     () => ({
@@ -468,11 +434,6 @@ const RevenueProfitReportPage = () => {
   });
   const soldListData = soldListResult.data;
   const soldListFetching = soldListResult.isFetching;
-  const previousPeriodResult = useGetRevenueProfitSpecificReportQuery(
-    previousPeriodQuery ?? undefined,
-    { skip: !previousPeriodQuery },
-  );
-  const previousData = previousPeriodResult.data;
   const clearSearchFilters = () => {
     setFromDate("");
     setToDate(today);
@@ -734,8 +695,11 @@ const RevenueProfitReportPage = () => {
             </div>
           </div>
           <p className="mt-2 text-[10px] text-slate-500">
-            Bộ lọc trên chỉ áp dụng cho khu vực <strong className="font-semibold text-slate-600">Tổng quan</strong> (số liệu
-            tổng và so sánh kỳ). Biểu đồ và phân tích chi tiết dùng dữ liệu toàn hệ thống, không theo bộ lọc này.
+            Bộ lọc ngày / sản phẩm ở trên chỉ áp dụng cho{" "}
+            <strong className="font-semibold text-slate-600">Tổng quan</strong>. Tab{" "}
+            <strong className="font-semibold text-slate-600">Biểu đồ</strong> có thêm bộ lọc kho và biến thể ngay trong
+            khung biểu đồ. Tab <strong className="font-semibold text-slate-600">Phân tích chi tiết</strong> vẫn dùng dữ
+            liệu toàn hệ thống (không theo các bộ lọc này).
           </p>
         </div>
 
@@ -808,71 +772,6 @@ const RevenueProfitReportPage = () => {
                 </p>
               </div>
             </div>
-            <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-xs font-semibold text-slate-700">So sánh kỳ trước</p>
-                {previousPeriodQuery ? (
-                  <p className="mt-0.5 text-[11px] text-slate-500">
-                    Kỳ đang xem: {fromDate} → {toDate} — các số lớn trùng 4 ô KPI phía trên. Kỳ trước cùng độ
-                    dài (theo lịch), kết thúc ngay trước ngày bắt đầu kỳ đang xem.
-                  </p>
-                ) : null}
-              </div>
-              {previousPeriodQuery ? (
-                <p className="text-[11px] text-slate-500">
-                  Kỳ trước: {previousPeriodQuery.fromDate} → {previousPeriodQuery.toDate}
-                </p>
-              ) : (
-                <p className="text-[11px] text-slate-500">
-                  Chọn đủ Từ ngày và Đến ngày để xem so sánh.
-                </p>
-              )}
-            </div>
-            {previousPeriodQuery ? (
-              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-xs">
-                  <p className="text-emerald-700">Doanh thu</p>
-                  <p className="mt-1 font-semibold text-emerald-900">
-                    {formatMoney(overviewData?.totalRevenue ?? 0)}
-                  </p>
-                  <p className="mt-1 text-emerald-800">
-                    Kỳ trước: {formatMoney(previousData?.totalRevenue ?? 0)} ·{" "}
-                    {formatDeltaPercent(
-                      overviewData?.totalRevenue ?? 0,
-                      previousData?.totalRevenue ?? 0,
-                    )}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-amber-100 bg-amber-50 p-3 text-xs">
-                  <p className="text-amber-700">Giá vốn</p>
-                  <p className="mt-1 font-semibold text-amber-900">
-                    {formatMoney(overviewData?.totalCost ?? 0)}
-                  </p>
-                  <p className="mt-1 text-amber-800">
-                    Kỳ trước: {formatMoney(previousData?.totalCost ?? 0)} ·{" "}
-                    {formatDeltaPercent(
-                      overviewData?.totalCost ?? 0,
-                      previousData?.totalCost ?? 0,
-                    )}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-sky-100 bg-sky-50 p-3 text-xs">
-                  <p className="text-sky-700">Lợi nhuận</p>
-                  <p className="mt-1 font-semibold text-sky-900">
-                    {formatMoney(overviewData?.totalProfit ?? 0)}
-                  </p>
-                  <p className="mt-1 text-sky-800">
-                    Kỳ trước: {formatMoney(previousData?.totalProfit ?? 0)} ·{" "}
-                    {formatDeltaPercent(
-                      overviewData?.totalProfit ?? 0,
-                      previousData?.totalProfit ?? 0,
-                    )}
-                  </p>
-                </div>
-              </div>
-            ) : null}
-          </div>
           </>
         ) : null}
 
@@ -953,9 +852,47 @@ const RevenueProfitReportPage = () => {
                 </span>
               </div>
             </div>
+            <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-slate-500">Kho</label>
+                <select
+                  value={chartWarehouseId}
+                  onChange={(e) => setChartWarehouseId(Number(e.target.value))}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
+                >
+                  <option value={0}>Tất cả kho</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-slate-500">
+                  Biến thể sản phẩm
+                </label>
+                <select
+                  value={chartProductVariantId}
+                  onChange={(e) => setChartProductVariantId(Number(e.target.value))}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
+                >
+                  <option value={0}>Tất cả biến thể</option>
+                  {productVariants.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.productName} · Hạng {v.grade}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
             <div className="space-y-2">
               {!chartRows.length ? (
-                <p className="text-xs text-slate-500">Chưa có dữ liệu để vẽ biểu đồ.</p>
+                <p className="text-xs text-slate-500">
+                  {chartReportFetching
+                    ? "Đang tải dữ liệu biểu đồ…"
+                    : "Chưa có dữ liệu để vẽ biểu đồ."}
+                </p>
               ) : (
                 chartRows.map((r) => {
                   const revenue = Math.max(0, r.revenue);
