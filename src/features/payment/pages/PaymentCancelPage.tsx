@@ -1,8 +1,17 @@
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { CircleX } from "lucide-react";
 import { ROUTES } from "../../../shared/constants/routes";
+import { useAuth } from "../../auth/hooks/useAuth";
+import { ordersPathAfterPayment, rolesFromAuthUser } from "../utils/ordersPathAfterPayment";
 
 export default function PaymentCancelPage() {
+    const auth = useAuth();
+    const backToOrdersPath = useMemo(
+        () => ordersPathAfterPayment(rolesFromAuthUser(auth.user)),
+        [auth.user],
+    );
+
     return (
         <section className="min-h-[70vh] bg-gradient-to-b from-rose-50 to-white">
             <div className="mx-auto flex max-w-2xl flex-col items-center px-4 py-16 text-center">
@@ -19,7 +28,7 @@ export default function PaymentCancelPage() {
                         Về trang chủ
                     </Link>
                     <Link
-                        to={ROUTES.SALES_ORDERS}
+                        to={backToOrdersPath}
                         className="rounded-lg bg-[#1a5f2a] px-4 py-2 text-sm font-semibold text-white hover:bg-[#145026]"
                     >
                         Quay lại xử lý đơn

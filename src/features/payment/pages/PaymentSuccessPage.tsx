@@ -1,8 +1,17 @@
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2 } from "lucide-react";
 import { ROUTES } from "../../../shared/constants/routes";
+import { useAuth } from "../../auth/hooks/useAuth";
+import { ordersPathAfterPayment, rolesFromAuthUser } from "../utils/ordersPathAfterPayment";
 
 export default function PaymentSuccessPage() {
+    const auth = useAuth();
+    const ordersListPath = useMemo(
+        () => ordersPathAfterPayment(rolesFromAuthUser(auth.user)),
+        [auth.user],
+    );
+
     return (
         <section className="min-h-[70vh] bg-gradient-to-b from-emerald-50 to-white">
             <div className="mx-auto flex max-w-2xl flex-col items-center px-4 py-16 text-center">
@@ -19,7 +28,7 @@ export default function PaymentSuccessPage() {
                         Về trang chủ
                     </Link>
                     <Link
-                        to={ROUTES.SALES_ORDERS}
+                        to={ordersListPath}
                         className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                     >
                         Mở danh sách đơn
