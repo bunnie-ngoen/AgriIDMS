@@ -66,6 +66,9 @@ const formatM3 = (value: number | null | undefined) =>
     maximumFractionDigits: 2,
   });
 
+/** Đồng bộ với WarehouseList, CreateGoodsReceipt, PutBoxIntoSlot: ngưỡng vận hành = 80% tổng sức chứa nominal các slot. */
+const MAX_SLOT_OPERATIONAL_UTILIZATION = 0.8;
+
 const extractVariantFromContents = (
   contents: {
     productVariantId?: number | null;
@@ -344,7 +347,9 @@ const SlotDetailPanel = ({
       : (contents?.totalBoxVolumeM3 ?? 0) > 0
         ? (contents?.totalBoxVolumeM3 ?? 0)
         : (slot.currentCapacity || 0);
-  const effectiveCapacity = (contents?.capacity ?? 0) > 0 ? (contents?.capacity ?? 0) : slot.capacity;
+  const nominalSlotCapacity =
+    (contents?.capacity ?? 0) > 0 ? (contents?.capacity ?? 0) : Number(slot.capacity ?? 0);
+  const effectiveCapacity = nominalSlotCapacity * MAX_SLOT_OPERATIONAL_UTILIZATION;
   const ratio =
     effectiveCapacity > 0 ? Math.min(1, effectiveCurrentCapacity / effectiveCapacity) * 100 : 0;
   const sortedSlotBoxes = useMemo(() => {
@@ -850,9 +855,14 @@ const SlotDetailPanel = ({
       </div>
       <dl className="space-y-1.5 text-[11px]">
         <div className="flex justify-between">
-          <dt className="text-slate-500">Sức chứa (m³)</dt>
+          <dt className="text-slate-500">Sức chứa vận hành (m³)</dt>
           <dd className="font-medium text-slate-800">{formatM3(effectiveCapacity)}</dd>
         </div>
+        {nominalSlotCapacity > 0 ? (
+          <p className="text-[10px] text-slate-500 -mt-1">
+            80% từ tổng slot nominal: {formatM3(nominalSlotCapacity)} m³
+          </p>
+        ) : null}
         <div className="flex justify-between">
           <dt className="text-slate-500">Đang chứa (m³)</dt>
           <dd className="font-medium text-slate-800">{formatM3(effectiveCurrentCapacity)}</dd>
@@ -912,8 +922,8 @@ const SlotDetailPanel = ({
               {formatM3(contents.totalBoxVolumeM3 ?? contents.currentCapacity)} m³
             </p>
             <p className="text-[10px] text-slate-500">
-              {formatM3(contents.currentCapacity)} / {formatM3(contents.capacity)} m³ · còn{" "}
-              {formatM3(contents.remainingCapacity)} m³ trống
+              {formatM3(effectiveCurrentCapacity)} / {formatM3(effectiveCapacity)} m³ · còn{" "}
+              {formatM3(Math.max(0, effectiveCapacity - effectiveCurrentCapacity))} m³ trống (vận hành)
             </p>
             <button
               type="button"
@@ -974,7 +984,8 @@ const RackOverview = ({
     }
     return slots.reduce(
       (acc, s) => ({
-        totalCapacity: acc.totalCapacity + (s.capacity || 0),
+        totalCapacity:
+          acc.totalCapacity + (s.capacity || 0) * MAX_SLOT_OPERATIONAL_UTILIZATION,
         totalCurrent: acc.totalCurrent + (s.currentCapacity || 0),
       }),
       { totalCapacity: 0, totalCurrent: 0 }
@@ -1003,10 +1014,9 @@ const RackOverview = ({
       {slots && slots.length > 0 && (
         <div className="p-2 flex flex-wrap gap-1.5">
           {slots.map((s) => {
+            const opCap = (s.capacity || 0) * MAX_SLOT_OPERATIONAL_UTILIZATION;
             const r =
-              s.capacity && s.capacity > 0
-                ? Math.min(1, s.currentCapacity / s.capacity)
-                : 0;
+              opCap > 0 ? Math.min(1, s.currentCapacity / opCap) : 0;
             const cellStyle = getUsageStyleFromRatio(r);
             const pct = Math.round(r * 100);
             const hasVariantHighlight =
@@ -1036,13 +1046,13 @@ const RackOverview = ({
                     ? "opacity-40 saturate-50"
                     : ""
                 }`}
-                title={`${s.code}: ${formatM3(s.currentCapacity)}/${formatM3(s.capacity)} (${pct}%) — Bấm xem chi tiết`}
+                title={`${s.code}: ${formatM3(s.currentCapacity)}/${formatM3(opCap)} (${pct}% vận hành) — Bấm xem chi tiết`}
               >
                 <span className="truncate max-w-full font-semibold">
                   {s.code}
                 </span>
                 <span className="text-[9px] opacity-90 mt-0.5">
-                  {formatM3(s.currentCapacity)}/{formatM3(s.capacity)} m³ ({pct}%)
+                  {formatM3(s.currentCapacity)}/{formatM3(opCap)} m³ ({pct}%)
                 </span>
               </button>
             );
@@ -1218,7 +1228,8 @@ const WarehouseMap = () => {
       return getUsageStyleFromRatio(0);
     }
 
-    const ratio = slot.currentCapacity / slot.capacity;
+    const opCap = slot.capacity * MAX_SLOT_OPERATIONAL_UTILIZATION;
+    const ratio = opCap > 0 ? slot.currentCapacity / opCap : 0;
     return getUsageStyleFromRatio(ratio);
   };
 
@@ -2349,10 +2360,11 @@ const WarehouseMap = () => {
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
                   {slots.map((slot) => {
                     const style = getSlotStyle(slot);
-                    const ratio =
+                    const opCap =
                       slot.capacity > 0
-                        ? (slot.currentCapacity / slot.capacity) * 100
+                        ? slot.capacity * MAX_SLOT_OPERATIONAL_UTILIZATION
                         : 0;
+                    const ratio = opCap > 0 ? (slot.currentCapacity / opCap) * 100 : 0;
                     const isSelected = detailSlot?.id === slot.id;
                     const hasVariantHighlight =
                       !!selectedVariantFilterId && variantMatchedSlotIds.length > 0;
@@ -2383,7 +2395,7 @@ const WarehouseMap = () => {
                       >
                         <span className="truncate max-w-[80%]">{slot.code}</span>
                         <span className="mt-0.5 text-[9px] opacity-90">
-                          {formatM3(slot.currentCapacity)}/{formatM3(slot.capacity)} m³ (
+                          {formatM3(slot.currentCapacity)}/{formatM3(opCap)} m³ (
                           {ratio.toFixed(0)}%)
                         </span>
                       </button>
