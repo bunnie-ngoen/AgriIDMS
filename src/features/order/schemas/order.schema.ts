@@ -12,6 +12,8 @@ export const orderListItemSchema = z.object({
     createdAt: z.string(),
     itemCount: z.coerce.number().int(),
     latestPaymentStatus: z.string().nullable().optional(),
+    customerName: z.string().nullable().optional(),
+    customerPhone: z.string().nullable().optional(),
 });
 
 export const orderListSchema = z.array(orderListItemSchema);

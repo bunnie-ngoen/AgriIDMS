@@ -18,6 +18,8 @@ export const pendingCodPaymentItemSchema = z.object({
     paymentId: z.coerce.number().int(),
     orderId: z.coerce.number().int(),
     customerUserId: z.string(),
+    customerName: z.string().nullable().optional(),
+    customerPhone: z.string().nullable().optional(),
     amount: z.coerce.number(),
     paymentStatus: z.string(),
     paymentMethod: z.string(),
