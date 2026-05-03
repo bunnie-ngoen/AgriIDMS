@@ -14,7 +14,7 @@ function formatKg(value?: number | null) {
   const n = typeof value === "number" ? value : 0;
   return n.toLocaleString("vi-VN", {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 3,
+    maximumFractionDigits: 1,
   });
 }
 
@@ -190,7 +190,11 @@ export default function UnassignedInventoryPage() {
           </div>
           <button
             type="button"
-            onClick={() => navigate(putawayBasePath)}
+            onClick={() => {
+              const q =
+                warehouseId > 0 ? `?warehouseId=${warehouseId}` : "";
+              navigate(`${putawayBasePath}${q}`);
+            }}
             className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-100"
           >
             Mở màn xếp vị trí
@@ -223,14 +227,19 @@ export default function UnassignedInventoryPage() {
                   </td>
                 </tr>
               ) : (
-                groupedByLot.map((row) => (
+                groupedByLot.map((row) => {
+                  const warehouseLabel =
+                    (row.warehouseName && row.warehouseName.trim() && row.warehouseName !== "—"
+                      ? row.warehouseName
+                      : warehouses.find((w) => w.id === warehouseId)?.name) ?? "—";
+                  return (
                   <tr key={row.lotId} className="border-t border-slate-100">
                     <td className="px-3 py-2 font-semibold text-slate-900">{row.lotCode}</td>
                     <td className="px-3 py-2 text-slate-700">
                       {row.productName}
                       {row.productVariantName ? ` · ${row.productVariantName}` : ""}
                     </td>
-                    <td className="px-3 py-2 text-slate-700">{row.warehouseName}</td>
+                    <td className="px-3 py-2 text-slate-700">{warehouseLabel}</td>
                     <td className="px-3 py-2 text-right text-slate-700">{row.boxCount}</td>
                     <td className="px-3 py-2 text-right text-slate-700">{formatKg(row.totalWeight)} kg</td>
                     <td className="px-3 py-2 text-center">
@@ -248,7 +257,11 @@ export default function UnassignedInventoryPage() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           type="button"
-                          onClick={() => navigate(`${putawayBasePath}?lotId=${row.lotId}`)}
+                          onClick={() =>
+                            navigate(
+                              `${putawayBasePath}?lotId=${row.lotId}&warehouseId=${warehouseId}`,
+                            )
+                          }
                           className="rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
                         >
                           Đi xếp ngay
@@ -266,7 +279,8 @@ export default function UnassignedInventoryPage() {
                       </div>
                     </td>
                   </tr>
-                ))
+                );
+                })
               )}
             </tbody>
           </table>
