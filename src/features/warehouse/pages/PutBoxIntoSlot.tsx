@@ -52,6 +52,15 @@ function isIneligibleForPutaway(status?: string | null): boolean {
   );
 }
 
+/** Tránh hiển thị float lệch (vd. 2.4000000000000004) — tối đa 1 chữ số thập phân, locale vi. */
+function formatVolumeM3(value: number): string {
+  const n = Math.max(0, Number(value) || 0);
+  return n.toLocaleString("vi-VN", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+  });
+}
+
 export default function PutBoxIntoSlot() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -183,6 +192,20 @@ export default function PutBoxIntoSlot() {
       setSelectedSlotId(slot.id);
     }
   }, [slot?.id, slot?.rackId]);
+
+  /** Khi chỉ có lotId (link cũ): gắn kho theo tên lô nếu API không trả warehouseId trên URL. */
+  useEffect(() => {
+    if (selectedWarehouseId > 0) return;
+    const name = lotDetail?.warehouseName?.trim();
+    if (!name) return;
+    const w = warehouses.find((x) => (x.name ?? "").trim() === name);
+    if (w && w.id > 0) {
+      setSelectedWarehouseId(w.id);
+      setSelectedZoneId(0);
+      setSelectedRackId(0);
+      setSelectedSlotId(0);
+    }
+  }, [lotDetail?.warehouseName, selectedWarehouseId, warehouses]);
 
   useEffect(() => {
     setSelectedLotBoxIds([]);
@@ -488,7 +511,7 @@ export default function PutBoxIntoSlot() {
     const tolerance = 0.0001;
     if (selectedLotTotalVolume - slotRemaining > tolerance) {
       toast.error(
-        `Vị trí không đủ dung lượng: còn ${slotRemaining.toFixed(4)} m³, đã chọn ${selectedLotTotalVolume.toFixed(4)} m³.`,
+        `Vị trí không đủ dung lượng: còn ${formatVolumeM3(slotRemaining)} m³, đã chọn ${formatVolumeM3(selectedLotTotalVolume)} m³.`,
       );
       return;
     }
@@ -1129,7 +1152,10 @@ export default function PutBoxIntoSlot() {
                       {slots.map((s) => (
                         <option key={s.id} value={s.id}>
                           #{s.id} · {s.code} · còn{" "}
-                          {Math.max(0, s.capacity * MAX_SLOT_UTILIZATION - s.currentCapacity)} m³
+                          {formatVolumeM3(
+                            Math.max(0, s.capacity * MAX_SLOT_UTILIZATION - s.currentCapacity),
+                          )}{" "}
+                          m³
                         </option>
                       ))}
                     </select>
@@ -1157,7 +1183,7 @@ export default function PutBoxIntoSlot() {
                         Dung lượng trống (m³)
                       </p>
                       <p className="font-semibold text-slate-900">
-                        {slotRemaining}
+                        {formatVolumeM3(slotRemaining)} m³
                       </p>
                     </div>
                     <div className="col-span-2">
@@ -1165,7 +1191,7 @@ export default function PutBoxIntoSlot() {
                         Dung lượng vận hành (80%)
                       </p>
                       <p className="font-semibold text-slate-900">
-                        {slotCurrent} / {slotCapacity} m³
+                        {formatVolumeM3(slotCurrent)} / {formatVolumeM3(slotCapacity)} m³
                       </p>
                       {((box?.volumeM3 != null && box.volumeM3 > 0) || selectedLotTotalVolume > 0) &&
                         slotCapacity > 0 && (

@@ -1595,7 +1595,11 @@ export default function GoodsReceiptQC() {
                 )}
                 className="grid grid-cols-1 md:grid-cols-12 gap-3 text-sm items-start rounded-2xl border border-emerald-100 bg-white p-3"
               >
-                <div className="md:col-span-3">
+                <input
+                  type="hidden"
+                  {...createBoxesForm.register("boxSize", { valueAsNumber: true })}
+                />
+                <div className="md:col-span-4">
                   <label className="flex h-5 items-center text-xs font-medium text-slate-600 mb-1">
                     Chọn lô
                   </label>
@@ -1618,7 +1622,7 @@ export default function GoodsReceiptQC() {
                     ))}
                   </select>
                 </div>
-                <div className="md:col-span-3">
+                <div className="md:col-span-4">
                   <label className="flex h-5 items-center text-xs font-medium text-slate-600 mb-1">
                     Loại thùng
                   </label>
@@ -1638,7 +1642,7 @@ export default function GoodsReceiptQC() {
                     </p>
                   )}
                 </div>
-                <div className="md:col-span-3">
+                <div className="md:col-span-4">
                   <label className="flex h-5 items-center text-xs font-medium text-slate-600 mb-1">
                     Kích cỡ thùng
                   </label>
@@ -1655,27 +1659,6 @@ export default function GoodsReceiptQC() {
                       </option>
                     ))}
                   </select>
-                </div>
-                <div className="md:col-span-3">
-                  <label className="flex h-5 items-center text-xs font-medium text-slate-600 mb-1">
-                    Khối lượng thùng (kg)
-                  </label>
-                  <input
-                    type="number"
-                    min={0.01}
-                    step="0.01"
-                    {...createBoxesForm.register("boxSize", {
-                      valueAsNumber: true,
-                    })}
-                    readOnly
-                    className="w-full h-11 rounded-xl border border-slate-200 px-3 py-2 text-sm bg-slate-50 focus:outline-none"
-                    placeholder="Tự động theo khối lượng riêng nhân thể tích thùng"
-                  />
-                  <p className="mt-1 text-[11px] text-slate-500 min-h-[16px]">
-                    {selectedVariant
-                      ? `Khối lượng riêng: ${selectedVariant.densityKgPerM3} kg/m³`
-                      : "Lô chưa xác định được biến thể sản phẩm"}
-                  </p>
                 </div>
                 <div className="md:col-span-12 flex justify-start pt-1">
                   <button
