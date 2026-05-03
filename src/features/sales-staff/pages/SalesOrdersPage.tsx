@@ -784,11 +784,13 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
     }
     return (
       <div className={`${SALES_TABLE_SHELL} max-h-[560px] overflow-auto`}>
-        <table className="w-full min-w-[980px] table-fixed bg-white">
+        <table className="w-full min-w-[1180px] table-fixed bg-white">
           <thead className="sticky top-0 z-10">
             <tr className={SALES_TABLE_HEAD}>
               <th className="w-20 py-3 pl-3 pr-6 whitespace-nowrap text-left lg:w-[5.5rem]">Thanh toán</th>
               <th className="py-3 pl-2 pr-3">Đơn hàng</th>
+              <th className="py-3 pr-3">Tên khách</th>
+              <th className="py-3 pr-3">Số điện thoại</th>
               <th className="py-3 pr-3">Trạng thái thanh toán</th>
               <th className="py-3 pr-3">Trạng thái đơn hàng</th>
               <th className="py-3 pr-3">Ngày và giờ</th>
@@ -811,6 +813,12 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
                   {p.paymentId}
                 </td>
                 <td className="py-3.5 pl-2 pr-3 font-semibold text-slate-900">Đơn hàng {p.orderId}</td>
+                <td className="py-3.5 pr-3 text-slate-700">
+                  {(p.customerName && p.customerName.trim()) || "—"}
+                </td>
+                <td className="py-3.5 pr-3 tabular-nums text-slate-700">
+                  {(p.customerPhone && p.customerPhone.trim()) || "—"}
+                </td>
                 <td className="py-3.5 pr-3">
                   <span className={`${STATUS_PILL} ${paymentStatusTone(p.paymentStatus)}`}>
                     {paymentStatusLabel(p.paymentStatus)}

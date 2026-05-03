@@ -30,6 +30,8 @@ type UnpaidPosRow = {
   fulfillmentType?: string | null;
   paymentTiming?: string | null;
   queueLabels: string[];
+  customerName?: string | null;
+  customerPhone?: string | null;
 };
 
 export default function SalesPosUnpaidOrdersPage() {
@@ -62,6 +64,8 @@ export default function SalesPosUnpaidOrdersPage() {
           fulfillmentType: order.fulfillmentType ?? null,
           paymentTiming: order.paymentTiming ?? null,
           queueLabels: [queueLabel],
+          customerName: order.customerName ?? null,
+          customerPhone: order.customerPhone ?? null,
         });
         return;
       }
@@ -69,6 +73,8 @@ export default function SalesPosUnpaidOrdersPage() {
       existed.latestPaymentStatus = order.latestPaymentStatus ?? existed.latestPaymentStatus;
       existed.fulfillmentType = order.fulfillmentType ?? existed.fulfillmentType;
       existed.paymentTiming = order.paymentTiming ?? existed.paymentTiming;
+      existed.customerName = order.customerName ?? existed.customerName ?? null;
+      existed.customerPhone = order.customerPhone ?? existed.customerPhone ?? null;
       if (!existed.queueLabels.includes(queueLabel)) existed.queueLabels.push(queueLabel);
       if (parseApiDateInput(order.createdAt).getTime() > parseApiDateInput(existed.createdAt).getTime()) {
         existed.createdAt = order.createdAt;
@@ -123,10 +129,12 @@ export default function SalesPosUnpaidOrdersPage() {
           <p className="text-sm text-slate-500">Không có đơn mua tại quầy chưa thanh toán phù hợp bộ lọc.</p>
         ) : (
           <div className="overflow-auto rounded-xl border border-slate-200">
-            <table className="w-full min-w-[920px] bg-white">
+            <table className="w-full min-w-[1080px] bg-white">
               <thead className="bg-slate-50">
                 <tr className="text-left text-xs text-slate-500">
                   <th className="px-3 py-2">Mã đơn</th>
+                  <th className="px-3 py-2">Tên khách</th>
+                  <th className="px-3 py-2">Số điện thoại</th>
                   <th className="px-3 py-2">Tiến độ xử lý</th>
                   <th className="px-3 py-2">Trạng thái đơn</th>
                   <th className="px-3 py-2">Ngày và giờ</th>
@@ -138,6 +146,10 @@ export default function SalesPosUnpaidOrdersPage() {
                   return (
                     <tr key={row.orderId} className="border-t border-slate-200 text-sm text-slate-700">
                       <td className="px-3 py-2 font-semibold">#{row.orderId}</td>
+                      <td className="px-3 py-2">{(row.customerName && row.customerName.trim()) || "—"}</td>
+                      <td className="px-3 py-2 tabular-nums">
+                        {(row.customerPhone && row.customerPhone.trim()) || "—"}
+                      </td>
                       <td className="px-3 py-2">
                         <div className="flex flex-wrap gap-1">
                           {row.queueLabels.map((label) => (
