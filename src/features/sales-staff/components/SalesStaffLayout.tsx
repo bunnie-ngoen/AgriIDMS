@@ -246,7 +246,7 @@ export default function SalesStaffLayout() {
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-700 text-cyan-300">
                   <PlusCircle size={15} />
                 </span>
-                <span className="flex-1 text-left">Bán tại quầy (POS)</span>
+                <span className="flex-1 text-left">Bán tại quầy</span>
                 <ChevronDown
                   size={15}
                   className={`transition-transform duration-200 ${isPosOpen ? "rotate-180" : ""}`}

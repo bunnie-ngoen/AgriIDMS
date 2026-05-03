@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Plus, Trash2 } from "lucide-react";
 import { useGetHomeProductsQuery, useGetHomeProductDetailQuery } from "../../home/api/home.api";
 import type { HomeProduct } from "../../home/schemas/home.schema";
+import { getHomeProductDiscountViewModel } from "../../home/utils/productDiscountDisplay";
 import { useCreatePosOrderMutation, useLazyLookupPosCustomerByPhoneQuery } from "../../order/api/order.api";
 import SalesStaffPageShell from "../components/SalesStaffPageShell";
 
@@ -77,6 +78,10 @@ function PosRow({ row, variants, updateRow, removeRow, canRemove }: PosRowProps)
 
   const boxTypes = productDetail?.boxTypes ?? [];
   const selectedVariant = variants.find((v) => String(v.id) === row.productVariantId);
+  /** Chi tiết Home khi đã load — ưu tiên; không thì dùng bản ghi GET product-variants (cùng field nearExpiry*). */
+  const displayPriceVm = selectedVariant
+    ? getHomeProductDiscountViewModel(productDetail ?? selectedVariant)
+    : null;
   const selectedOptionValue = row.boxWeight
     ? `${row.isPartial ? "Partial" : "Full"}|${row.boxWeight}`
     : "";
@@ -107,15 +112,46 @@ function PosRow({ row, variants, updateRow, removeRow, canRemove }: PosRowProps)
               </select>
             </div>
 
-            {selectedVariant ? (
-              <div className="w-[220px]">
-                <label className="text-xs font-medium text-slate-600">Giá bán (₫/kg)</label>
-                <input
-                  type="text"
-                  readOnly
-                  value={`${vnd(selectedVariant.price)} ₫/kg`}
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-800"
-                />
+            {selectedVariant && displayPriceVm ? (
+              <div className="min-w-[220px] max-w-[260px]">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-slate-600">Giá bán (₫/kg)</label>
+                  {displayPriceVm.hasDiscount ? (
+                    <span className="rounded bg-rose-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
+                      Giảm giá
+                    </span>
+                  ) : null}
+                </div>
+                <div className="mt-1 space-y-0.5 rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-800">
+                  {displayPriceVm.hasDiscount && displayPriceVm.salePricePerKg != null ? (
+                    <>
+                      <div className="text-xs text-slate-500 line-through tabular-nums">
+                        {vnd(displayPriceVm.basePricePerKg)} ₫/kg
+                      </div>
+                      <div className="font-semibold tabular-nums text-rose-700">
+                        {vnd(displayPriceVm.salePricePerKg)} ₫/kg
+                      </div>
+                      {displayPriceVm.discountPercent != null ? (
+                        <div className="text-[11px] font-medium text-rose-800">
+                          −{displayPriceVm.discountPercent}%
+                        </div>
+                      ) : null}
+                    </>
+                  ) : displayPriceVm.hasDiscount &&
+                    displayPriceVm.salePricePerKg == null &&
+                    displayPriceVm.tiers.length > 0 ? (
+                    <>
+                      <div className="text-xs text-slate-500 line-through tabular-nums">
+                        {vnd(displayPriceVm.basePricePerKg)} ₫/kg
+                      </div>
+                      <div className="text-xs font-medium text-amber-800">
+                        Theo mức HSD từ {vnd(displayPriceVm.tiers[0]!.pricePerKg)} ₫/kg — giá cuối khớp khi tạo đơn
+                      </div>
+                    </>
+                  ) : (
+                    <div className="font-medium tabular-nums">{vnd(displayPriceVm.basePricePerKg)} ₫/kg</div>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="w-[220px]" />
