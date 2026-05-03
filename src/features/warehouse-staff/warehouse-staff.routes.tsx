@@ -22,6 +22,9 @@ const WarehouseExportsPage = lazy(
 const WarehouseStartShippingPage = lazy(
   () => import("./pages/WarehouseStartShippingPage"),
 );
+const WarehousePosCounterHandoverPage = lazy(
+  () => import("./pages/WarehousePosCounterHandoverPage"),
+);
 const GoodsReceiptListPage = lazy(
   () => import("../goods-receipt/pages/GoodsReceiptList"),
 );
@@ -88,6 +91,7 @@ export const warehouseStaffRoutes = [
       { path: "stock-checks/:id", element: <StockCheckDetailsPage /> },
       { path: "orders/:orderId/proposals", element: <WarehouseAllocationProposalPage /> },
       { path: "exports", element: <WarehouseExportsPage /> },
+      { path: "pos-counter-handover", element: <WarehousePosCounterHandoverPage /> },
       { path: "shipping", element: <WarehouseStartShippingPage /> },
       { path: "goods-receipts", element: <GoodsReceiptListPage /> },
       { path: "ai-qc", element: <AiQcStandalonePage /> },

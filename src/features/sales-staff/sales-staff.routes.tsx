@@ -8,6 +8,7 @@ const SalesApprovedExportPage = lazy(() => import("./pages/SalesApprovedExportPa
 const SalesPosCreatePage = lazy(() => import("./pages/SalesPosCreatePage"));
 const SalesPosUnpaidOrdersPage = lazy(() => import("./pages/SalesPosUnpaidOrdersPage"));
 const SalesOrderDetailPage = lazy(() => import("./pages/SalesOrderDetailPage"));
+const SalesOrderBankTransferPage = lazy(() => import("./pages/SalesOrderBankTransferPage"));
 const SalesComplaintsPendingPage = lazy(() => import("./pages/SalesComplaintsPendingPage"));
 const SalesComplaintsProcessedPage = lazy(() => import("./pages/SalesComplaintsProcessedPage"));
 const ProfilePage = lazy(() => import("../home/pages/ProfilePage"));
@@ -25,6 +26,7 @@ export const salesStaffRoutes = [
       { path: "orders/unpaid-pos", element: <SalesPosUnpaidOrdersPage /> },
       { path: "orders/pending-cod", element: <SalesPendingCodPage /> },
       { path: "orders/approved-export", element: <SalesApprovedExportPage /> },
+      { path: "orders/:id/bank-transfer", element: <SalesOrderBankTransferPage /> },
       { path: "orders/:id", element: <SalesOrderDetailPage /> },
       { path: "complaints", element: <SalesComplaintsPendingPage /> },
       { path: "complaints/pending", element: <SalesComplaintsPendingPage /> },

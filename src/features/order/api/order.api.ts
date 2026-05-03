@@ -8,6 +8,7 @@ import {
     orderListSchema,
     paidPendingExportOrderListSchema,
     saleConfirmResponseSchema,
+    posCustomerLookupResponseSchema,
     type AllocationProposalResult,
     type AllocationConfirmResponse,
     type AllocationProposalsResponse,
@@ -15,6 +16,7 @@ import {
     type OrderListItem,
     type PaidPendingExportOrderListItem,
     type SaleConfirmResponse,
+    type PosCustomerLookupResponse,
 } from "../schemas/order.schema";
 
 /** Backend `ShippingStatus` (AgriIDMS) — API nhận JSON số khi chưa bật JsonStringEnumConverter. */
@@ -216,6 +218,38 @@ export const orderApi = api.injectEndpoints({
             },
         }),
 
+        getPendingPosCounterHandoverOrders: builder.query<
+            OrderListItem[],
+            { skip?: number; take?: number } | void
+        >({
+            query: (arg) => ({
+                url: "Orders/staff/pending-pos-counter-handover",
+                method: "GET",
+                params: {
+                    skip: arg?.skip ?? 0,
+                    take: arg?.take ?? 50,
+                },
+            }),
+            transformResponse: (raw: unknown) => {
+                const normalized = toCamelCase(raw);
+                const parsed = orderListSchema.safeParse(normalized);
+                if (!parsed.success) return [];
+                return parsed.data;
+            },
+        }),
+
+        confirmPosCounterHandoverAsStaff: builder.mutation<
+            { message?: string; orderId?: number; status?: string },
+            number
+        >({
+            query: (id) => ({
+                url: `Orders/${id}/pos-counter-handover/confirm`,
+                method: "PATCH",
+            }),
+            transformResponse: (raw: unknown) =>
+                toCamelCase(raw) as { message?: string; orderId?: number; status?: string },
+        }),
+
         saleConfirmOrder: builder.mutation<SaleConfirmResponse, number>({
             query: (id) => ({
                 url: `Orders/${id}/sale-confirm`,
@@ -258,6 +292,22 @@ export const orderApi = api.injectEndpoints({
             },
         }),
 
+        lookupPosCustomerByPhone: builder.query<PosCustomerLookupResponse, string>({
+            query: (phone) => ({
+                url: "Orders/staff/pos-customer-lookup",
+                method: "GET",
+                params: { phone },
+            }),
+            transformResponse: (raw: unknown) => {
+                const normalized = toCamelCase(raw);
+                const parsed = posCustomerLookupResponseSchema.safeParse(normalized);
+                if (!parsed.success) {
+                    return { found: false } satisfies PosCustomerLookupResponse;
+                }
+                return parsed.data;
+            },
+        }),
+
         createPosOrder: builder.mutation<
             {
                 orderId: number;
@@ -269,6 +319,7 @@ export const orderApi = api.injectEndpoints({
                 customerUserId?: string;
                 customerName?: string;
                 customerPhone?: string;
+                customerAddress?: string;
                 items: Array<{
                     productVariantId: number;
                     boxWeight: number;
@@ -416,6 +467,9 @@ export const {
     useGetPendingWarehouseConfirmOrdersQuery,
     useGetConfirmedAllocationOrdersQuery,
     useGetApprovedExportOrdersQuery,
+    useGetPendingPosCounterHandoverOrdersQuery,
+    useConfirmPosCounterHandoverAsStaffMutation,
+    useLazyLookupPosCustomerByPhoneQuery,
     useCreatePosOrderMutation,
     useSaleConfirmOrderMutation,
     useSaleRejectOrderMutation,

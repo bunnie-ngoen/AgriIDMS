@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Plus, Trash2 } from "lucide-react";
 import { useGetHomeProductsQuery, useGetHomeProductDetailQuery } from "../../home/api/home.api";
 import type { HomeProduct } from "../../home/schemas/home.schema";
-import { useCreatePosOrderMutation } from "../../order/api/order.api";
+import { useCreatePosOrderMutation, useLazyLookupPosCustomerByPhoneQuery } from "../../order/api/order.api";
 import SalesStaffPageShell from "../components/SalesStaffPageShell";
 
 type PosFormItem = {
@@ -18,7 +18,7 @@ type PosFormItem = {
 type RecreateOrderPrefill = {
   sourceOrderId: number;
   fulfillmentType: 0 | 1;
-  paymentTiming?: 0 | 1;
+  /** Nếu có (đơn cũ gắn tài khoản), coi như khách đã xác thực — không bắt tìm lại. */
   customerUserId?: string;
   customerName?: string;
   customerPhone?: string;
@@ -27,6 +27,8 @@ type RecreateOrderPrefill = {
   expectedPaymentMethod?: "COD" | "BANKING";
   items: PosFormItem[];
 };
+
+type CustomerLookupMatch = "unset" | "found" | "guest" | "error";
 
 function vnd(n: number) {
   return n.toLocaleString("vi-VN");
@@ -186,11 +188,14 @@ export default function SalesPosCreatePage() {
   const location = useLocation();
   const { data: variants = [], isLoading: isLoadingVariants } = useGetHomeProductsQuery();
   const [createPosOrder, { isLoading: isCreating }] = useCreatePosOrderMutation();
+  const [triggerLookupCustomer, { isFetching: isLookupFetching }] = useLazyLookupPosCustomerByPhoneQuery();
 
   const [rows, setRows] = useState<PosFormItem[]>([makeRow(1)]);
   const [fulfillmentType, setFulfillmentType] = useState<0 | 1>(0);
-  const [paymentTiming, setPaymentTiming] = useState<0 | 1>(0);
-  const [customerUserId, setCustomerUserId] = useState("");
+  /** UserId khách (Customer) sau tra cứu SĐT hoặc từ prefill — không nhập tay trên form. */
+  const [resolvedCustomerUserId, setResolvedCustomerUserId] = useState<string | null>(null);
+  const [customerMatch, setCustomerMatch] = useState<CustomerLookupMatch>("unset");
+  const [lastSearchedPhone, setLastSearchedPhone] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
@@ -206,6 +211,49 @@ export default function SalesPosCreatePage() {
     [variants],
   );
 
+  const phoneDirty =
+    lastSearchedPhone !== null && customerPhone.trim() !== lastSearchedPhone.trim();
+  const canUseLinkedAccount =
+    customerMatch === "found" &&
+    !!resolvedCustomerUserId?.trim() &&
+    !phoneDirty;
+
+  const onCustomerPhoneChange = (value: string) => {
+    setCustomerPhone(value);
+    if (lastSearchedPhone !== null && value.trim() !== lastSearchedPhone.trim()) {
+      setResolvedCustomerUserId(null);
+      setCustomerMatch("unset");
+    }
+  };
+
+  const handleLookupCustomer = async () => {
+    const q = customerPhone.trim();
+    if (!q) {
+      toast.error("Vui lòng nhập số điện thoại trước khi tìm kiếm.");
+      return;
+    }
+    try {
+      const res = await triggerLookupCustomer(q).unwrap();
+      setLastSearchedPhone(q);
+      if (res.found && res.customerUserId) {
+        setResolvedCustomerUserId(res.customerUserId);
+        setCustomerMatch("found");
+        setCustomerName((res.fullName ?? "").trim());
+        setCustomerPhone((res.phoneNumber ?? q).trim());
+        setCustomerAddress((res.address ?? "").trim());
+      } else {
+        setResolvedCustomerUserId(null);
+        setCustomerMatch("guest");
+        setCustomerName("");
+        setCustomerPhone(q);
+        setCustomerAddress("");
+      }
+    } catch {
+      setCustomerMatch("error");
+      toast.error("Không thể kiểm tra khách hàng, vui lòng thử lại.");
+    }
+  };
+
   useEffect(() => {
     const state = location.state as { prefillFromOrder?: RecreateOrderPrefill } | null;
     const prefill = state?.prefillFromOrder;
@@ -213,8 +261,16 @@ export default function SalesPosCreatePage() {
 
     setSourceOrderId(prefill.sourceOrderId);
     setFulfillmentType(prefill.fulfillmentType);
-    setPaymentTiming(prefill.paymentTiming ?? 0);
-    setCustomerUserId(prefill.customerUserId ?? "");
+    const uid = prefill.customerUserId?.trim();
+    if (uid) {
+      setResolvedCustomerUserId(uid);
+      setCustomerMatch("found");
+      setLastSearchedPhone(prefill.customerPhone?.trim() ?? null);
+    } else {
+      setResolvedCustomerUserId(null);
+      setCustomerMatch("unset");
+      setLastSearchedPhone(null);
+    }
     setCustomerName(prefill.customerName ?? "");
     setCustomerPhone(prefill.customerPhone ?? "");
     setCustomerAddress(prefill.customerAddress ?? "");
@@ -257,6 +313,11 @@ export default function SalesPosCreatePage() {
       return;
     }
 
+    if (!canUseLinkedAccount && !customerPhone.trim()) {
+      toast.error("Vui lòng nhập số điện thoại khách (hoặc tra cứu để gắn tài khoản).");
+      return;
+    }
+
     const t = toast.loading("Đang tạo đơn mua trực tiếp tại quầy...");
     setCreatedOrderId(null);
     setCreatedTotalAmount(null);
@@ -264,10 +325,12 @@ export default function SalesPosCreatePage() {
     try {
       const created = await createPosOrder({
         fulfillmentType,
-        paymentTiming: fulfillmentType === 1 ? paymentTiming : undefined,
-        customerUserId: customerUserId.trim() || undefined,
-        customerName: customerName.trim() || undefined,
-        customerPhone: customerPhone.trim() || undefined,
+        // POS tại quầy chỉ trả trước (PayBefore); không hỗ trợ trả sau.
+        paymentTiming: fulfillmentType === 1 ? 0 : undefined,
+        customerUserId: canUseLinkedAccount ? resolvedCustomerUserId!.trim() : undefined,
+        customerName: canUseLinkedAccount ? undefined : customerName.trim() || undefined,
+        customerPhone: canUseLinkedAccount ? undefined : customerPhone.trim() || undefined,
+        customerAddress: customerAddress.trim() || undefined,
         items: parsedItems,
       }).unwrap();
 
@@ -284,7 +347,7 @@ export default function SalesPosCreatePage() {
       // Gọi auto-propose sau tạo đơn sẽ luôn lỗi "Chỉ có thể giữ hàng khi... Confirmed".
       if (fulfillmentType === 1) {
         setHandoffMessage(
-          "Đơn POS giao hàng đã ở trạng thái Confirmed và kho đã giữ thùng khi tạo đơn. Tiếp tục: thu thanh toán (nếu PayBefore) → xuất kho → giao — không cần bước auto-propose như đơn online.",
+          "Đơn POS giao hàng đã ở trạng thái Confirmed và kho đã giữ thùng khi tạo đơn. Tiếp tục: thu thanh toán (trả trước) → xuất kho → giao — không cần bước auto-propose như đơn online.",
         );
       } else {
         setHandoffMessage("TakeAway: đơn đã được giữ hàng ngay, chuyển sang bước thanh toán.");
@@ -333,30 +396,85 @@ export default function SalesPosCreatePage() {
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-600">Customer User ID (nếu có)</label>
-            <input
-              value={customerUserId}
-              onChange={(e) => setCustomerUserId(e.target.value)}
-              placeholder="Nhập mã tài khoản khách (nếu có)"
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            />
+            <label className="text-xs font-medium text-slate-600">Hình thức thanh toán dự kiến</label>
+            <select
+              value={expectedPaymentMethod}
+              onChange={(e) => setExpectedPaymentMethod((e.target.value as "COD" | "BANKING"))}
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+            >
+              <option value="COD">Tiền mặt </option>
+              <option value="BANKING">Chuyển khoản ngân hàng</option>
+            </select>
           </div>
+
+          <div className="md:col-span-2">
+            <label className="text-xs font-medium text-slate-600">Số điện thoại</label>
+            <div className="mt-1 flex min-h-[42px] rounded-lg border border-slate-300 bg-white shadow-sm ring-1 ring-slate-900/5 focus-within:border-[#1a5f2a] focus-within:ring-2 focus-within:ring-[#1a5f2a]/20">
+              <input
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                value={customerPhone}
+                onChange={(e) => onCustomerPhoneChange(e.target.value)}
+                placeholder="Ví dụ: 09xxxxxxxx"
+                className="min-w-0 flex-1 border-0 bg-transparent px-3 py-2.5 text-sm outline-none placeholder:text-slate-400"
+              />
+              <button
+                type="button"
+                onClick={() => void handleLookupCustomer()}
+                disabled={isLookupFetching}
+                className="shrink-0 border-l border-slate-200 bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isLookupFetching ? "Đang tìm..." : "Tìm kiếm"}
+              </button>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {canUseLinkedAccount ? (
+                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
+                  Khách đã có tài khoản
+                </span>
+              ) : null}
+              {customerMatch === "guest" && lastSearchedPhone !== null && !phoneDirty ? (
+                <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-900">
+                  Khách vãng lai
+                </span>
+              ) : null}
+              {customerMatch === "found" && !phoneDirty ? (
+                <span className="text-[11px] font-medium text-emerald-700">
+                  Đã tìm thấy khách hàng trong hệ thống.
+                </span>
+              ) : null}
+              {customerMatch === "guest" && lastSearchedPhone !== null && !phoneDirty ? (
+                <span className="text-[11px] font-medium text-amber-800">
+                  Không tìm thấy tài khoản, tạo đơn cho khách vãng lai.
+                </span>
+              ) : null}
+              {phoneDirty ? (
+                <span className="text-[11px] font-medium text-slate-600">
+                  Số điện thoại đã thay đổi — bấm Tìm kiếm để cập nhật khách theo SĐT mới.
+                </span>
+              ) : null}
+            </div>
+            {resolvedCustomerUserId && canUseLinkedAccount ? (
+              <div className="mt-2">
+                <label className="text-xs font-medium text-slate-500">Mã tài khoản khách (tự điền)</label>
+                <input
+                  readOnly
+                  value={resolvedCustomerUserId}
+                  className="mt-1 w-full cursor-default rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700"
+                />
+              </div>
+            ) : null}
+          </div>
+
           <div>
             <label className="text-xs font-medium text-slate-600">Tên khách hàng</label>
             <input
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
+              disabled={canUseLinkedAccount}
               placeholder="Ví dụ: Nguyễn Văn A"
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-slate-600">Số điện thoại</label>
-            <input
-              value={customerPhone}
-              onChange={(e) => setCustomerPhone(e.target.value)}
-              placeholder="Ví dụ: 09xxxxxxxx"
-              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-700"
             />
           </div>
           <div>
@@ -364,41 +482,21 @@ export default function SalesPosCreatePage() {
             <input
               value={customerAddress}
               onChange={(e) => setCustomerAddress(e.target.value)}
-              placeholder="Địa chỉ từ đơn cũ (chỉ để review)"
+              placeholder={
+                canUseLinkedAccount
+                  ? "Địa chỉ giao / ghi nhận (có thể chỉnh trước khi tạo đơn)"
+                  : "Địa chỉ ( tùy chọn)"
+              }
               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
             />
           </div>
-          <div>
-            <label className="text-xs font-medium text-slate-600">Hình thức thanh toán dự kiến</label>
-            <select
-              value={expectedPaymentMethod}
-              onChange={(e) => setExpectedPaymentMethod((e.target.value as "COD" | "BANKING"))}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-            >
-              <option value="COD">Tiền mặt (COD)</option>
-              <option value="BANKING">Chuyển khoản ngân hàng</option>
-            </select>
-          </div>
-          {fulfillmentType === 1 ? (
-            <div>
-              <label className="text-xs font-medium text-slate-600">Thanh toán dự kiến</label>
-              <select
-                value={paymentTiming}
-                onChange={(e) => setPaymentTiming(Number(e.target.value) as 0 | 1)}
-                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-              >
-                <option value={0}>Trả trước</option>
-                <option value={1}>Trả sau</option>
-              </select>
-            </div>
-          ) : null}
           <div className="md:col-span-2">
             <label className="text-xs font-medium text-slate-600">Ghi chú</label>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={2}
-              placeholder="Ghi chú review lại từ đơn cũ (không gửi API tạo đơn)"
+              placeholder="Ghi chú tại quầy "
               className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
             />
           </div>
@@ -455,7 +553,7 @@ export default function SalesPosCreatePage() {
           <p className="mt-1 text-xs text-emerald-700">
             {fulfillmentType === 1
               ? "Đơn Delivery: kho/staff tiếp tục allocation -> xuất kho -> giao hàng."
-              : "Đơn TakeAway: thanh toán thành công sẽ tự chuyển Delivered."}
+              : "Đơn TakeAway: sau khi quản lý duyệt phiếu xuất, kho xác nhận đã giao cho khách tại quầy thì đơn mới hoàn tất (Delivered)."}
           </p>
           {!!handoffMessage && (
             <p className="mt-2 text-xs text-emerald-800">{handoffMessage}</p>
@@ -482,8 +580,9 @@ export default function SalesPosCreatePage() {
               onClick={() => {
                 setRows([makeRow(1)]);
                 setFulfillmentType(0);
-                setPaymentTiming(0);
-                setCustomerUserId("");
+                setResolvedCustomerUserId(null);
+                setCustomerMatch("unset");
+                setLastSearchedPhone(null);
                 setCustomerName("");
                 setCustomerPhone("");
                 setCustomerAddress("");

@@ -17,6 +17,9 @@ export const exportReceiptSchema = z.object({
   status: z.string(),
   createdBy: z.string(),
   createdAt: z.string(),
+  hasPrintSnapshot: z.boolean().optional(),
+  /** Cảnh báo không chặn (BE trả khi confirm-pick, ví dụ lưu lạnh). */
+  warnings: z.array(z.string()).optional().default([]),
   details: z.array(exportDetailSchema),
 });
 
