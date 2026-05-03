@@ -134,7 +134,7 @@ export default function CreateGoodsReceipt() {
             remainingWeight: Number(oldDetail?.remainingWeight ?? ordered),
             unitPriceAtOrder: Number(line.unitPriceAtOrder ?? 0),
             priceDate: line.priceDate,
-            receivedWeight: isMultiSupplier ? ordered : Number(oldDetail?.remainingWeight ?? 0),
+            receivedWeight: ordered,
           };
         }),
       }));
@@ -157,7 +157,7 @@ export default function CreateGoodsReceipt() {
             remainingWeight: Number(d.remainingWeight ?? d.orderedWeight ?? 0),
             unitPriceAtOrder: Number(d.unitPrice ?? 0),
             priceDate: selectedPo?.orderDate,
-            receivedWeight: Number(d.remainingWeight ?? 0),
+            receivedWeight: Number(d.orderedWeight ?? 0),
           })),
         },
       ]);
@@ -224,23 +224,6 @@ export default function CreateGoodsReceipt() {
   );
 
   const canSubmit = isMultiSupplier ? isMultiFormValid : hasLegacyAtLeastOneLine;
-
-  const updateLineWeight = (supplierId: number, purchaseOrderDetailId: number, value: number) => {
-    setSupplierCards((prev) =>
-      prev.map((card) =>
-        card.supplierId !== supplierId
-          ? card
-          : {
-              ...card,
-              lines: card.lines.map((line) =>
-                line.purchaseOrderDetailId === purchaseOrderDetailId
-                  ? { ...line, receivedWeight: Number.isNaN(value) ? 0 : value }
-                  : line,
-              ),
-            },
-      ),
-    );
-  };
 
   const onSubmit = async (values: FormValues) => {
     setServerMessage(null);
@@ -398,7 +381,7 @@ export default function CreateGoodsReceipt() {
               <p className="text-xs text-slate-500">
                 {isMultiSupplier
                   ? "PO đa NCC: mỗi NCC là một card riêng, các dòng nhận phải theo đúng kế hoạch NCC."
-                  : "PO 1 NCC: hiển thị 1 card NCC, bạn có thể điều chỉnh khối lượng nhận theo rule luồng cũ."}
+                  : "PO 1 NCC: hiển thị 1 card NCC. KL nhận luôn bằng KL đặt trên đơn mua cho từng dòng."}
               </p>
 
               {watchedPurchaseOrderId <= 0 && (
@@ -459,21 +442,8 @@ export default function CreateGoodsReceipt() {
                                   <td className="px-3 py-2.5 text-right text-slate-600">
                                     {line.priceDate ? new Date(line.priceDate).toLocaleDateString("vi-VN") : "-"}
                                   </td>
-                                  <td className="px-3 py-2.5 text-right">
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      min={0}
-                                      value={line.receivedWeight}
-                                      onChange={(e) =>
-                                        updateLineWeight(
-                                          card.supplierId,
-                                          line.purchaseOrderDetailId,
-                                          Number(e.target.value),
-                                        )
-                                      }
-                                      className="w-28 rounded-lg border border-slate-200 px-2 py-1 text-right text-sm"
-                                    />
+                                  <td className="px-3 py-2.5 text-right text-slate-800 tabular-nums">
+                                    {line.orderedWeight.toLocaleString("vi-VN")}
                                   </td>
                                   <td className="px-3 py-2.5 text-right">
                                     <span className={`text-xs font-medium ${lineValid ? "text-emerald-700" : "text-amber-700"}`}>
