@@ -1,12 +1,156 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, X } from "lucide-react";
+import toast from "react-hot-toast";
 import {
+  revenueReportApi,
   useGetRevenueProfitSpecificReportQuery,
+  type RevenueLossByLot,
+  type RevenueProfitReportRow,
 } from "../api/revenue-report.api";
+import { useAppDispatch } from "../../../app/hook";
 import { useGetWarehousesQuery } from "../api/create-user.api";
 import { useGetProductsQuery } from "../../product/api/product.api";
 import { useGetProductVariantsQuery } from "../../product/api/product-variant.api";
 import { useGetAllLotsQuery } from "../../goods-receipt/api/goods-receipt.api";
+import type { LotListItem } from "../../goods-receipt/types/goods-receipt.type";
+
+type LotProfitAggregateRow = {
+  lotId: number;
+  lotCode: string;
+  supplierName: string;
+  warehouseName: string;
+  productLabel: string;
+  totalKg: number;
+  soldKg: number;
+  unsoldKg: number;
+  disposedKg: number;
+  stockAdjustmentLossKg: number;
+  revenue: number;
+  cost: number;
+  profit: number;
+};
+
+const aggregateLotProfitRowsFromExports = (
+  source: RevenueProfitReportRow[],
+  lossByLots: RevenueLossByLot[],
+  lotsCatalog: LotListItem[],
+): LotProfitAggregateRow[] => {
+  const lossByLotId = new Map<number, { disposedKg: number; stockAdjustmentLossKg: number }>();
+  const lossByLotCode = new Map<string, { disposedKg: number; stockAdjustmentLossKg: number }>();
+  lossByLots.forEach((item) => {
+    const payload = {
+      disposedKg: Number(item.disposedKg ?? 0),
+      stockAdjustmentLossKg: Number(item.stockAdjustmentLossKg ?? 0),
+    };
+    if (item.lotId > 0) lossByLotId.set(item.lotId, payload);
+    if (item.lotCode) lossByLotCode.set(item.lotCode, payload);
+  });
+  const lotRemainingById = new Map<number, number>();
+  const lotRemainingByCode = new Map<string, number>();
+  lotsCatalog.forEach((lot) => {
+    if (lot.lotId > 0) {
+      lotRemainingById.set(lot.lotId, Number(lot.remainingQuantity ?? 0));
+    }
+    if (lot.lotCode) {
+      lotRemainingByCode.set(lot.lotCode, Number(lot.remainingQuantity ?? 0));
+    }
+  });
+
+  const map = new Map<string, LotProfitAggregateRow>();
+
+  source.forEach((row) => {
+    const lotCode = row.lotCode || `LÔ-#${row.boxId}`;
+    const lotId = Number(row.lotId ?? 0);
+    const lotKey = lotId > 0 ? `ID-${lotId}` : lotCode;
+    const productLabel =
+      [row.productName?.trim(), row.variantName?.trim()].filter(Boolean).join(" · ") || "—";
+    const current = map.get(lotKey);
+    if (current) {
+      current.totalKg += row.quantityKg;
+      current.soldKg += row.quantityKg;
+      current.revenue += row.revenue;
+      current.cost += row.cost;
+      current.profit += row.profit;
+      if (current.productLabel === "—" && productLabel !== "—") {
+        current.productLabel = productLabel;
+      }
+    } else {
+      const unsoldKg =
+        lotId > 0
+          ? Number(lotRemainingById.get(lotId) ?? 0)
+          : Number(lotRemainingByCode.get(lotCode) ?? 0);
+      map.set(lotKey, {
+        lotId,
+        lotCode,
+        supplierName: row.supplierName || "—",
+        warehouseName: row.warehouseName || "—",
+        productLabel,
+        totalKg: row.quantityKg,
+        soldKg: row.quantityKg,
+        unsoldKg: Math.max(0, unsoldKg),
+        disposedKg: Number(
+          lotId > 0
+            ? lossByLotId.get(lotId)?.disposedKg ?? 0
+            : lossByLotCode.get(lotCode)?.disposedKg ?? 0,
+        ),
+        stockAdjustmentLossKg: Number(
+          lotId > 0
+            ? lossByLotId.get(lotId)?.stockAdjustmentLossKg ?? 0
+            : lossByLotCode.get(lotCode)?.stockAdjustmentLossKg ?? 0,
+        ),
+        revenue: row.revenue,
+        cost: row.cost,
+        profit: row.profit,
+      });
+    }
+  });
+
+  for (const lot of lotsCatalog) {
+    const lotKey = lot.lotId > 0 ? `ID-${lot.lotId}` : lot.lotCode;
+    if (!map.has(lotKey)) {
+      const lotId = lot.lotId;
+      const lotCode = lot.lotCode;
+      map.set(lotKey, {
+        lotId,
+        lotCode,
+        supplierName: "—",
+        warehouseName: lot.warehouseName || "—",
+        productLabel:
+          [lot.productName?.trim(), lot.productVariantName?.trim()].filter(Boolean).join(" · ") ||
+          "—",
+        totalKg: 0,
+        soldKg: 0,
+        unsoldKg: Math.max(0, Number(lot.remainingQuantity ?? 0)),
+        disposedKg: Number(
+          lotId > 0
+            ? lossByLotId.get(lotId)?.disposedKg ?? 0
+            : lossByLotCode.get(lotCode)?.disposedKg ?? 0,
+        ),
+        stockAdjustmentLossKg: Number(
+          lotId > 0
+            ? lossByLotId.get(lotId)?.stockAdjustmentLossKg ?? 0
+            : lossByLotCode.get(lotCode)?.stockAdjustmentLossKg ?? 0,
+        ),
+        revenue: 0,
+        cost: 0,
+        profit: 0,
+      });
+    }
+  }
+
+  for (const row of map.values()) {
+    if (row.productLabel === "—" && row.lotId > 0) {
+      const lot = lotsCatalog.find((l) => l.lotId === row.lotId);
+      if (lot) {
+        row.productLabel =
+          [lot.productName?.trim(), lot.productVariantName?.trim()].filter(Boolean).join(" · ") ||
+          "—";
+      }
+    }
+  }
+
+  return Array.from(map.values()).sort((a, b) => b.profit - a.profit);
+};
 
 const formatMoney = (value: number) =>
   `${Number(value || 0).toLocaleString("vi-VN", {
@@ -44,19 +188,6 @@ const toMonthKey = (value: string) => {
   return `${year}-${month}`;
 };
 
-const toIsoDate = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
-
-const formatDeltaPercent = (current: number, previous: number) => {
-  if (!previous) return current ? "100%" : "0%";
-  const pct = ((current - previous) / Math.abs(previous)) * 100;
-  return `${pct.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`;
-};
-
 const toBucketLabel = (isoDate: string, mode: "day" | "month") => {
   const d = new Date(isoDate);
   if (Number.isNaN(d.getTime())) return "Không rõ";
@@ -66,7 +197,84 @@ const toBucketLabel = (isoDate: string, mode: "day" | "month") => {
   return d.toLocaleDateString("vi-VN");
 };
 
+const downloadRevenueRowsExcel = (rows: RevenueProfitReportRow[], filenameSuffix: string) => {
+  if (!rows.length) return false;
+  const escape = (v: string | number) =>
+    String(v ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+
+  const header = `
+      <tr>
+        <th>Thời gian xuất</th>
+        <th>Phiếu xuất</th>
+        <th>Đơn hàng</th>
+        <th>Khách hàng</th>
+        <th>Nhà cung cấp</th>
+        <th>Box</th>
+        <th>Lô</th>
+        <th>Sản phẩm</th>
+        <th>Kg</th>
+        <th>Đơn giá bán</th>
+        <th>Đơn giá vốn</th>
+        <th>Doanh thu</th>
+        <th>Giá vốn</th>
+        <th>Lợi nhuận</th>
+      </tr>`;
+  const body = rows
+    .map(
+      (r) => `
+      <tr>
+        <td>${escape(formatDateTime(r.exportedAt))}</td>
+        <td>${escape(r.exportCode)}</td>
+        <td>${escape(`#${r.orderId}`)}</td>
+        <td>${escape(r.customerName || "—")}</td>
+        <td>${escape(r.supplierName || "—")}</td>
+        <td>${escape(r.boxCode || `#${r.boxId}`)}</td>
+        <td>${escape(r.lotCode || "—")}</td>
+        <td>${escape(
+          `${r.productName || "—"}${r.variantName ? ` · ${r.variantName}` : ""}`,
+        )}</td>
+        <td>${escape(r.quantityKg)}</td>
+        <td>${escape(r.saleUnitPrice)}</td>
+        <td>${escape(r.costUnitPrice)}</td>
+        <td>${escape(r.revenue)}</td>
+        <td>${escape(r.cost)}</td>
+        <td>${escape(r.profit)}</td>
+      </tr>`,
+    )
+    .join("");
+
+  const html = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office"
+            xmlns:x="urn:schemas-microsoft-com:office:excel"
+            xmlns="http://www.w3.org/TR/REC-html40">
+      <head><meta charset="UTF-8" /></head>
+      <body>
+        <table border="1">
+          ${header}
+          ${body}
+        </table>
+      </body>
+      </html>`;
+
+  const blob = new Blob([html], {
+    type: "application/vnd.ms-excel;charset=utf-8;",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `danh-sach-mat-hang-da-ban-${filenameSuffix}-${stamp}.xls`;
+  a.click();
+  URL.revokeObjectURL(url);
+  return true;
+};
+
 const RevenueProfitReportPage = () => {
+  const dispatch = useAppDispatch();
   const today = new Date().toISOString().slice(0, 10);
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>(today);
@@ -76,18 +284,30 @@ const RevenueProfitReportPage = () => {
   const [warehouseId, setWarehouseId] = useState<number | 0>(0);
   const [productId, setProductId] = useState<number | 0>(0);
   const [productVariantId, setProductVariantId] = useState<number | 0>(0);
-  const [page, setPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(50);
+  const [soldFromDate, setSoldFromDate] = useState<string>("");
+  const [soldToDate, setSoldToDate] = useState<string>(today);
+  const [soldPage, setSoldPage] = useState<number>(1);
+  const [soldPageSize, setSoldPageSize] = useState<number>(50);
   const [openedRevenueModal, setOpenedRevenueModal] = useState<
     "customer" | "supplier" | null
   >(null);
   const [isSoldItemsModalOpen, setIsSoldItemsModalOpen] = useState(false);
   const [isLotProfitModalOpen, setIsLotProfitModalOpen] = useState(false);
+  const [lotModalRows, setLotModalRows] = useState<LotProfitAggregateRow[]>([]);
+  const [lotModalTotals, setLotModalTotals] = useState<{
+    totalDisposedKg: number;
+    totalStockAdjustmentLossKg: number;
+  } | null>(null);
+  const [lotModalLoading, setLotModalLoading] = useState(false);
+  const [lotModalPage, setLotModalPage] = useState(1);
+  const [lotModalPageSize, setLotModalPageSize] = useState(25);
   const [soldItemsKeyword, setSoldItemsKeyword] = useState("");
   const [soldItemsWarehouseFilter, setSoldItemsWarehouseFilter] = useState("");
   const [activeSection, setActiveSection] = useState<
     "overview" | "chart" | "analysis"
   >("overview");
+  const [chartWarehouseId, setChartWarehouseId] = useState<number | 0>(0);
+  const [chartProductVariantId, setChartProductVariantId] = useState<number | 0>(0);
   const chartDayPickerRef = useRef<HTMLInputElement | null>(null);
   const chartMonthPickerRef = useRef<HTMLInputElement | null>(null);
 
@@ -95,6 +315,64 @@ const RevenueProfitReportPage = () => {
   const { data: products = [] } = useGetProductsQuery();
   const { data: productVariants = [] } = useGetProductVariantsQuery();
   const { data: allLots = [] } = useGetAllLotsQuery();
+
+  useEffect(() => {
+    if (!isLotProfitModalOpen) return;
+    let cancelled = false;
+    const fetchPageSize = 1000;
+    const maxApiPages = 250;
+
+    setLotModalPage(1);
+    setLotModalLoading(true);
+    setLotModalRows([]);
+    setLotModalTotals(null);
+
+    (async () => {
+      try {
+        const mergedRows: RevenueProfitReportRow[] = [];
+        let lossByLots: RevenueLossByLot[] = [];
+        let totalDisposedKg = 0;
+        let totalStockAdjustmentLossKg = 0;
+        let page = 1;
+        let totalPages = 1;
+
+        do {
+          const res = await dispatch(
+            revenueReportApi.endpoints.getRevenueProfitSpecificReport.initiate(
+              { page, pageSize: fetchPageSize },
+              { forceRefetch: true },
+            ),
+          ).unwrap();
+          if (cancelled) return;
+          if (page === 1) {
+            lossByLots = res.lossByLots ?? [];
+            totalDisposedKg = Number(res.totalDisposedKg ?? 0);
+            totalStockAdjustmentLossKg = Number(res.totalStockAdjustmentLossKg ?? 0);
+          }
+          mergedRows.push(...(res.rows ?? []));
+          totalPages = Math.max(1, Number(res.totalPages ?? 1));
+          page += 1;
+        } while (page <= totalPages && page <= maxApiPages && !cancelled);
+
+        if (cancelled) return;
+        const aggregated = aggregateLotProfitRowsFromExports(mergedRows, lossByLots, allLots);
+        setLotModalRows(aggregated);
+        setLotModalTotals({ totalDisposedKg, totalStockAdjustmentLossKg });
+      } catch {
+        if (!cancelled) {
+          toast.error("Không tải được thống kê lợi nhuận theo lô.");
+          setLotModalRows([]);
+          setLotModalTotals(null);
+        }
+      } finally {
+        if (!cancelled) setLotModalLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLotProfitModalOpen, dispatch, allLots]);
 
   const variantsByProduct = useMemo(
     () =>
@@ -104,80 +382,64 @@ const RevenueProfitReportPage = () => {
     [productVariants, productId],
   );
 
-  const query = useMemo(
+  /** Chỉ phục vụ ô Tổng quan (KPI). */
+  const overviewQuery = useMemo(
     () => ({
       fromDate: fromDate || undefined,
       toDate: toDate || undefined,
       warehouseId: warehouseId || undefined,
       productId: productId || undefined,
       productVariantId: productVariantId || undefined,
-      page,
-      pageSize,
+      page: 1,
+      pageSize: 50,
     }),
-    [fromDate, toDate, warehouseId, productId, productVariantId, page, pageSize],
+    [fromDate, toDate, warehouseId, productId, productVariantId],
   );
-  const comparisonCurrentPeriodQuery = useMemo(() => {
-    if (!fromDate || !toDate) return null;
-    const from = new Date(fromDate);
-    const to = new Date(toDate);
-    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) {
-      return null;
-    }
-    return {
-      fromDate,
-      toDate,
-      page: 1,
-      pageSize: 5000,
-    };
-  }, [fromDate, toDate]);
-  const previousPeriodQuery = useMemo(() => {
-    if (!fromDate || !toDate) return null;
-    const from = new Date(fromDate);
-    const to = new Date(toDate);
-    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) {
-      return null;
-    }
-    const oneDay = 24 * 60 * 60 * 1000;
-    const rangeMs = to.getTime() - from.getTime();
-    const previousTo = new Date(from.getTime() - oneDay);
-    const previousFrom = new Date(previousTo.getTime() - rangeMs);
-    return {
-      fromDate: toIsoDate(previousFrom),
-      toDate: toIsoDate(previousTo),
-      page: 1,
-      pageSize: 5000,
-    };
-  }, [fromDate, toDate]);
 
-  const actualQuery = useGetRevenueProfitSpecificReportQuery(query);
-  const data = actualQuery.data;
-  const isFetching = actualQuery.isFetching;
-  const chartQuery = useMemo(
+  const overviewResult = useGetRevenueProfitSpecificReportQuery(overviewQuery);
+  const overviewData = overviewResult.data;
+
+  /** Biểu đồ: lọc theo kho / biến thể (tab riêng). */
+  const chartReportQuery = useMemo(
     () => ({
+      warehouseId: chartWarehouseId || undefined,
+      productVariantId: chartProductVariantId || undefined,
       page: 1,
       pageSize: 5000,
     }),
-    [],
+    [chartWarehouseId, chartProductVariantId],
   );
-  const chartQueryResult = useGetRevenueProfitSpecificReportQuery(chartQuery);
-  const chartDataRows = chartQueryResult.data?.rows ?? [];
-  const comparisonCurrentPeriodResult = useGetRevenueProfitSpecificReportQuery(
-    comparisonCurrentPeriodQuery ?? undefined,
-    { skip: !comparisonCurrentPeriodQuery },
+  const chartReportResult = useGetRevenueProfitSpecificReportQuery(chartReportQuery, {
+    skip: activeSection !== "chart",
+  });
+  const chartDataRows = chartReportResult.data?.rows ?? [];
+  const chartReportFetching = chartReportResult.isFetching;
+
+  /** Phân tích chi tiết: dữ liệu toàn hệ thống, không theo bộ lọc biểu đồ. */
+  const broadReportQuery = useMemo(() => ({ page: 1, pageSize: 5000 }), []);
+  const broadReportResult = useGetRevenueProfitSpecificReportQuery(broadReportQuery);
+  const broadData = broadReportResult.data;
+
+  const soldListQuery = useMemo(
+    () => ({
+      fromDate: soldFromDate || undefined,
+      toDate: soldToDate || undefined,
+      page: soldPage,
+      pageSize: soldPageSize,
+    }),
+    [soldFromDate, soldToDate, soldPage, soldPageSize],
   );
-  const comparisonCurrentData = comparisonCurrentPeriodResult.data;
-  const previousPeriodResult = useGetRevenueProfitSpecificReportQuery(
-    previousPeriodQuery ?? undefined,
-    { skip: !previousPeriodQuery },
-  );
-  const previousData = previousPeriodResult.data;
+  const soldListResult = useGetRevenueProfitSpecificReportQuery(soldListQuery, {
+    skip: !isSoldItemsModalOpen,
+  });
+  const soldListData = soldListResult.data;
+  const soldListFetching = soldListResult.isFetching;
   const clearSearchFilters = () => {
     setFromDate("");
     setToDate(today);
     setWarehouseId(0);
     setProductId(0);
     setProductVariantId(0);
-    setPage(1);
   };
 
   const chartRows = useMemo(() => {
@@ -236,92 +498,15 @@ const RevenueProfitReportPage = () => {
     ];
   }, [chartMode, chartDataRows, chartDay, chartMonth, today]);
 
-  const lotProfitRows = useMemo(() => {
-    const source = data?.rows ?? [];
-    const lossByLotId = new Map<number, { disposedKg: number; stockAdjustmentLossKg: number }>();
-    const lossByLotCode = new Map<string, { disposedKg: number; stockAdjustmentLossKg: number }>();
-    (data?.lossByLots ?? []).forEach((item) => {
-      const payload = {
-        disposedKg: Number(item.disposedKg ?? 0),
-        stockAdjustmentLossKg: Number(item.stockAdjustmentLossKg ?? 0),
-      };
-      if (item.lotId > 0) lossByLotId.set(item.lotId, payload);
-      if (item.lotCode) lossByLotCode.set(item.lotCode, payload);
-    });
-    const lotRemainingById = new Map<number, number>();
-    const lotRemainingByCode = new Map<string, number>();
-    allLots.forEach((lot) => {
-      if (lot.lotId > 0) {
-        lotRemainingById.set(lot.lotId, Number(lot.remainingQuantity ?? 0));
-      }
-      if (lot.lotCode) {
-        lotRemainingByCode.set(lot.lotCode, Number(lot.remainingQuantity ?? 0));
-      }
-    });
-    const map = new Map<
-      string,
-      {
-        lotId: number;
-        lotCode: string;
-        supplierName: string;
-        warehouseName: string;
-        totalKg: number;
-        soldKg: number;
-        unsoldKg: number;
-        disposedKg: number;
-        stockAdjustmentLossKg: number;
-        revenue: number;
-        cost: number;
-        profit: number;
-      }
-    >();
-
-    source.forEach((row) => {
-      const lotCode = row.lotCode || `LÔ-#${row.boxId}`;
-      const lotId = Number(row.lotId ?? 0);
-      const lotKey = lotId > 0 ? `ID-${lotId}` : lotCode;
-      const current = map.get(lotKey);
-      if (current) {
-        current.totalKg += row.quantityKg;
-        current.soldKg += row.quantityKg;
-        current.revenue += row.revenue;
-        current.cost += row.cost;
-        current.profit += row.profit;
-      } else {
-        const unsoldKg =
-          lotId > 0
-            ? Number(lotRemainingById.get(lotId) ?? 0)
-            : Number(lotRemainingByCode.get(lotCode) ?? 0);
-        map.set(lotKey, {
-          lotId,
-          lotCode,
-          supplierName: row.supplierName || "—",
-          warehouseName: row.warehouseName || "—",
-          totalKg: row.quantityKg,
-          soldKg: row.quantityKg,
-          unsoldKg: Math.max(0, unsoldKg),
-          disposedKg: Number(
-            lotId > 0
-              ? lossByLotId.get(lotId)?.disposedKg ?? 0
-              : lossByLotCode.get(lotCode)?.disposedKg ?? 0,
-          ),
-          stockAdjustmentLossKg: Number(
-            lotId > 0
-              ? lossByLotId.get(lotId)?.stockAdjustmentLossKg ?? 0
-              : lossByLotCode.get(lotCode)?.stockAdjustmentLossKg ?? 0,
-          ),
-          revenue: row.revenue,
-          cost: row.cost,
-          profit: row.profit,
-        });
-      }
-    });
-
-    return Array.from(map.values()).sort((a, b) => b.profit - a.profit);
-  }, [data?.rows, data?.lossByLots, allLots]);
+  const lotModalTotalPages = Math.max(1, Math.ceil(lotModalRows.length / lotModalPageSize));
+  const safeLotModalPage = Math.min(Math.max(1, lotModalPage), lotModalTotalPages);
+  const lotModalPageSlice = useMemo(() => {
+    const start = (safeLotModalPage - 1) * lotModalPageSize;
+    return lotModalRows.slice(start, start + lotModalPageSize);
+  }, [lotModalRows, safeLotModalPage, lotModalPageSize]);
 
   const topBottomProducts = useMemo(() => {
-    const source = data?.rows ?? [];
+    const source = broadData?.rows ?? [];
     const map = new Map<
       string,
       { label: string; soldKg: number; revenue: number; cost: number; profit: number }
@@ -350,10 +535,10 @@ const RevenueProfitReportPage = () => {
       top: [...rows].sort((a, b) => b.profit - a.profit).slice(0, 5),
       bottom: [...rows].sort((a, b) => a.profit - b.profit).slice(0, 5),
     };
-  }, [data?.rows]);
+  }, [broadData?.rows]);
 
   const filteredSoldRows = useMemo(() => {
-    const rows = data?.rows ?? [];
+    const rows = soldListData?.rows ?? [];
     const keyword = soldItemsKeyword.trim().toLowerCase();
     return rows.filter((r) => {
       const byWarehouse =
@@ -374,82 +559,31 @@ const RevenueProfitReportPage = () => {
         .toLowerCase();
       return searchable.includes(keyword);
     });
-  }, [data?.rows, soldItemsKeyword, soldItemsWarehouseFilter]);
+  }, [soldListData?.rows, soldItemsKeyword, soldItemsWarehouseFilter]);
 
-  const exportExcel = () => {
-    const rows = data?.rows ?? [];
-    if (!rows.length) return;
-    const escape = (v: string | number) =>
-      String(v ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-
-    const header = `
-      <tr>
-        <th>Thời gian xuất</th>
-        <th>Phiếu xuất</th>
-        <th>Đơn hàng</th>
-        <th>Khách hàng</th>
-        <th>Nhà cung cấp</th>
-        <th>Box</th>
-        <th>Lô</th>
-        <th>Sản phẩm</th>
-        <th>Kg</th>
-        <th>Đơn giá bán</th>
-        <th>Đơn giá vốn</th>
-        <th>Doanh thu</th>
-        <th>Giá vốn</th>
-        <th>Lợi nhuận</th>
-      </tr>`;
-    const body = rows
-      .map(
-        (r) => `
-      <tr>
-        <td>${escape(formatDateTime(r.exportedAt))}</td>
-        <td>${escape(r.exportCode)}</td>
-        <td>${escape(`#${r.orderId}`)}</td>
-        <td>${escape(r.customerName || "—")}</td>
-        <td>${escape(r.supplierName || "—")}</td>
-        <td>${escape(r.boxCode || `#${r.boxId}`)}</td>
-        <td>${escape(r.lotCode || "—")}</td>
-        <td>${escape(
-          `${r.productName || "—"}${r.variantName ? ` · ${r.variantName}` : ""}`,
-        )}</td>
-        <td>${escape(r.quantityKg)}</td>
-        <td>${escape(r.saleUnitPrice)}</td>
-        <td>${escape(r.costUnitPrice)}</td>
-        <td>${escape(r.revenue)}</td>
-        <td>${escape(r.cost)}</td>
-        <td>${escape(r.profit)}</td>
-      </tr>`,
-      )
-      .join("");
-
-    const html = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office"
-            xmlns:x="urn:schemas-microsoft-com:office:excel"
-            xmlns="http://www.w3.org/TR/REC-html40">
-      <head><meta charset="UTF-8" /></head>
-      <body>
-        <table border="1">
-          ${header}
-          ${body}
-        </table>
-      </body>
-      </html>`;
-
-    const blob = new Blob([html], {
-      type: "application/vnd.ms-excel;charset=utf-8;",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    const stamp = new Date().toISOString().slice(0, 10);
-    a.href = url;
-    a.download = `bao-cao-doanh-thu-loi-nhuan-${stamp}.xls`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleExportSoldListExcel = async () => {
+    const toastId = toast.loading("Đang chuẩn bị file Excel...");
+    try {
+      const res = await dispatch(
+        revenueReportApi.endpoints.getRevenueProfitSpecificReport.initiate(
+          {
+            fromDate: soldFromDate || undefined,
+            toDate: soldToDate || undefined,
+            page: 1,
+            pageSize: 10000,
+          },
+          { forceRefetch: true },
+        ),
+      ).unwrap();
+      const rows = res.rows ?? [];
+      if (!downloadRevenueRowsExcel(rows, "tat-ca-trang")) {
+        toast.error("Không có dữ liệu để xuất.", { id: toastId });
+        return;
+      }
+      toast.success("Đã tải file Excel.", { id: toastId });
+    } catch {
+      toast.error("Xuất Excel thất bại.", { id: toastId });
+    }
   };
 
   return (
@@ -471,7 +605,6 @@ const RevenueProfitReportPage = () => {
                 value={fromDate}
                 onChange={(e) => {
                   setFromDate(e.target.value);
-                  setPage(1);
                 }}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
               />
@@ -485,7 +618,6 @@ const RevenueProfitReportPage = () => {
                 value={toDate}
                 onChange={(e) => {
                   setToDate(e.target.value);
-                  setPage(1);
                 }}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
               />
@@ -498,7 +630,6 @@ const RevenueProfitReportPage = () => {
                 value={warehouseId}
                 onChange={(e) => {
                   setWarehouseId(Number(e.target.value));
-                  setPage(1);
                 }}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
               >
@@ -520,7 +651,6 @@ const RevenueProfitReportPage = () => {
                   const nextProductId = Number(e.target.value);
                   setProductId(nextProductId);
                   setProductVariantId(0);
-                  setPage(1);
                 }}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
               >
@@ -533,7 +663,7 @@ const RevenueProfitReportPage = () => {
               </select>
             </div>
             <div className="md:col-span-2 xl:col-span-2">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-[11px] font-medium text-slate-500">
                     Biến thể
@@ -542,7 +672,6 @@ const RevenueProfitReportPage = () => {
                     value={productVariantId}
                     onChange={(e) => {
                       setProductVariantId(Number(e.target.value));
-                      setPage(1);
                     }}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
                   >
@@ -562,18 +691,16 @@ const RevenueProfitReportPage = () => {
                   <X size={14} />
                   Xóa tìm kiếm
                 </button>
-                <button
-                  type="button"
-                  onClick={exportExcel}
-                  disabled={!data?.rows?.length}
-                  className="mt-[18px] inline-flex h-[38px] items-center justify-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
-                >
-                  <Download size={14} />
-                  Xuất Excel
-                </button>
               </div>
             </div>
           </div>
+          <p className="mt-2 text-[10px] text-slate-500">
+            Bộ lọc ngày / sản phẩm ở trên chỉ áp dụng cho{" "}
+            <strong className="font-semibold text-slate-600">Tổng quan</strong>. Tab{" "}
+            <strong className="font-semibold text-slate-600">Biểu đồ</strong> có thêm bộ lọc kho và biến thể ngay trong
+            khung biểu đồ. Tab <strong className="font-semibold text-slate-600">Phân tích chi tiết</strong> vẫn dùng dữ
+            liệu toàn hệ thống (không theo các bộ lọc này).
+          </p>
         </div>
 
         <div className="mb-4">
@@ -614,94 +741,38 @@ const RevenueProfitReportPage = () => {
           </div>
         </div>
 
-        <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4">
-          <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
-            <p className="text-[11px] text-emerald-700">Tổng doanh thu</p>
-            <p className="mt-1 text-sm font-semibold text-emerald-900">
-              {formatMoney(data?.totalRevenue ?? 0)}
-            </p>
-          </div>
-          <div className="rounded-xl border border-amber-100 bg-amber-50 p-3">
-            <p className="text-[11px] text-amber-700">Tổng giá vốn</p>
-            <p className="mt-1 text-sm font-semibold text-amber-900">
-              {formatMoney(data?.totalCost ?? 0)}
-            </p>
-          </div>
-          <div className="rounded-xl border border-sky-100 bg-sky-50 p-3">
-            <p className="text-[11px] text-sky-700">Tổng lợi nhuận</p>
-            <p className="mt-1 text-sm font-semibold text-sky-900">
-              {formatMoney(data?.totalProfit ?? 0)}
-            </p>
-          </div>
-          <div className="rounded-xl border border-violet-100 bg-violet-50 p-3">
-            <p className="text-[11px] text-violet-700">Biên lợi nhuận</p>
-            <p className="mt-1 text-sm font-semibold text-violet-900">
-              {(data?.profitMarginPercent ?? 0).toLocaleString("vi-VN", {
-                maximumFractionDigits: 2,
-              })}
-              %
-            </p>
-          </div>
-        </div>
-
         {activeSection === "overview" ? (
-          <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3 sm:p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-semibold text-slate-700">So sánh kỳ trước</p>
-              {previousPeriodQuery ? (
-                <p className="text-[11px] text-slate-500">
-                  Kỳ trước: {previousPeriodQuery.fromDate} → {previousPeriodQuery.toDate}
+          <>
+            <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+                <p className="text-[11px] text-emerald-700">Tổng doanh thu</p>
+                <p className="mt-1 text-sm font-semibold text-emerald-900">
+                  {formatMoney(overviewData?.totalRevenue ?? 0)}
                 </p>
-              ) : (
-                <p className="text-[11px] text-slate-500">
-                  Chọn đủ Từ ngày và Đến ngày để xem so sánh.
-                </p>
-              )}
-            </div>
-            {previousPeriodQuery ? (
-              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-xs">
-                  <p className="text-emerald-700">Doanh thu</p>
-                  <p className="mt-1 font-semibold text-emerald-900">
-                    {formatMoney(comparisonCurrentData?.totalRevenue ?? 0)}
-                  </p>
-                  <p className="mt-1 text-emerald-800">
-                    Kỳ trước: {formatMoney(previousData?.totalRevenue ?? 0)} ·{" "}
-                    {formatDeltaPercent(
-                      comparisonCurrentData?.totalRevenue ?? 0,
-                      previousData?.totalRevenue ?? 0,
-                    )}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-amber-100 bg-amber-50 p-3 text-xs">
-                  <p className="text-amber-700">Giá vốn</p>
-                  <p className="mt-1 font-semibold text-amber-900">
-                    {formatMoney(comparisonCurrentData?.totalCost ?? 0)}
-                  </p>
-                  <p className="mt-1 text-amber-800">
-                    Kỳ trước: {formatMoney(previousData?.totalCost ?? 0)} ·{" "}
-                    {formatDeltaPercent(
-                      comparisonCurrentData?.totalCost ?? 0,
-                      previousData?.totalCost ?? 0,
-                    )}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-sky-100 bg-sky-50 p-3 text-xs">
-                  <p className="text-sky-700">Lợi nhuận</p>
-                  <p className="mt-1 font-semibold text-sky-900">
-                    {formatMoney(comparisonCurrentData?.totalProfit ?? 0)}
-                  </p>
-                  <p className="mt-1 text-sky-800">
-                    Kỳ trước: {formatMoney(previousData?.totalProfit ?? 0)} ·{" "}
-                    {formatDeltaPercent(
-                      comparisonCurrentData?.totalProfit ?? 0,
-                      previousData?.totalProfit ?? 0,
-                    )}
-                  </p>
-                </div>
               </div>
-            ) : null}
-          </div>
+              <div className="rounded-xl border border-amber-100 bg-amber-50 p-3">
+                <p className="text-[11px] text-amber-700">Tổng giá vốn</p>
+                <p className="mt-1 text-sm font-semibold text-amber-900">
+                  {formatMoney(overviewData?.totalCost ?? 0)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-sky-100 bg-sky-50 p-3">
+                <p className="text-[11px] text-sky-700">Tổng lợi nhuận</p>
+                <p className="mt-1 text-sm font-semibold text-sky-900">
+                  {formatMoney(overviewData?.totalProfit ?? 0)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-violet-100 bg-violet-50 p-3">
+                <p className="text-[11px] text-violet-700">Biên lợi nhuận</p>
+                <p className="mt-1 text-sm font-semibold text-violet-900">
+                  {(overviewData?.profitMarginPercent ?? 0).toLocaleString("vi-VN", {
+                    maximumFractionDigits: 2,
+                  })}
+                  %
+                </p>
+              </div>
+            </div>
+          </>
         ) : null}
 
         {activeSection === "chart" ? (
@@ -781,9 +852,47 @@ const RevenueProfitReportPage = () => {
                 </span>
               </div>
             </div>
+            <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-slate-500">Kho</label>
+                <select
+                  value={chartWarehouseId}
+                  onChange={(e) => setChartWarehouseId(Number(e.target.value))}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
+                >
+                  <option value={0}>Tất cả kho</option>
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-medium text-slate-500">
+                  Biến thể sản phẩm
+                </label>
+                <select
+                  value={chartProductVariantId}
+                  onChange={(e) => setChartProductVariantId(Number(e.target.value))}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs"
+                >
+                  <option value={0}>Tất cả biến thể</option>
+                  {productVariants.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.productName} · Hạng {v.grade}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
             <div className="space-y-2">
               {!chartRows.length ? (
-                <p className="text-xs text-slate-500">Chưa có dữ liệu để vẽ biểu đồ.</p>
+                <p className="text-xs text-slate-500">
+                  {chartReportFetching
+                    ? "Đang tải dữ liệu biểu đồ…"
+                    : "Chưa có dữ liệu để vẽ biểu đồ."}
+                </p>
               ) : (
                 chartRows.map((r) => {
                   const revenue = Math.max(0, r.revenue);
@@ -843,14 +952,14 @@ const RevenueProfitReportPage = () => {
                   onClick={() => setOpenedRevenueModal("customer")}
                   className="inline-flex items-center justify-center rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-100"
                 >
-                  Doanh thu theo khách hàng ({(data?.revenueByCustomers ?? []).length})
+                  Doanh thu theo khách hàng ({(broadData?.revenueByCustomers ?? []).length})
                 </button>
                 <button
                   type="button"
                   onClick={() => setOpenedRevenueModal("supplier")}
                   className="inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
                 >
-                  Doanh thu theo nhà cung cấp ({(data?.revenueBySuppliers ?? []).length})
+                  Doanh thu theo nhà cung cấp ({(broadData?.revenueBySuppliers ?? []).length})
                 </button>
               </div>
             </div>
@@ -865,17 +974,24 @@ const RevenueProfitReportPage = () => {
               <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                 <button
                   type="button"
-                  onClick={() => setIsSoldItemsModalOpen(true)}
+                  onClick={() => {
+                    setSoldFromDate(fromDate);
+                    setSoldToDate(toDate || today);
+                    setSoldPage(1);
+                    setSoldItemsKeyword("");
+                    setSoldItemsWarehouseFilter("");
+                    setIsSoldItemsModalOpen(true);
+                  }}
                   className="inline-flex items-center justify-center rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
                 >
-                  Danh sách mặt hàng đã bán ({data?.totalRows ?? 0})
+                  Danh sách mặt hàng đã bán ({broadData?.totalRows ?? 0})
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsLotProfitModalOpen(true)}
                   className="inline-flex items-center justify-center rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-100"
                 >
-                  Thống kê lợi nhuận theo từng lô ({lotProfitRows.length})
+                  Thống kê lợi nhuận theo từng lô ({allLots.length})
                 </button>
               </div>
             </div>
@@ -979,14 +1095,14 @@ const RevenueProfitReportPage = () => {
                 </thead>
                 <tbody>
                   {openedRevenueModal === "customer" ? (
-                    (data?.revenueByCustomers ?? []).length === 0 ? (
+                    (broadData?.revenueByCustomers ?? []).length === 0 ? (
                       <tr>
                         <td className="px-3 py-6 text-center text-slate-500" colSpan={4}>
                           Chưa có dữ liệu theo khách hàng.
                         </td>
                       </tr>
                     ) : (
-                      (data?.revenueByCustomers ?? []).map((item) => (
+                      (broadData?.revenueByCustomers ?? []).map((item) => (
                         <tr
                           key={item.customerKey}
                           className="border-t border-slate-100 hover:bg-slate-50"
@@ -1008,14 +1124,14 @@ const RevenueProfitReportPage = () => {
                         </tr>
                       ))
                     )
-                  ) : (data?.revenueBySuppliers ?? []).length === 0 ? (
+                  ) : (broadData?.revenueBySuppliers ?? []).length === 0 ? (
                     <tr>
                       <td className="px-3 py-6 text-center text-slate-500" colSpan={4}>
                         Chưa có dữ liệu theo nhà cung cấp.
                       </td>
                     </tr>
                   ) : (
-                    (data?.revenueBySuppliers ?? []).map((item) => (
+                    (broadData?.revenueBySuppliers ?? []).map((item) => (
                       <tr
                         key={item.supplierKey}
                         className="border-t border-slate-100 hover:bg-slate-50"
@@ -1057,21 +1173,60 @@ const RevenueProfitReportPage = () => {
               <div>
                 <p className="text-sm font-semibold text-slate-800">Danh sách mặt hàng đã bán</p>
                 <p className="text-[11px] text-slate-500">
-                  {isFetching
+                  {soldListFetching
                     ? "Đang tải dữ liệu..."
-                    : `${data?.totalRows ?? 0} dòng chi tiết theo box · Trang ${data?.page ?? 1}/${data?.totalPages ?? 1}`}
+                    : `${soldListData?.totalRows ?? 0} dòng chi tiết theo box · Trang ${soldListData?.page ?? soldPage}/${soldListData?.totalPages ?? 1}`}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsSoldItemsModalOpen(false)}
-                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Đóng
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleExportSoldListExcel()}
+                  disabled={soldListFetching}
+                  className="inline-flex items-center justify-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                >
+                  <Download size={14} />
+                  Xuất Excel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSoldItemsModalOpen(false)}
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Đóng
+                </button>
+              </div>
             </div>
             <div className="flex flex-wrap items-end gap-2 border-b border-slate-100 bg-slate-50/40 px-4 py-2.5">
-              <div className="min-w-[220px] flex-1">
+              <div>
+                <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                  Từ ngày
+                </label>
+                <input
+                  type="date"
+                  value={soldFromDate}
+                  onChange={(e) => {
+                    setSoldFromDate(e.target.value);
+                    setSoldPage(1);
+                  }}
+                  className="w-[148px] rounded border border-slate-300 bg-white px-2 py-1.5 text-xs"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                  Đến ngày
+                </label>
+                <input
+                  type="date"
+                  value={soldToDate}
+                  onChange={(e) => {
+                    setSoldToDate(e.target.value);
+                    setSoldPage(1);
+                  }}
+                  className="w-[148px] rounded border border-slate-300 bg-white px-2 py-1.5 text-xs"
+                />
+              </div>
+              <div className="min-w-[200px] flex-1">
                 <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-slate-500">
                   Tìm nhanh
                 </label>
@@ -1093,11 +1248,9 @@ const RevenueProfitReportPage = () => {
                   className="w-full rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs"
                 >
                   <option value="">Tất cả kho</option>
-                  {Array.from(
-                    new Set((data?.rows ?? []).map((r) => r.warehouseName || "—")),
-                  ).map((name) => (
-                    <option key={name} value={name}>
-                      {name}
+                  {warehouses.map((w) => (
+                    <option key={w.id} value={w.name}>
+                      {w.name}
                     </option>
                   ))}
                 </select>
@@ -1178,15 +1331,15 @@ const RevenueProfitReportPage = () => {
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-2 text-xs">
               <span className="text-slate-500">
-                Hiển thị {(data?.rows ?? []).length} / {data?.totalRows ?? 0} dòng
+                Hiển thị {(soldListData?.rows ?? []).length} / {soldListData?.totalRows ?? 0} dòng (trang hiện tại)
               </span>
               <div className="inline-flex items-center gap-2">
                 <label className="text-slate-500">Số dòng/trang</label>
                 <select
-                  value={pageSize}
+                  value={soldPageSize}
                   onChange={(e) => {
-                    setPageSize(Number(e.target.value));
-                    setPage(1);
+                    setSoldPageSize(Number(e.target.value));
+                    setSoldPage(1);
                   }}
                   className="rounded border border-slate-300 px-2 py-1 text-xs"
                 >
@@ -1197,23 +1350,26 @@ const RevenueProfitReportPage = () => {
                 </select>
                 <button
                   type="button"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={isFetching || (data?.page ?? 1) <= 1}
+                  onClick={() => setSoldPage((p) => Math.max(1, p - 1))}
+                  disabled={soldListFetching || (soldListData?.page ?? soldPage) <= 1}
                   className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50"
                 >
                   Trước
                 </button>
                 <span className="text-slate-600">
-                  Trang {data?.page ?? page}/{data?.totalPages ?? 1}
+                  Trang {soldListData?.page ?? soldPage}/{soldListData?.totalPages ?? 1}
                 </span>
                 <button
                   type="button"
                   onClick={() =>
-                    setPage((p) =>
-                      Math.min(data?.totalPages ?? p, p + 1),
+                    setSoldPage((p) =>
+                      Math.min(soldListData?.totalPages ?? p, p + 1),
                     )
                   }
-                  disabled={isFetching || (data?.page ?? page) >= (data?.totalPages ?? 1)}
+                  disabled={
+                    soldListFetching ||
+                    (soldListData?.page ?? soldPage) >= (soldListData?.totalPages ?? 1)
+                  }
                   className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50"
                 >
                   Sau
@@ -1232,22 +1388,34 @@ const RevenueProfitReportPage = () => {
             onClick={() => setIsLotProfitModalOpen(false)}
             className="absolute inset-0 bg-black/40"
           />
-          <div className="relative z-10 w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div className="relative z-10 flex w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
               <div>
                 <p className="text-sm font-semibold text-slate-800">
                   Thống kê lợi nhuận theo từng lô
                 </p>
                 <p className="text-[11px] text-slate-500">
-                  Tổng hợp doanh thu, giá vốn và lợi nhuận theo từng lô hàng.
+                  Tổng hợp doanh thu, giá vốn và lợi nhuận theo từng lô hàng (đủ lô trong hệ thống, có
+                  phân trang).
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
                   <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 font-medium text-rose-700">
-                    Tiêu hủy: {formatKg(data?.totalDisposedKg ?? 0)} kg
+                    Tiêu hủy:{" "}
+                    {lotModalLoading
+                      ? "…"
+                      : `${formatKg(lotModalTotals?.totalDisposedKg ?? 0)} kg`}
                   </span>
                   <span className="inline-flex items-center rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 font-medium text-orange-700">
-                    Hao hụt kiểm kê: {formatKg(data?.totalStockAdjustmentLossKg ?? 0)} kg
+                    Hao hụt kiểm kê:{" "}
+                    {lotModalLoading
+                      ? "…"
+                      : `${formatKg(lotModalTotals?.totalStockAdjustmentLossKg ?? 0)} kg`}
                   </span>
+                  {!lotModalLoading ? (
+                    <span className="text-slate-500">
+                      {lotModalRows.length} lô · trang {safeLotModalPage}/{lotModalTotalPages}
+                    </span>
+                  ) : null}
                 </div>
               </div>
               <button
@@ -1258,11 +1426,12 @@ const RevenueProfitReportPage = () => {
                 Đóng
               </button>
             </div>
-            <div className="max-h-[72vh] overflow-auto">
-              <table className="w-full min-w-[1120px] text-[11px]">
+            <div className="max-h-[64vh] overflow-auto">
+              <table className="w-full min-w-[1280px] text-[11px]">
                 <thead className="sticky top-0 bg-slate-50 text-slate-600">
                   <tr>
                     <th className="px-3 py-2 text-left">Mã lô</th>
+                    <th className="px-3 py-2 text-left">Sản phẩm</th>
                     <th className="px-3 py-2 text-left">Nhà cung cấp</th>
                     <th className="px-3 py-2 text-left">Kho</th>
                     <th className="px-3 py-2 text-right">Đã bán (kg)</th>
@@ -1275,22 +1444,38 @@ const RevenueProfitReportPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {lotProfitRows.length === 0 ? (
+                  {lotModalLoading ? (
                     <tr>
-                      <td className="px-3 py-6 text-center text-slate-500" colSpan={10}>
-                        Chưa có dữ liệu lô hàng trong khoảng thời gian đã chọn.
+                      <td className="px-3 py-8 text-center text-slate-500" colSpan={11}>
+                        Đang tải toàn bộ dữ liệu xuất kho…
+                      </td>
+                    </tr>
+                  ) : lotModalRows.length === 0 ? (
+                    <tr>
+                      <td className="px-3 py-6 text-center text-slate-500" colSpan={11}>
+                        Chưa có dữ liệu lô hàng.
                       </td>
                     </tr>
                   ) : (
-                    lotProfitRows.map((row) => (
-                      <tr key={`${row.lotId}-${row.lotCode}`} className="border-t border-slate-100 hover:bg-slate-50">
+                    lotModalPageSlice.map((row) => (
+                      <tr
+                        key={`${row.lotId}-${row.lotCode}`}
+                        className="border-t border-slate-100 hover:bg-slate-50"
+                      >
                         <td className="px-3 py-2 font-medium text-slate-800">{row.lotCode}</td>
+                        <td className="max-w-[200px] px-3 py-2 text-slate-700">
+                          <span className="line-clamp-2" title={row.productLabel}>
+                            {row.productLabel}
+                          </span>
+                        </td>
                         <td className="px-3 py-2">{row.supplierName}</td>
                         <td className="px-3 py-2">{row.warehouseName}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatKg(row.soldKg)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatKg(row.unsoldKg)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatKg(row.disposedKg)}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{formatKg(row.stockAdjustmentLossKg)}</td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          {formatKg(row.stockAdjustmentLossKg)}
+                        </td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatMoney(row.revenue)}</td>
                         <td className="px-3 py-2 text-right tabular-nums">{formatMoney(row.cost)}</td>
                         <td
@@ -1305,6 +1490,56 @@ const RevenueProfitReportPage = () => {
                   )}
                 </tbody>
               </table>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-2 text-[11px] text-slate-600">
+              <label className="inline-flex items-center gap-2">
+                <span className="text-slate-500">Số dòng / trang</span>
+                <select
+                  value={lotModalPageSize}
+                  onChange={(e) => {
+                    setLotModalPageSize(Number(e.target.value));
+                    setLotModalPage(1);
+                  }}
+                  disabled={lotModalLoading}
+                  className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setLotModalPage((p) => {
+                      const cur = Math.min(Math.max(1, p), lotModalTotalPages);
+                      return Math.max(1, cur - 1);
+                    })
+                  }
+                  disabled={lotModalLoading || safeLotModalPage <= 1}
+                  className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50"
+                >
+                  Trước
+                </button>
+                <span>
+                  Trang {safeLotModalPage}/{lotModalTotalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setLotModalPage((p) => {
+                      const cur = Math.min(Math.max(1, p), lotModalTotalPages);
+                      return Math.min(lotModalTotalPages, cur + 1);
+                    })
+                  }
+                  disabled={lotModalLoading || safeLotModalPage >= lotModalTotalPages}
+                  className="rounded border border-slate-300 px-2 py-1 disabled:opacity-50"
+                >
+                  Sau
+                </button>
+              </div>
             </div>
           </div>
         </div>

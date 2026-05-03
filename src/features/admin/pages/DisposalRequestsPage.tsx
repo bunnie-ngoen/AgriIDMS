@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import { formatVietnamDateTime, formatVietnamDate } from "../../../shared/lib/vietnamTime";
 import {
   useApproveDisposalRequestMutation,
   useGetDisposalRequestByIdQuery,
@@ -37,9 +38,8 @@ export default function DisposalRequestsPage() {
   };
 
   const handleReject = async (id: number) => {
-    const note = window.prompt("Nhập lý do từ chối (tuỳ chọn):") ?? "";
     try {
-      await rejectRequest({ id, reviewNote: note }).unwrap();
+      await rejectRequest({ id }).unwrap();
       toast.success("Đã từ chối yêu cầu tiêu hủy.");
       await refetch();
     } catch (err: any) {
@@ -96,7 +96,7 @@ export default function DisposalRequestsPage() {
                       <p className="text-slate-800 mt-1">
                         {detailItem.reviewedByName || detailItem.reviewedBy || "Chưa duyệt"}
                         {detailItem.reviewedAt
-                          ? ` · ${new Date(detailItem.reviewedAt).toLocaleString("vi-VN")}`
+                          ? ` · ${formatVietnamDateTime(detailItem.reviewedAt)}`
                           : ""}
                       </p>
                     </div>
@@ -130,9 +130,7 @@ export default function DisposalRequestsPage() {
                               </td>
                               <td className="px-3 py-2">{box.lotCode || "—"}</td>
                               <td className="px-3 py-2">
-                                {box.expiryDate
-                                  ? new Date(box.expiryDate).toLocaleDateString("vi-VN")
-                                  : "—"}
+                                {box.expiryDate ? formatVietnamDate(box.expiryDate) : "—"}
                               </td>
                               <td className="px-3 py-2">{box.slotCode || "Chưa xếp"}</td>
                               <td className="px-3 py-2 text-right tabular-nums">{box.weight}</td>
@@ -197,7 +195,7 @@ export default function DisposalRequestsPage() {
                       {item.requestedByName || item.requestedBy || "—"}
                     </td>
                     <td className="px-3 py-2 text-slate-700">
-                      {new Date(item.requestedAt).toLocaleString("vi-VN")}
+                      {formatVietnamDateTime(item.requestedAt)}
                     </td>
                     <td className="px-3 py-2 text-center">
                       <button

@@ -13,12 +13,36 @@ import { formatVietnamNotificationTime } from "../../../../shared/lib/vietnamTim
 import { useGetWarehousesQuery } from "../../api/create-user.api";
 import { useGetUnassignedBoxesByWarehouseQuery } from "../../../goods-receipt/api/goods-receipt.api";
 
+const PUTAWAY_KEYWORDS = ["Putaway", "Unassigned", "Unslotted", "NeedSlot", "NeedPutaway"];
+
+function isPutawayTypedNotification(item: {
+  referenceType?: string | null;
+  type?: string | null;
+}): boolean {
+  const referenceType = item.referenceType ?? "";
+  const notificationType = item.type ?? "";
+  return (
+    PUTAWAY_KEYWORDS.some((k) => referenceType.includes(k) || notificationType.includes(k)) ||
+    referenceType === "LotPendingPutaway"
+  );
+}
+
+/** Ẩn với Quản lý/Admin: thông báo xếp vị trí theo type hoặc nội dung “chưa xếp vị trí”. */
+function isHiddenPutawayStockNotificationForPrivilegedRoles(item: {
+  referenceType?: string | null;
+  type?: string | null;
+  message?: string | null;
+}): boolean {
+  if (isPutawayTypedNotification(item)) return true;
+  return /chưa xếp vị trí/i.test(String(item.message ?? ""));
+}
+
 export default function AdminHeaderNotificationBell() {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
 
   const navigate = useNavigate();
-  const { isManager, isWarehouseStaff } = useRoleGuard();
+  const { isManager, isWarehouseStaff, isAdmin } = useRoleGuard();
 
   const lotBasePath = isWarehouseStaff()
     ? "/warehouse/lots"
@@ -43,7 +67,8 @@ export default function AdminHeaderNotificationBell() {
     useGetMyNotificationsQuery({ page: 1, pageSize: 10 });
   const { data: unreadCountData, refetch: refetchUnreadCount } =
     useGetUnreadNotificationCountQuery();
-  const shouldShowPutawayFallback = isManager() || isWarehouseStaff();
+  const shouldShowPutawayFallback = isWarehouseStaff();
+  const hidePutawayStockNotifications = isManager() || isAdmin();
   const { data: warehouses = [] } = useGetWarehousesQuery(undefined, {
     skip: !shouldShowPutawayFallback,
   });
@@ -66,17 +91,7 @@ export default function AdminHeaderNotificationBell() {
 
   const hasServerPutawayNotification = useMemo(() => {
     const items = notificationData?.items ?? [];
-    return items.some((item) => {
-      const ref = item.referenceType ?? "";
-      const t = item.type ?? "";
-      return (
-        ref.includes("Putaway") ||
-        ref.includes("Unassigned") ||
-        ref === "LotPendingPutaway" ||
-        t.includes("Putaway") ||
-        t.includes("Unassigned")
-      );
-    });
+    return items.some((item) => isPutawayTypedNotification(item));
   }, [notificationData?.items]);
 
   const fallbackPutawayNotification = useMemo(() => {
@@ -110,13 +125,27 @@ export default function AdminHeaderNotificationBell() {
 
   const displayedNotifications = useMemo(() => {
     const base = notificationData?.items ?? [];
-    return fallbackPutawayNotification
-      ? [fallbackPutawayNotification, ...base]
+    const list = hidePutawayStockNotifications
+      ? base.filter((item) => !isHiddenPutawayStockNotificationForPrivilegedRoles(item))
       : base;
-  }, [notificationData?.items, fallbackPutawayNotification]);
+    return fallbackPutawayNotification
+      ? [fallbackPutawayNotification, ...list]
+      : list;
+  }, [notificationData?.items, fallbackPutawayNotification, hidePutawayStockNotifications]);
 
-  const unreadCount =
-    (unreadCountData?.unreadCount ?? 0) + (fallbackPutawayNotification ? 1 : 0);
+  const hiddenPutawayUnreadInFetchedPage = useMemo(() => {
+    if (!hidePutawayStockNotifications) return 0;
+    return (notificationData?.items ?? []).filter(
+      (item) => !item.isRead && isHiddenPutawayStockNotificationForPrivilegedRoles(item),
+    ).length;
+  }, [notificationData?.items, hidePutawayStockNotifications]);
+
+  const unreadCount = Math.max(
+    0,
+    (unreadCountData?.unreadCount ?? 0) -
+      hiddenPutawayUnreadInFetchedPage +
+      (fallbackPutawayNotification ? 1 : 0),
+  );
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -166,11 +195,7 @@ export default function AdminHeaderNotificationBell() {
       return referenceId ? `${purchaseOrderBasePath}/${referenceId}` : purchaseOrderBasePath;
     }
 
-    const putawayKeywords = ["Putaway", "Unassigned", "Unslotted", "NeedSlot", "NeedPutaway"];
-    const isPutawayNotification =
-      putawayKeywords.some((k) => referenceType.includes(k) || notificationType.includes(k)) ||
-      referenceType === "LotPendingPutaway";
-    if (isPutawayNotification) {
+    if (isPutawayTypedNotification({ referenceType, type: notificationType })) {
       const params = new URLSearchParams();
       if (referenceId) params.set("lotId", String(referenceId));
       if (item.warehouseId && item.warehouseId > 0) params.set("warehouseId", String(item.warehouseId));
@@ -224,15 +249,8 @@ export default function AdminHeaderNotificationBell() {
       }
     }
 
-    const referenceType = item.referenceType ?? "";
-    const notificationType = item.type ?? "";
-    const putawayKeywords = ["Putaway", "Unassigned", "Unslotted", "NeedSlot", "NeedPutaway"];
-    const isPutawayNotification =
-      putawayKeywords.some((k) => referenceType.includes(k) || notificationType.includes(k)) ||
-      referenceType === "LotPendingPutaway";
-
     setOpen(false);
-    if (isPutawayNotification) {
+    if (isPutawayTypedNotification(item)) {
       navigate(putawayBasePath, {
         state: {
           lotId: item.referenceId ?? null,
