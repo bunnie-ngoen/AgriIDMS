@@ -15,7 +15,7 @@ import {
   Warehouse,
   Menu,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../../app/hook";
 import { logout } from "../../auth/slices/auth.slice";
 import { api } from "../../../shared/api";
@@ -29,8 +29,6 @@ import {
 } from "../../notification/api/notification.api";
 
 import { formatVietnamNotificationTime } from "../../../shared/lib/vietnamTime";
-import { useGetWarehousesQuery } from "../../admin/api/create-user.api";
-import { useGetUnassignedBoxesByWarehouseQuery } from "../../goods-receipt/api/goods-receipt.api";
 
 export default function WarehouseStaffLayout() {
   const dispatch = useAppDispatch();
@@ -49,51 +47,8 @@ export default function WarehouseStaffLayout() {
     pageSize: 10,
   });
   const { data: unreadCountData, refetch: refetchUnreadCount } = useGetUnreadNotificationCountQuery();
-  const { data: warehouses = [] } = useGetWarehousesQuery();
-  const warehouseWithMostUnassigned = useMemo(() => {
-    return warehouses
-      .filter((w) => Number(w.unassignedStockWeight ?? 0) > 0)
-      .sort(
-        (a, b) =>
-          Number(b.unassignedStockWeight ?? 0) - Number(a.unassignedStockWeight ?? 0),
-      )[0];
-  }, [warehouses]);
-  const { data: unassignedBoxes = [] } = useGetUnassignedBoxesByWarehouseQuery(
-    warehouseWithMostUnassigned?.id ?? 0,
-    { skip: !warehouseWithMostUnassigned?.id },
-  );
   const [markAsRead] = useMarkNotificationAsReadMutation();
   const [markAllAsRead, { isLoading: isMarkingAllAsRead }] = useMarkAllNotificationsAsReadMutation();
-  const hasServerPutawayNotification = useMemo(() => {
-    const items = notificationData?.items ?? [];
-    return items.some((item) => {
-      const ref = item.referenceType ?? "";
-      const t = item.type ?? "";
-      return (
-        ref.includes("Putaway") ||
-        ref.includes("Unassigned") ||
-        ref === "LotPendingPutaway" ||
-        t.includes("Putaway") ||
-        t.includes("Unassigned")
-      );
-    });
-  }, [notificationData?.items]);
-  const putawayReminder = useMemo(() => {
-    if (hasServerPutawayNotification || !warehouseWithMostUnassigned) return null;
-    const lotId =
-      unassignedBoxes.find((b) => Number(b.lotId) > 0)?.lotId ?? null;
-    const unassignedWeight = Number(
-      warehouseWithMostUnassigned.unassignedStockWeight ?? 0,
-    );
-    if (unassignedWeight <= 0) return null;
-
-    return {
-      lotId,
-      warehouseId: warehouseWithMostUnassigned.id,
-      warehouseName: warehouseWithMostUnassigned.name,
-      unassignedWeight,
-    };
-  }, [hasServerPutawayNotification, warehouseWithMostUnassigned, unassignedBoxes]);
   const displayedNotifications = notificationData?.items ?? [];
   const unreadCount = unreadCountData?.unreadCount ?? 0;
   const previousUnreadCountRef = useRef<number | null>(null);
@@ -251,34 +206,6 @@ export default function WarehouseStaffLayout() {
         </div>
 
         <div className="flex-1 overflow-y-auto px-3 py-4">
-          {putawayReminder ? (
-            <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">
-                Cần xếp vị trí
-              </p>
-              <p className="mt-1 text-xs text-amber-900 leading-5">
-                Kho <span className="font-semibold">{putawayReminder.warehouseName}</span> còn{" "}
-                <span className="font-semibold">
-                  {putawayReminder.unassignedWeight.toLocaleString("vi-VN")} kg
-                </span>{" "}
-                chưa xếp.
-              </p>
-              <button
-                type="button"
-                onClick={() =>
-                  navigate("/warehouse/putaway", {
-                    state: {
-                      lotId: putawayReminder.lotId,
-                      warehouseId: putawayReminder.warehouseId,
-                    },
-                  })
-                }
-                className="mt-2 inline-flex w-full items-center justify-center rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
-              >
-                Đi xếp vị trí ngay
-              </button>
-            </div>
-          ) : null}
           <ul className="space-y-1">
             <li>
               <NavLink
