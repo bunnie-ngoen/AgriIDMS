@@ -8,8 +8,12 @@ export const VIETNAM_TIME_ZONE = "Asia/Ho_Chi_Minh";
 export function parseApiDateInput(input: string | number | Date): Date {
     if (input instanceof Date) return input;
     if (typeof input === "number") return new Date(input);
-    const s = input.trim();
+    let s = input.trim();
     if (!s) return new Date(NaN);
+    // Một số API/SQL trả "yyyy-MM-dd HH:mm:ss" — chuẩn hoá để nhánh UTC bên dưới nhận diện đúng.
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(s) && !s.includes("T")) {
+        s = s.replace(" ", "T");
+    }
     // Đã có Z hoặc offset (+/-HH:mm hoặc +HH)
     if (/[zZ]$/.test(s) || /[+-]\d{2}:?\d{2}$/.test(s) || /[+-]\d{2}$/.test(s)) {
         return new Date(s);
