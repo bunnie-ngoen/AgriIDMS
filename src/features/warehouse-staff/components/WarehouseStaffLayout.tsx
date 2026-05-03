@@ -7,6 +7,7 @@ import {
   Sparkles,
   FileText,
   LogOut,
+  Store,
   PackageCheck,
   QrCode,
   ShieldCheck,
@@ -106,6 +107,12 @@ export default function WarehouseStaffLayout() {
       normalizedReferenceType.includes("Qc") ||
       normalizedType.includes("Qc") ||
       normalizedType.includes("QC");
+
+    if (normalizedReferenceType === "PosCounterHandover" && referenceId) {
+      navigate(`/warehouse/pos-counter-handover?highlightOrderId=${referenceId}`);
+      setNotificationOpen(false);
+      return;
+    }
 
     if (normalizedReferenceType === "ExportReceipt" && referenceId) {
       navigate(`/warehouse/exports?exportId=${referenceId}`);
@@ -239,6 +246,23 @@ export default function WarehouseStaffLayout() {
                   <Truck size={15} />
                 </span>
                 Xác nhận shipper đã lấy hàng
+              </NavLink>
+            </li>
+            <li>
+              <NavLink
+                to="/warehouse/pos-counter-handover"
+                className={({ isActive }) =>
+                  `w-full flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                    isActive
+                      ? "bg-slate-800 text-white border border-slate-700"
+                      : "text-slate-300 hover:bg-slate-800/70"
+                  }`
+                }
+              >
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg mr-3 shrink-0 bg-slate-800 text-slate-200">
+                  <Store size={15} />
+                </span>
+                Giao tại quầy (POS)
               </NavLink>
             </li>
             <li>

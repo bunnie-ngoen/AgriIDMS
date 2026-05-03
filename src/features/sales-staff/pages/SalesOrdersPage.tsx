@@ -44,8 +44,41 @@ const STATUS_PILL =
   "inline-flex items-center rounded-full border px-2 py-1 text-xs font-semibold";
 const SALE_CONFIRM_TIMEOUT_MINUTES = 60;
 
-/** RTK Query ném lỗi này khi gọi `refetch()` trong khi endpoint đang `skip: true`. */
+/** COD giao trả sau: chỉ xác nhận thu tiền sau duyệt xuất / đã giao. POS tại quầy (đã Confirmed): được xác nhận sớm trừ giao + trả sau. */
+function canConfirmPendingCashByOrderRules(p: PendingCodPaymentItem): boolean {
+  const os = (p.orderStatus ?? "").trim();
+  if (os === "ApprovedExport" || os === "Delivered") return true;
+  const rawSrc = String(p.orderSource ?? "").trim();
+  const isPos = rawSrc === "POS" || rawSrc === "1";
+  if (!isPos || os !== "Confirmed") return false;
+  const payAfter = (p.paymentTiming ?? "").trim() === "PayAfter";
+  const delivery = (p.fulfillmentType ?? "").trim() === "Delivery";
+  return !(payAfter && delivery);
+}
+
+/** RTK Query #38 (dev): gọi `refetch()` khi query chưa start (thường do `skip: true`). Production: "Minified Redux Toolkit error #38; ...". */
 const RTK_SKIP_REFETCH_MESSAGE = "Cannot refetch a query that has not been started yet";
+
+const RTK_REFETCH_SKIPPED_VI =
+  "Không thể làm mới danh sách vì một số dữ liệu chưa được tải trên trang này (ví dụ tài khoản sale không mở hàng đợi kho/giữ hàng). Vui lòng tải lại trang nếu cần.";
+
+function errorMessageFromUnknown(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "object" && err !== null && "message" in err) {
+    const m = (err as { message?: unknown }).message;
+    if (typeof m === "string") return m;
+  }
+  return String(err);
+}
+
+function isRtkRefetchSkippedErrorMessage(msg: string): boolean {
+  if (!msg) return false;
+  if (msg.includes(RTK_SKIP_REFETCH_MESSAGE)) return true;
+  if (/redux-toolkit\.js\.org\/Errors\?code=38/i.test(msg)) return true;
+  if (/redux toolkit error\s*#\s*38/i.test(msg)) return true;
+  if (/\berror\s*#\s*38\b/i.test(msg) && /minified/i.test(msg)) return true;
+  return false;
+}
 
 function getApiErrorMessage(err: unknown, fallback: string) {
   const e = err as {
@@ -53,9 +86,8 @@ function getApiErrorMessage(err: unknown, fallback: string) {
     message?: string;
   };
   const raw = e?.data?.message || e?.data?.error || e?.data?.detail || e?.message || "";
-  if (typeof raw === "string" && raw.includes(RTK_SKIP_REFETCH_MESSAGE)) {
-    return "Không thể làm mới danh sách vì một số dữ liệu chưa được tải trên trang này. Vui lòng tải lại trang nếu cần.";
-  }
+  if (typeof raw === "string" && isRtkRefetchSkippedErrorMessage(raw)) return RTK_REFETCH_SKIPPED_VI;
+  if (isRtkRefetchSkippedErrorMessage(errorMessageFromUnknown(err))) return RTK_REFETCH_SKIPPED_VI;
   return raw || fallback;
 }
 
@@ -63,8 +95,7 @@ async function refetchIfStarted(refetch: () => Promise<unknown>): Promise<void> 
   try {
     await refetch();
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes(RTK_SKIP_REFETCH_MESSAGE)) return;
+    if (isRtkRefetchSkippedErrorMessage(errorMessageFromUnknown(e))) return;
     throw e;
   }
 }
@@ -828,11 +859,12 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
     }
     return (
       <div className={`${SALES_TABLE_SHELL} max-h-[560px] overflow-auto`}>
-        <table className="w-full min-w-[1180px] table-fixed bg-white">
+        <table className="w-full min-w-[1260px] table-fixed bg-white">
           <thead className="sticky top-0 z-10">
             <tr className={SALES_TABLE_HEAD}>
               <th className="w-20 py-3 pl-3 pr-6 whitespace-nowrap text-left lg:w-[5.5rem]">Thanh toán</th>
               <th className="py-3 pl-2 pr-3">Đơn hàng</th>
+              <th className="py-3 pr-3 w-[8.5rem]">Nguồn</th>
               <th className="py-3 pr-3">Tên khách</th>
               <th className="py-3 pr-3">Số điện thoại</th>
               <th className="py-3 pr-3">Trạng thái thanh toán</th>
@@ -844,19 +876,28 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
           </thead>
           <tbody className="divide-y divide-slate-100">
             {rows.map((p) => {
-              const canConfirmOrderStatus =
-                p.orderStatus === "ApprovedExport" || p.orderStatus === "Delivered";
-              const canConfirmThisPayment = canConfirmCod && canConfirmOrderStatus;
-              const disableReason =
-                !canConfirmOrderStatus
-                  ? "Chỉ xác nhận khi đơn đã duyệt xuất hoặc đã giao hàng."
-                  : "Bạn không có quyền xác nhận thanh toán.";
+              const canConfirmOrderStage = canConfirmPendingCashByOrderRules(p);
+              const canConfirmThisPayment = canConfirmCod && canConfirmOrderStage;
+              const disableReason = !canConfirmCod
+                ? "Bạn không có quyền xác nhận thanh toán."
+                : !canConfirmOrderStage
+                  ? "COD giao trả sau: chỉ xác nhận sau khi đơn đã duyệt xuất hoặc đã giao. Đơn POS tại quầy (đã xác nhận): có thể xác nhận tiền ngay, trừ giao hàng trả sau."
+                  : undefined;
               return (
               <tr key={p.paymentId} className="text-sm transition-colors hover:bg-slate-50/80">
                 <td className="w-20 py-3.5 pl-3 pr-6 text-left font-semibold tabular-nums text-slate-900 whitespace-nowrap lg:w-[5.5rem]">
                   {p.paymentId}
                 </td>
                 <td className="py-3.5 pl-2 pr-3 font-semibold text-slate-900">Đơn hàng {p.orderId}</td>
+                <td className="py-3.5 pr-3">
+                  {(p.orderSource ?? "").trim() ? (
+                    <span className={`${STATUS_PILL} ${orderSourceTone(String(p.orderSource))}`}>
+                      {orderSourceLabel(String(p.orderSource))}
+                    </span>
+                  ) : (
+                    <span className="text-slate-400">—</span>
+                  )}
+                </td>
                 <td className="py-3.5 pr-3 text-slate-700">
                   {(p.customerName && p.customerName.trim()) || "—"}
                 </td>
@@ -885,8 +926,10 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
                   >
                     Xác nhận
                   </button>
-                  {!canConfirmThisPayment && !canConfirmOrderStatus ? (
+                  {!canConfirmThisPayment && canConfirmCod && !canConfirmOrderStage ? (
                     <p className="mt-1 text-[11px] text-amber-700">Chưa tới bước xác nhận tiền</p>
+                  ) : !canConfirmThisPayment && !canConfirmCod ? (
+                    <p className="mt-1 text-[11px] text-amber-700">Không có quyền xác nhận</p>
                   ) : null}
                 </td>
               </tr>

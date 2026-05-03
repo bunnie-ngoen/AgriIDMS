@@ -15,7 +15,12 @@ import {
   useCreateStaffOnlinePayBeforePaymentMutation,
   useGetLatestPaymentByOrderQuery,
 } from "../../payment/api/payment.api";
-import { paymentMethodEnum, shouldUseStaffOnlinePayBeforeEndpoint } from "../../payment/schemas/payment.schema";
+import {
+  paymentMethodApiToFormValue,
+  paymentMethodEnum,
+  shouldUseStaffOnlinePayBeforeEndpoint,
+  type PaymentResponse,
+} from "../../payment/schemas/payment.schema";
 import {
   formatVietnamDate,
   formatVietnamDateTime,
@@ -117,7 +122,13 @@ export default function SalesOrderDetailPage() {
     isOverdueSaleConfirm(order.createdAt);
 
   const recreatePaymentMethod =
-    latestPayment?.paymentMethod === "BANKING" ? "BANKING" : "COD";
+    latestPayment?.paymentMethod && /^banking$/i.test(latestPayment.paymentMethod) ? "BANKING" : "COD";
+
+  /** Đồng bộ dropdown "Phương thức" với thanh toán mới nhất từ API (tránh luôn mặc định Tiền mặt khi vào lại trang). */
+  useEffect(() => {
+    if (!latestPayment?.paymentMethod) return;
+    setPaymentMethod(paymentMethodApiToFormValue(latestPayment.paymentMethod));
+  }, [latestPayment?.id, latestPayment?.paymentMethod]);
 
   useEffect(() => {
     if (!valid || !order) return;
@@ -143,6 +154,30 @@ export default function SalesOrderDetailPage() {
       await refetchPayment();
     } catch (err) {
       setMsg(getApiErrorMessage(err, failText));
+    }
+  };
+
+  const handleCreatePayment = async () => {
+    if (!valid || !canCreatePayment || !order) return;
+    setMsg("");
+    try {
+      const useStaff = shouldUseStaffOnlinePayBeforeEndpoint(order);
+      const created: PaymentResponse = useStaff
+        ? await createStaffPayment({ orderId, paymentMethod }).unwrap()
+        : await createPayment({ orderId, paymentMethod }).unwrap();
+      setMsg("Đã tạo thanh toán mới.");
+      await refetch();
+      await refetchPayment();
+      if (paymentMethod === paymentMethodEnum.BANKING) {
+        const url = created.checkoutUrl?.trim();
+        if (url) {
+          navigate(`/sales/orders/${orderId}/bank-transfer`, {
+            state: { checkoutUrl: url, amount: created.amount },
+          });
+        }
+      }
+    } catch (err) {
+      setMsg(getApiErrorMessage(err, "Không thể tạo thanh toán."));
     }
   };
 
@@ -311,7 +346,6 @@ export default function SalesOrderDetailPage() {
                               prefillFromOrder: {
                                 sourceOrderId: order.orderId,
                                 fulfillmentType: order.fulfillmentType === "Delivery" ? 1 : 0,
-                                paymentTiming: order.paymentTiming === "PayAfter" ? 1 : 0,
                                 customerName: order.recipient?.fullName ?? "",
                                 customerPhone: order.recipient?.phone ?? "",
                                 customerAddress: order.recipient?.address ?? "",
@@ -460,18 +494,7 @@ export default function SalesOrderDetailPage() {
 
                   <button
                     type="button"
-                    onClick={() =>
-                      runOrderAction(
-                        () => {
-                          const useStaff = shouldUseStaffOnlinePayBeforeEndpoint(order);
-                          return useStaff
-                            ? createStaffPayment({ orderId, paymentMethod }).unwrap()
-                            : createPayment({ orderId, paymentMethod }).unwrap();
-                        },
-                        "Đã tạo thanh toán mới.",
-                        "Không thể tạo thanh toán.",
-                      )
-                    }
+                    onClick={() => void handleCreatePayment()}
                     disabled={!canCreatePayment || isCreatingAnyPayment}
                     className={btnPrimary}
                   >

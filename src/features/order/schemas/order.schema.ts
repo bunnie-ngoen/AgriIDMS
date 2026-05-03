@@ -78,6 +78,16 @@ export const saleConfirmResponseSchema = z.object({
 });
 export type SaleConfirmResponse = z.infer<typeof saleConfirmResponseSchema>;
 
+/** BE: PosCustomerLookupResponseDto */
+export const posCustomerLookupResponseSchema = z.object({
+    found: z.boolean(),
+    customerUserId: z.string().nullable().optional(),
+    fullName: z.string().nullable().optional(),
+    phoneNumber: z.string().nullable().optional(),
+    address: z.string().nullable().optional(),
+});
+export type PosCustomerLookupResponse = z.infer<typeof posCustomerLookupResponseSchema>;
+
 export const allocationProposalResultSchema = z.object({
     orderId: z.coerce.number().int(),
     proposedBoxCount: z.coerce.number().int(),

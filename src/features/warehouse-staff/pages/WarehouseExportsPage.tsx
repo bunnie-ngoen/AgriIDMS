@@ -248,6 +248,14 @@ export default function WarehouseExportsPage() {
         `Xác nhận lấy hàng thành công · Phiếu #${currentExportId} → ${exportStatusLabel(next || res.status)}.`,
         { id: t },
       );
+      const notices = (res.warnings ?? []).filter((w) => w.trim().length > 0);
+      if (notices.length > 0) {
+        const noticeText = notices.join(" ");
+        toast(noticeText, { icon: "⚠️", duration: 10000 });
+        setMsg(noticeText);
+      } else {
+        setMsg("");
+      }
       await loadExport(currentExportId).unwrap();
       await refreshLists();
       toast.success("Đã cập nhật chi tiết phiếu và danh sách.");

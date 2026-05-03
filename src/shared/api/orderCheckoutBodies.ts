@@ -104,6 +104,7 @@ export type CreatePosOrderRequestBody = {
     customerUserId?: string;
     customerName?: string;
     customerPhone?: string;
+    customerAddress?: string;
     items: CreatePosOrderItemBody[];
 };
 
@@ -113,6 +114,7 @@ export function toCreatePosOrderRequestBody(input: {
     customerUserId?: string;
     customerName?: string;
     customerPhone?: string;
+    customerAddress?: string;
     items: Array<{
         productVariantId: number;
         boxWeight: number;
@@ -127,6 +129,7 @@ export function toCreatePosOrderRequestBody(input: {
         customerUserId: input.customerUserId?.trim() || undefined,
         customerName: input.customerName?.trim() || undefined,
         customerPhone: input.customerPhone?.trim() || undefined,
+        customerAddress: input.customerAddress?.trim() || undefined,
         items: input.items.map((i) => {
             const line: CreatePosOrderItemBody = {
                 productVariantId: Math.trunc(Number(i.productVariantId)),

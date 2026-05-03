@@ -24,6 +24,9 @@ export const pendingCodPaymentItemSchema = z.object({
     paymentStatus: z.string(),
     paymentMethod: z.string(),
     orderStatus: z.string(),
+    orderSource: z.string().optional().nullable(),
+    fulfillmentType: z.string().optional().nullable(),
+    paymentTiming: z.string().optional().nullable(),
     createdAt: z.string(),
 });
 
@@ -39,6 +42,13 @@ export const paymentMethodEnum = {
 
 export type PaymentMethodValue =
     (typeof paymentMethodEnum)[keyof typeof paymentMethodEnum];
+
+/** BE trả `paymentMethod` dạng enum string (`Cash`, `Banking`) hoặc số — map về giá trị select trên FE. */
+export function paymentMethodApiToFormValue(method?: string | null): PaymentMethodValue {
+    const m = (method ?? "").trim();
+    if (m === "3" || /^banking$/i.test(m)) return paymentMethodEnum.BANKING;
+    return paymentMethodEnum.COD;
+}
 
 /** BE PaymentService: POST Payments/staff/online-paybefore chỉ cho PayBefore + Delivery (+ Online/POS). */
 export function shouldUseStaffOnlinePayBeforeEndpoint(order: {
