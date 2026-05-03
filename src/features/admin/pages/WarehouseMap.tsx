@@ -1122,8 +1122,9 @@ const ZoneOverview = ({
 };
 
 const WarehouseMap = () => {
-  const { isManager, isAdmin } = useRoleGuard();
+  const { isManager, isAdmin, isWarehouseStaff } = useRoleGuard();
   const canDirectDispose = isManager() || isAdmin();
+  const isWarehouseStaffView = isWarehouseStaff();
   const warehouseBasePath = isManager() ? "/manager/warehouses" : "/admin/warehouses";
   const putawayBasePath = isManager() ? "/manager/putaway" : "/admin/putaway";
   const { id } = useParams<{ id: string }>();
@@ -2010,12 +2011,14 @@ const WarehouseMap = () => {
             >
               Danh sách hàng tiêu hủy
             </button>
-            <Link
-              to={`${warehouseBasePath}/${warehouseId}/config`}
-              className="inline-flex items-center rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 hover:bg-emerald-100"
-            >
-              Cấu hình kho
-            </Link>
+            {!isWarehouseStaffView && (
+              <Link
+                to={`${warehouseBasePath}/${warehouseId}/config`}
+                className="inline-flex items-center rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-1 font-medium text-emerald-700 hover:bg-emerald-100"
+              >
+                Cấu hình kho
+              </Link>
+            )}
             <Link
               to={warehouseBasePath}
               className="text-emerald-600 hover:underline"
@@ -2066,16 +2069,18 @@ const WarehouseMap = () => {
                 <option value="D3">Ô có hàng còn 3 ngày hết hạn</option>
                 <option value="D7">Ô có hàng còn 7 ngày hết hạn</option>
               </select>
-              <button
-                type="button"
-                onClick={() => {
-                  setDetailSlot(null);
-                  setIsAreaDetailModalOpen(true);
-                }}
-                className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 sm:ml-auto"
-              >
-                Mở chi tiết khu vực
-              </button>
+              {!isWarehouseStaffView && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDetailSlot(null);
+                    setIsAreaDetailModalOpen(true);
+                  }}
+                  className="inline-flex items-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 sm:ml-auto"
+                >
+                  Mở chi tiết khu vực
+                </button>
+              )}
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2">
               <select
