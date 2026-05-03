@@ -1,4 +1,4 @@
-import type { HomeProduct, HomeProductDetail } from "../schemas/home.schema";
+import type { HomeProduct } from "../schemas/home.schema";
 
 type PriceTier = HomeProduct["nearExpiryPriceTiers"][number];
 
@@ -41,11 +41,10 @@ export type HomeProductDiscountViewModel = {
 };
 
 /**
- * Chuẩn hóa dữ liệu hiển thị chi tiết — chỉ dựa trên payload Home (không tự tính lại engine giảm giá).
+ * Chuẩn hóa dữ liệu hiển thị giá — chỉ dựa trên payload Home (không tự tính lại engine giảm giá).
+ * Dùng cho cả danh sách variant và chi tiết (HomeProductDetail mở rộng cùng các field nearExpiry*).
  */
-export function getHomeProductDiscountViewModel(
-    product: HomeProductDetail,
-): HomeProductDiscountViewModel {
+export function getHomeProductDiscountViewModel(product: HomeProduct): HomeProductDiscountViewModel {
     const hasDiscount = productHasActiveSaleDisplay(product);
     const basePricePerKg = product.price;
 
