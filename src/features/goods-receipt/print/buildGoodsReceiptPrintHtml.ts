@@ -1,4 +1,5 @@
 import type { GoodsReceiptPrintData } from "../types/goods-receipt.type";
+import { parseApiDateInput, VIETNAM_TIME_ZONE } from "../../../shared/lib/vietnamTime";
 
 function escHtml(s: string) {
   return s
@@ -10,16 +11,25 @@ function escHtml(s: string) {
 
 function formatDateVi(dateInput?: string | null): string {
   if (!dateInput) return "—";
-  const d = new Date(dateInput);
+  const d = parseApiDateInput(dateInput);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("vi-VN");
+  return d.toLocaleDateString("vi-VN", { timeZone: VIETNAM_TIME_ZONE });
 }
 
 function dateLongVi(dateInput?: string | null): string {
   if (!dateInput) return "ngày ... tháng ... năm ...";
-  const d = new Date(dateInput);
+  const d = parseApiDateInput(dateInput);
   if (Number.isNaN(d.getTime())) return "ngày ... tháng ... năm ...";
-  return `ngày ${d.getDate()} tháng ${d.getMonth() + 1} năm ${d.getFullYear()}`;
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: VIETNAM_TIME_ZONE,
+    day: "numeric",
+    month: "numeric",
+    year: "numeric",
+  }).formatToParts(d);
+  const day = parts.find((p) => p.type === "day")?.value ?? "";
+  const month = parts.find((p) => p.type === "month")?.value ?? "";
+  const year = parts.find((p) => p.type === "year")?.value ?? "";
+  return `ngày ${day} tháng ${month} năm ${year}`;
 }
 
 export function buildGoodsReceiptPrintHtml(d: GoodsReceiptPrintData): string {

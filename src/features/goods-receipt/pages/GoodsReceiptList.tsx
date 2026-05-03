@@ -5,6 +5,7 @@ import { useGetSuppliersQuery } from "../../supplier/api/supplier.api";
 import { useGetWarehousesQuery } from "../../admin/api/create-user.api";
 import { Loader2, FileText, FilePlus2, Eye } from "lucide-react";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
+import { formatVietnamDate, parseApiDateInput } from "../../../shared/lib/vietnamTime";
 
 function toDateInputValue(date: Date): string {
   const year = date.getFullYear();
@@ -80,7 +81,7 @@ export default function GoodsReceiptList() {
             : "";
 
         if (safeFromDate || safeToDate) {
-          const receivedAt = r.receivedDate ? new Date(r.receivedDate) : null;
+          const receivedAt = r.receivedDate ? parseApiDateInput(r.receivedDate) : null;
           if (!receivedAt || Number.isNaN(receivedAt.getTime())) return false;
 
           if (safeFromDate) {
@@ -99,8 +100,8 @@ export default function GoodsReceiptList() {
         return true;
       })
         .sort((a, b) => {
-          const aTime = a.receivedDate ? new Date(a.receivedDate).getTime() : 0;
-          const bTime = b.receivedDate ? new Date(b.receivedDate).getTime() : 0;
+          const aTime = a.receivedDate ? parseApiDateInput(a.receivedDate).getTime() : 0;
+          const bTime = b.receivedDate ? parseApiDateInput(b.receivedDate).getTime() : 0;
 
           if (aTime !== bTime) {
             return sortDirection === "ASC" ? aTime - bTime : bTime - aTime;
@@ -382,9 +383,7 @@ export default function GoodsReceiptList() {
                         className="px-5 py-3.5 text-slate-600 cursor-pointer"
                         onClick={() => navigate(`${basePath}/${r.id}`)}
                       >
-                        {r.receivedDate
-                          ? new Date(r.receivedDate).toLocaleDateString("vi-VN")
-                          : "—"}
+                        {r.receivedDate ? formatVietnamDate(r.receivedDate) : "—"}
                       </td>
                       <td
                         className="px-5 py-3.5 cursor-pointer"

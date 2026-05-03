@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 import { useGetAllLotsQuery, useUpdateLotQrImageMutation } from "../api/goods-receipt.api";
 import { uploadQrPayloadToCloudinary } from "../../../shared/lib/qrImageCloudinary";
+import { formatVietnamDate, parseApiDateInput } from "../../../shared/lib/vietnamTime";
 
 function toVietnameseLotStatus(status: string): string {
   if (status === "Active") return "Đang hoạt động";
@@ -166,8 +167,8 @@ export default function LotListPage() {
         return haystack.includes(keyword);
       })
       .sort((a, b) => {
-        const aTime = a.receivedDate ? new Date(a.receivedDate).getTime() : 0;
-        const bTime = b.receivedDate ? new Date(b.receivedDate).getTime() : 0;
+        const aTime = a.receivedDate ? parseApiDateInput(a.receivedDate).getTime() : 0;
+        const bTime = b.receivedDate ? parseApiDateInput(b.receivedDate).getTime() : 0;
         if (aTime !== bTime) {
           return sortDirection === "ASC" ? aTime - bTime : bTime - aTime;
         }
@@ -408,10 +409,10 @@ export default function LotListPage() {
                       <td className="px-5 py-3.5 text-slate-600">{lot.productVariantName || "—"}</td>
                       <td className="px-5 py-3.5 text-slate-700">{lot.warehouseName || "—"}</td>
                       <td className="px-5 py-3.5 text-slate-600">
-                        {lot.receivedDate ? new Date(lot.receivedDate).toLocaleDateString("vi-VN") : "—"}
+                        {lot.receivedDate ? formatVietnamDate(lot.receivedDate) : "—"}
                       </td>
                       <td className="px-5 py-3.5 text-slate-600">
-                        {lot.expiryDate ? new Date(lot.expiryDate).toLocaleDateString("vi-VN") : "—"}
+                        {lot.expiryDate ? formatVietnamDate(lot.expiryDate) : "—"}
                       </td>
                       <td className="px-5 py-3.5">
                         {lot.qrImageUrl ? (

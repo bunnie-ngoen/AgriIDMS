@@ -6,6 +6,7 @@ import { useRoleGuard } from "../../auth/hooks/useRoleGuard";
 import { useGetLotDetailByIdQuery } from "../api/goods-receipt.api";
 import type { LotBoxItem } from "../types/goods-receipt.type";
 import { boxStatusLabelVietnam } from "../../../shared/lib/boxStatusUi";
+import { formatVietnamDate, formatVietnamDateTime } from "../../../shared/lib/vietnamTime";
 
 function toVietnameseLotStatus(status: string): string {
   if (status === "Active") return "Đang hoạt động";
@@ -361,9 +362,7 @@ export default function LotDetailPage() {
                   Ngày nhập
                 </p>
                 <p className="text-slate-900 font-semibold mt-1">
-                  {data.receivedDate
-                    ? new Date(data.receivedDate).toLocaleDateString("vi-VN")
-                    : "—"}
+                  {data.receivedDate ? formatVietnamDate(data.receivedDate) : "—"}
                 </p>
               </div>
               <div>
@@ -371,9 +370,7 @@ export default function LotDetailPage() {
                   HSD
                 </p>
                 <p className="text-slate-900 font-semibold mt-1">
-                  {data.expiryDate
-                    ? new Date(data.expiryDate).toLocaleDateString("vi-VN")
-                    : "—"}
+                  {data.expiryDate ? formatVietnamDate(data.expiryDate) : "—"}
                 </p>
               </div>
               <div>
@@ -503,9 +500,7 @@ export default function LotDetailPage() {
                             )}
                           </td>
                           <td className="px-5 py-3.5 text-slate-600">
-                            {b.createdAt
-                              ? new Date(b.createdAt).toLocaleDateString("vi-VN")
-                              : "—"}
+                            {b.createdAt ? formatVietnamDate(b.createdAt) : "—"}
                           </td>
                           <td className="px-5 py-3.5 text-right">
                             <div className="inline-flex items-center gap-2">
@@ -645,9 +640,7 @@ export default function LotDetailPage() {
                         Ngày tạo
                       </p>
                       <p className="mt-1 font-medium text-slate-900">
-                        {selectedBox.createdAt
-                          ? new Date(selectedBox.createdAt).toLocaleString("vi-VN")
-                          : "—"}
+                        {selectedBox.createdAt ? formatVietnamDateTime(selectedBox.createdAt) : "—"}
                       </p>
                     </div>
                     <div>
