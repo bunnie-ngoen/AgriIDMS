@@ -26,14 +26,15 @@ export default function ProtectedRoute({
         return <Navigate to={ROUTES.LOGIN} state={{ from: location }} replace />;
     }
 
-    // Kiểm tra quyền nếu có allowedRoles
+    // Kiểm tra quyền nếu có allowedRoles (bất kỳ vai trò nào khớp — không chỉ roles[0])
     if (allowedRoles && allowedRoles.length > 0) {
-        const userRole = userRoles[0];
-        if (!userRole) {
+        if (userRoles.length === 0) {
             return <Navigate to={ROUTES.LOGIN} state={{ from: location }} replace />;
         }
-        const hasPermission = allowedRoles.includes(userRole as UserRole);
-        
+        const hasPermission = userRoles.some((r) =>
+            allowedRoles.includes(r as UserRole),
+        );
+
         if (!hasPermission) {
             return <Navigate to={ROUTES.UNAUTHORIZED} replace />;
         }

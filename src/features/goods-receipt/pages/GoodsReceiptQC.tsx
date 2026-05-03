@@ -171,8 +171,15 @@ export default function GoodsReceiptQC() {
     skip: !receiptId || Number.isNaN(receiptId),
   });
 
+  /** API thường trả mới nhất trước; bảng QC hiển thị từ thùng cũ → mới (số thùng tăng dần). */
+  const receiptBoxesSortedOldestFirst = useMemo(
+    () => [...receiptBoxes].sort((a, b) => a.id - b.id),
+    [receiptBoxes],
+  );
+
   const [qcInspection, { isLoading: isQcLoading }] = useQcInspectionMutation();
-  const [approveReceipt] = useApproveGoodsReceiptMutation();
+  const [approveReceipt, { isLoading: isApprovingReceipt }] =
+    useApproveGoodsReceiptMutation();
   const [managerAllowQc, { isLoading: isManagerAllowingQc }] =
     useManagerAllowQcMutation();
   const [managerReviewMin, { isLoading: isManagerReviewingMin }] =
@@ -202,10 +209,10 @@ export default function GoodsReceiptQC() {
 
   const boxesTotalPages = Math.max(
     1,
-    Math.ceil(receiptBoxes.length / boxesPageSize),
+    Math.ceil(receiptBoxesSortedOldestFirst.length / boxesPageSize),
   );
   const safeBoxesPage = Math.min(boxesPage, boxesTotalPages);
-  const boxesPaged = receiptBoxes.slice(
+  const boxesPaged = receiptBoxesSortedOldestFirst.slice(
     (safeBoxesPage - 1) * boxesPageSize,
     safeBoxesPage * boxesPageSize,
   );
@@ -225,7 +232,6 @@ export default function GoodsReceiptQC() {
     { productVariantId: 0, usableWeight: 0 },
   ]);
   const [qcLinesError, setQcLinesError] = useState<string | null>(null);
-  const autoApprovedOnPageRef = useRef(false);
 
   const [isAiQcModalOpen, setIsAiQcModalOpen] = useState(false);
   const [aiQcImageFile, setAiQcImageFile] = useState<File | null>(null);
@@ -433,6 +439,8 @@ export default function GoodsReceiptQC() {
     canReviewApprovalStage && receipt?.status === "PendingManagerApproval";
   const canManagerMinWeightAction =
     canReviewApprovalStage && receipt?.status === "PendingManagerApprovalQc";
+  const canManagerFinalApprove =
+    canReviewApprovalStage && receipt?.status === "QCCompleted";
   const canViewPrice = isAdmin() || isManager();
   const moneyFmt = useMemo(
     () => new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }),
@@ -704,17 +712,7 @@ export default function GoodsReceiptQC() {
         id: toastId,
       });
       setSelectedDetailIdForQc(null);
-      const refreshed = await refetch();
-      const latestReceipt = refreshed.data;
-
-      // Fallback cho luồng Admin/Manager: nếu backend chưa tự duyệt ngay sau QC
-      // thì FE chủ động gọi duyệt để đảm bảo đúng nghiệp vụ "tự động duyệt".
-      if (canReviewApprovalStage && latestReceipt?.status === "QCCompleted") {
-        await approveReceipt(latestReceipt.id).unwrap();
-        toast.success("Đã tự động duyệt phiếu sau khi kiểm tra chất lượng.");
-        await refetch();
-        await refetchLots();
-      }
+      await refetch();
       if (canViewPrice) await refetchForApproval();
     } catch (err: any) {
       const msg =
@@ -724,40 +722,6 @@ export default function GoodsReceiptQC() {
       toast.error(msg, { id: toastId });
     }
   };
-
-  useEffect(() => {
-    if (!receipt) return;
-    if (!canReviewApprovalStage) return;
-    if (receipt.status !== "QCCompleted") return;
-    if (autoApprovedOnPageRef.current) return;
-
-    autoApprovedOnPageRef.current = true;
-    (async () => {
-      const toastId = toast.loading("Đang tự động duyệt phiếu...");
-      try {
-        await approveReceipt(receipt.id).unwrap();
-        toast.success("Đã tự động duyệt phiếu.", { id: toastId });
-        await refetch();
-        await refetchLots();
-        if (canViewPrice) await refetchForApproval();
-      } catch (err: any) {
-        autoApprovedOnPageRef.current = false;
-        const msg =
-          err?.data?.message ||
-          err?.data?.error ||
-          "Tự động duyệt phiếu thất bại.";
-        toast.error(msg, { id: toastId });
-      }
-    })();
-  }, [
-    receipt,
-    canReviewApprovalStage,
-    approveReceipt,
-    refetch,
-    refetchLots,
-    canViewPrice,
-    refetchForApproval,
-  ]);
 
   const handleConfirmChangeWarehouse = async () => {
     if (!selectedWarehouseId || selectedWarehouseId <= 0) {
@@ -845,6 +809,31 @@ export default function GoodsReceiptQC() {
         err?.data?.error ||
         err?.data?.Error ||
         "Quản lí xử lý thất bại.";
+      toast.error(msg, { id: toastId });
+    }
+  };
+
+  const handleManagerFinalApprove = async () => {
+    if (
+      !window.confirm(
+        "Xác nhận duyệt phiếu nhập sau khi đã hoàn tất kiểm tra chất lượng?",
+      )
+    )
+      return;
+    const toastId = toast.loading("Đang duyệt phiếu...");
+    try {
+      await approveReceipt(receipt.id).unwrap();
+      toast.success("Đã duyệt phiếu nhập.", { id: toastId });
+      await refetch();
+      await refetchLots();
+      if (canViewPrice) await refetchForApproval();
+    } catch (err: any) {
+      const msg =
+        err?.data?.message ||
+        err?.data?.Message ||
+        err?.data?.error ||
+        err?.data?.Error ||
+        "Duyệt phiếu thất bại.";
       toast.error(msg, { id: toastId });
     }
   };
@@ -1499,6 +1488,19 @@ export default function GoodsReceiptQC() {
                   </span>
                 </p>
                 <div className="flex flex-wrap gap-2">
+                  {canManagerFinalApprove && (
+                    <button
+                      type="button"
+                      onClick={() => void handleManagerFinalApprove()}
+                      disabled={isApprovingReceipt}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold text-white px-3 py-1.5 disabled:opacity-60"
+                    >
+                      {isApprovingReceipt && (
+                        <Loader2 size={12} className="animate-spin" />
+                      )}
+                      Duyệt phiếu nhập
+                    </button>
+                  )}
                   {canManagerToleranceAction && (
                     <>
                       <button
@@ -1688,7 +1690,7 @@ export default function GoodsReceiptQC() {
                   ) : null}
                 </div>
 
-                {receiptBoxes.length === 0 ? (
+                {receiptBoxesSortedOldestFirst.length === 0 ? (
                   <p className="mt-2 text-xs text-slate-500">
                     Chưa có thùng nào cho phiếu nhập này.
                   </p>
@@ -1767,9 +1769,12 @@ export default function GoodsReceiptQC() {
                         </span>{" "}
                         -{" "}
                         <span className="font-semibold text-slate-700">
-                          {Math.min(safeBoxesPage * boxesPageSize, receiptBoxes.length)}
+                          {Math.min(
+                            safeBoxesPage * boxesPageSize,
+                            receiptBoxesSortedOldestFirst.length,
+                          )}
                         </span>{" "}
-                        / {receiptBoxes.length} thùng
+                        / {receiptBoxesSortedOldestFirst.length} thùng
                       </div>
                       <div className="flex items-center gap-2">
                         <select

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import toast from "react-hot-toast";
 import QrCameraScannerModal from "../../../shared/components/QrCameraScannerModal";
@@ -1125,8 +1125,24 @@ const WarehouseMap = () => {
   const { isManager, isAdmin, isWarehouseStaff } = useRoleGuard();
   const canDirectDispose = isManager() || isAdmin();
   const isWarehouseStaffView = isWarehouseStaff();
-  const warehouseBasePath = isManager() ? "/manager/warehouses" : "/admin/warehouses";
-  const putawayBasePath = isManager() ? "/manager/putaway" : "/admin/putaway";
+  const { pathname } = useLocation();
+  const appShellPrefix = pathname.startsWith("/warehouse/")
+    ? "warehouse"
+    : pathname.startsWith("/manager/")
+      ? "manager"
+      : "admin";
+  const warehouseBasePath =
+    appShellPrefix === "manager"
+      ? "/manager/warehouses"
+      : appShellPrefix === "warehouse"
+        ? "/warehouse/warehouses"
+        : "/admin/warehouses";
+  const putawayBasePath =
+    appShellPrefix === "manager"
+      ? "/manager/putaway"
+      : appShellPrefix === "warehouse"
+        ? "/warehouse/putaway"
+        : "/admin/putaway";
   const { id } = useParams<{ id: string }>();
   const warehouseId = Number(id);
   const navigate = useNavigate();
