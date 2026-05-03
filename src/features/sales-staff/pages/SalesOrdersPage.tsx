@@ -133,7 +133,14 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
   const [saleConfirmOrderIdQuery, setSaleConfirmOrderIdQuery] = useState<string>("");
   const [pendingCodOrderIdQuery, setPendingCodOrderIdQuery] = useState<string>("");
   const defaultQueue: QueueKey =
-    forcedQueue ?? (isWarehouseOnly ? "warehouseConfirm" : (canSaleConfirm ? "saleConfirm" : "allocation"));
+    forcedQueue ??
+    (isWarehouseOnly
+      ? "warehouseConfirm"
+      : canSaleConfirm
+        ? "saleConfirm"
+        : isSalesOnly
+          ? "pendingCod"
+          : "allocation");
   const [activeQueue, setActiveQueue] = useState<QueueKey>(defaultQueue);
   const [sortBy, setSortBy] = useState<"createdDesc" | "createdAsc" | "totalDesc" | "totalAsc">("createdDesc");
   const [pageSize, setPageSize] = useState<20 | 50 | 100>(20);
@@ -173,6 +180,14 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
     }
   }, [isWarehouseOnly, activeQueue]);
 
+  /** Sale thuần: không dùng hàng đợi giữ hàng / kho xác nhận (xử lý ở kho). */
+  useEffect(() => {
+    if (!isSalesOnly) return;
+    if (activeQueue === "allocation" || activeQueue === "warehouseConfirm") {
+      setActiveQueue(canSaleConfirm ? "saleConfirm" : "pendingCod");
+    }
+  }, [isSalesOnly, activeQueue, canSaleConfirm]);
+
   const currentPage = pageByQueue[activeQueue] ?? 1;
   const currentSkip = (currentPage - 1) * pageSize;
 
@@ -185,6 +200,7 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
         skip: currentSkip,
         take: pageSize,
       },
+      { skip: isSalesOnly },
     );
   const { data: pendingWarehouseConfirm = [], isLoading: isLoadingPendingWarehouseConfirm, refetch: refetchPendingWarehouseConfirm } =
     useGetPendingWarehouseConfirmOrdersQuery(
@@ -193,6 +209,7 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
         skip: currentSkip,
         take: pageSize,
       },
+      { skip: isSalesOnly },
     );
   const { data: pendingCodPayments = [], isLoading: isLoadingPendingCod, refetch: refetchPendingCod } =
     useGetPendingCodPaymentsQuery({ skip: currentSkip, take: pageSize });
@@ -268,20 +285,6 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
           tone: "text-sky-700 bg-sky-50 border-sky-200",
         },
         {
-          key: "pending-allocation",
-          label: "Chờ giữ hàng",
-          value: filteredPendingAllocation.length,
-          icon: Boxes,
-          tone: "text-emerald-700 bg-emerald-50 border-emerald-200",
-        },
-        {
-          key: "pending-warehouse",
-          label: "Chờ kho xác nhận",
-          value: filteredPendingWarehouseConfirm.length,
-          icon: ShieldAlert,
-          tone: "text-indigo-700 bg-indigo-50 border-indigo-200",
-        },
-        {
           key: "pending-cod",
           label: "Thanh toán chờ xử lý",
           value: filteredPendingCodPayments.length,
@@ -335,8 +338,6 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
   const queueTabs = isSalesOnly
     ? ([
         { key: "saleConfirm", label: "Đơn hàng chờ xác nhận bán", count: filteredPendingSaleConfirm.length },
-        { key: "allocation", label: "Chờ giữ hàng", count: filteredPendingAllocation.length },
-        { key: "warehouseConfirm", label: "Chờ kho xác nhận", count: filteredPendingWarehouseConfirm.length },
         { key: "pendingCod", label: "Thanh toán chờ xử lý", count: filteredPendingCodPayments.length },
         {
           key: "approvedExport",
