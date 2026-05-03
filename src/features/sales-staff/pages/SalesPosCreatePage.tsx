@@ -4,10 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Plus, Trash2 } from "lucide-react";
 import { useGetHomeProductsQuery, useGetHomeProductDetailQuery } from "../../home/api/home.api";
 import type { HomeProduct } from "../../home/schemas/home.schema";
-import {
-  useAutoProposeAllocationAsStaffMutation,
-  useCreatePosOrderMutation,
-} from "../../order/api/order.api";
+import { useCreatePosOrderMutation } from "../../order/api/order.api";
 import SalesStaffPageShell from "../components/SalesStaffPageShell";
 
 type PosFormItem = {
@@ -189,7 +186,6 @@ export default function SalesPosCreatePage() {
   const location = useLocation();
   const { data: variants = [], isLoading: isLoadingVariants } = useGetHomeProductsQuery();
   const [createPosOrder, { isLoading: isCreating }] = useCreatePosOrderMutation();
-  const [autoPropose, { isLoading: isAutoProposing }] = useAutoProposeAllocationAsStaffMutation();
 
   const [rows, setRows] = useState<PosFormItem[]>([makeRow(1)]);
   const [fulfillmentType, setFulfillmentType] = useState<0 | 1>(0);
@@ -284,24 +280,12 @@ export default function SalesPosCreatePage() {
       setCreatedTotalAmount(created.totalAmount ?? 0);
       toast.success(createdText, { id: t });
 
+      // Đơn POS (kể cả Delivery) BE tạo ở Confirmed và đã ReserveStockImmediately — không qua AwaitingAllocation.
+      // Gọi auto-propose sau tạo đơn sẽ luôn lỗi "Chỉ có thể giữ hàng khi... Confirmed".
       if (fulfillmentType === 1) {
-        // Delivery mới đi allocation flow, nên auto-propose FEFO sau khi tạo đơn.
-        try {
-          const proposal = await autoPropose(created.orderId).unwrap();
-          const hasProposalValue = (proposal.proposedBoxCount ?? 0) > 0;
-          setHandoffMessage(proposal.message ?? "");
-
-          if (hasProposalValue) {
-            toast.success(proposal.message ?? "Đã đề xuất FEFO, chờ kho xác nhận.", { id: t });
-          } else {
-            // proposedBoxCount = 0 nghĩa là BE không có box khả dụng để đề xuất allocate
-            toast.error(proposal.message ?? "Không có box khả dụng để đề xuất FEFO.", { id: t });
-          }
-        } catch (e: unknown) {
-          const msg = getApiErrorMessage(e, "Không thể tự động đề xuất FEFO.");
-          setHandoffMessage(msg);
-          toast.error(msg, { id: t });
-        }
+        setHandoffMessage(
+          "Đơn POS giao hàng đã ở trạng thái Confirmed và kho đã giữ thùng khi tạo đơn. Tiếp tục: thu thanh toán (nếu PayBefore) → xuất kho → giao — không cần bước auto-propose như đơn online.",
+        );
       } else {
         setHandoffMessage("TakeAway: đơn đã được giữ hàng ngay, chuyển sang bước thanh toán.");
       }
@@ -447,21 +431,23 @@ export default function SalesPosCreatePage() {
 
         <button
           type="submit"
-          disabled={isCreating || isAutoProposing || isLoadingVariants}
+          disabled={isCreating || isLoadingVariants}
           className="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
         >
-          {isCreating
-            ? "Đang tạo đơn..."
-            : isAutoProposing
-              ? "Đang tự đề xuất FEFO..."
-              : "Tạo đơn"}
+          {isCreating ? "Đang tạo đơn..." : "Tạo đơn"}
         </button>
       </form>
 
       {createdOrderId && (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
           <p className="text-sm font-semibold text-emerald-800">
-            Đã tạo thành công Đơn hàng {createdOrderId}
+            Đã tạo thành công đơn mới #{createdOrderId}
+            {sourceOrderId ? (
+              <span className="font-normal text-emerald-700">
+                {" "}
+                (tham chiếu tạo lại từ đơn #{sourceOrderId})
+              </span>
+            ) : null}
           </p>
           <p className="text-xs text-emerald-700 mt-1">
             Thành tiền (VNĐ): {vnd(createdTotalAmount ?? 0)} ₫

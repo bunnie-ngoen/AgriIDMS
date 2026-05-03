@@ -1,4 +1,5 @@
 import type { ExportPrintData } from "../schemas/export.schema";
+import { parseApiDateInput, VIETNAM_TIME_ZONE } from "../../../shared/lib/vietnamTime";
 
 function escHtml(s: string) {
   return s
@@ -9,10 +10,17 @@ function escHtml(s: string) {
 }
 
 function formatVnDate(input: string): string {
-  const dt = new Date(input);
-  const day = String(dt.getDate()).padStart(2, "0");
-  const month = String(dt.getMonth() + 1).padStart(2, "0");
-  const year = dt.getFullYear();
+  const d = parseApiDateInput(input);
+  if (Number.isNaN(d.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: VIETNAM_TIME_ZONE,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).formatToParts(d);
+  const day = parts.find((p) => p.type === "day")?.value ?? "";
+  const month = parts.find((p) => p.type === "month")?.value ?? "";
+  const year = parts.find((p) => p.type === "year")?.value ?? "";
   return `Ngày ${day} tháng ${month} năm ${year}`;
 }
 

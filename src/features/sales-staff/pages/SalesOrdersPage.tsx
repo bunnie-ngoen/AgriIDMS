@@ -11,6 +11,7 @@ import {
   useGetPendingSaleConfirmOrdersQuery,
   useGetPendingWarehouseConfirmOrdersQuery,
   useSaleConfirmOrderMutation,
+  useSaleRejectOrderMutation,
 } from "../../order/api/order.api";
 import {
   useConfirmCodPaymentMutation,
@@ -43,12 +44,29 @@ const STATUS_PILL =
   "inline-flex items-center rounded-full border px-2 py-1 text-xs font-semibold";
 const SALE_CONFIRM_TIMEOUT_MINUTES = 60;
 
+/** RTK Query ném lỗi này khi gọi `refetch()` trong khi endpoint đang `skip: true`. */
+const RTK_SKIP_REFETCH_MESSAGE = "Cannot refetch a query that has not been started yet";
+
 function getApiErrorMessage(err: unknown, fallback: string) {
   const e = err as {
     data?: { message?: string; error?: string; detail?: string };
     message?: string;
   };
-  return e?.data?.message || e?.data?.error || e?.data?.detail || e?.message || fallback;
+  const raw = e?.data?.message || e?.data?.error || e?.data?.detail || e?.message || "";
+  if (typeof raw === "string" && raw.includes(RTK_SKIP_REFETCH_MESSAGE)) {
+    return "Không thể làm mới danh sách vì một số dữ liệu chưa được tải trên trang này. Vui lòng tải lại trang nếu cần.";
+  }
+  return raw || fallback;
+}
+
+async function refetchIfStarted(refetch: () => Promise<unknown>): Promise<void> {
+  try {
+    await refetch();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes(RTK_SKIP_REFETCH_MESSAGE)) return;
+    throw e;
+  }
 }
 
 function isShippingPendingPickupList(o: OrderListItem): boolean {
@@ -156,7 +174,6 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
     Record<number, SaleConfirmResponse>
   >({});
   const [recentSaleConfirmedCards, setRecentSaleConfirmedCards] = useState<SaleConfirmPreviewCard[]>([]);
-  const [recreatedSaleConfirmByOrderId, setRecreatedSaleConfirmByOrderId] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     if (forcedQueue && activeQueue !== forcedQueue) {
@@ -229,6 +246,7 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
 
   const [saleConfirmOrder, { isLoading: isConfirming }] =
     useSaleConfirmOrderMutation();
+  const [saleRejectOrder, { isLoading: isSaleRejecting }] = useSaleRejectOrderMutation();
   const [allocateAsStaff, { isLoading: isAllocating }] =
     useAllocateAsStaffMutation();
   const [autoProposeAllocationAsStaff, { isLoading: isAutoProposing }] =
@@ -440,24 +458,37 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
           ].slice(0, 5),
         );
       }
-      setRecreatedSaleConfirmByOrderId((prev) => {
-        if (!prev[id]) return prev;
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      });
-      await refetchPendingSaleConfirm();
-      await refetchPendingWarehouseConfirm();
+      await refetchIfStarted(refetchPendingSaleConfirm);
+      await refetchIfStarted(refetchPendingWarehouseConfirm);
     } catch (err: unknown) {
       const msg = getApiErrorMessage(err, `Sale-confirm đơn #${id} thất bại`);
       toast.error(msg, { id: t });
     }
   };
 
-  const handleRecreateForSaleReview = (orderId: number) => {
-    setRecreatedSaleConfirmByOrderId((prev) => ({ ...prev, [orderId]: true }));
-    toast("Đã bật chế độ review lại đơn. Vui lòng kiểm tra đơn rồi bấm Xác nhận.", { icon: "ℹ️" });
-    navigate(`/sales/orders/${orderId}`);
+  const handleSaleRejectOverduePending = async (orderId: number) => {
+    if (
+      !window.confirm(
+        "Hủy đơn sẽ chuyển đơn sang Đã hủy và nhả toàn bộ thùng đang giữ (Reserved) để khách khác có thể đặt. Tiếp tục?",
+      )
+    ) {
+      return;
+    }
+    const t = toast.loading(`Đang hủy đơn #${orderId}...`);
+    try {
+      const res = await saleRejectOrder(orderId).unwrap();
+      toast.success(res.message || `Đã hủy đơn #${orderId}`, { id: t });
+      setSaleConfirmFeedbackByOrderId((prev) => {
+        if (!prev[orderId]) return prev;
+        const next = { ...prev };
+        delete next[orderId];
+        return next;
+      });
+      await refetchIfStarted(refetchPendingSaleConfirm);
+      await refetchIfStarted(refetchPendingAllocation);
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, `Hủy đơn #${orderId} thất bại`), { id: t });
+    }
   };
 
   const renderSaleConfirmCards = (
@@ -485,27 +516,34 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
     return (
       <div className="mt-4 space-y-4">
         <div className={`${SALES_TABLE_SHELL} max-h-[560px] overflow-auto`}>
-          <table className="w-full min-w-[980px] bg-white">
+          <table className="w-full min-w-[1180px] bg-white">
             <thead className="sticky top-0 z-10">
               <tr className={SALES_TABLE_HEAD}>
                 <th className="py-3 pl-4 pr-3">Đơn hàng</th>
+                <th className="py-3 pr-3">Tên khách hàng</th>
+                <th className="py-3 pr-3">SĐT khách</th>
                 <th className="py-3 pr-3">Trạng thái</th>
                 <th className="py-3 pr-3">Hình thức mua</th>
                 <th className="py-3 pr-3">Ngày và giờ</th>
                 <th className="py-3 pr-3">Số sản phẩm</th>
                 <th className="py-3 pr-3">Thành tiền (VNĐ)</th>
-                <th className="py-3 pr-4 w-[220px]">Thao tác</th>
+                <th className="py-3 pr-4 w-[280px]">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {sortedRows.map((o) => {
                 const feedback = saleConfirmFeedbackByOrderId[o.orderId];
                 const expired = isSaleConfirmExpired(o.createdAt);
-                const recreated = !!recreatedSaleConfirmByOrderId[o.orderId];
-                const canConfirmThisOrder = canSaleConfirm && (!expired || recreated);
+                const canConfirmThisOrder = canSaleConfirm;
+                const customerNameDisplay = (o.customerName && o.customerName.trim()) || "—";
+                const customerPhoneDisplay = (o.customerPhone && o.customerPhone.trim()) || "—";
                 return (
                   <tr key={o.orderId} className="text-sm transition-colors hover:bg-slate-50/80">
                     <td className="py-3.5 pl-4 pr-3 font-semibold text-slate-900">Đơn hàng {o.orderId}</td>
+                    <td className="py-3.5 pr-3 max-w-[200px] truncate text-slate-800" title={customerNameDisplay}>
+                      {customerNameDisplay}
+                    </td>
+                    <td className="py-3.5 pr-3 tabular-nums text-slate-700">{customerPhoneDisplay}</td>
                     <td className="py-3.5 pr-3">
                       <span className={`${STATUS_PILL} ${orderStatusTone(o.status)}`}>
                         {orderStatusLabel(o.status)}
@@ -525,18 +563,23 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
                           type="button"
                           onClick={() => handleSaleConfirm(o.orderId)}
                           disabled={isConfirming || !canConfirmThisOrder}
-                          title={!canConfirmThisOrder ? "Đơn đã quá 60 phút. Hãy bấm Tạo lại đơn để review trước." : undefined}
+                          title={
+                            expired
+                              ? "Đơn đã quá 60 phút kể từ lúc khách đặt — vẫn có thể xác nhận nếu đã liên hệ khách, hoặc hủy để nhả hàng."
+                              : undefined
+                          }
                           className="rounded-xl border border-neutral-900 bg-neutral-950 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-neutral-900 disabled:opacity-50"
                         >
                           Xác nhận
                         </button>
-                        {expired && !recreated ? (
+                        {expired ? (
                           <button
                             type="button"
-                            onClick={() => handleRecreateForSaleReview(o.orderId)}
-                            className="rounded-xl border border-indigo-300 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 shadow-sm hover:bg-indigo-100"
+                            onClick={() => void handleSaleRejectOverduePending(o.orderId)}
+                            disabled={isSaleRejecting || !canSaleConfirm}
+                            className="rounded-xl border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800 shadow-sm hover:bg-rose-100 disabled:opacity-50"
                           >
-                            Tạo lại đơn
+                            {"Hủy đơn (do sale quá 60')"}
                           </button>
                         ) : null}
                         {expired ? (
@@ -566,8 +609,8 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
     try {
       await allocateAsStaff(id).unwrap();
       toast.success(`Giữ hàng đơn #${id} thành công`, { id: t });
-      await refetchPendingAllocation();
-      await refetchPendingSaleConfirm();
+      await refetchIfStarted(refetchPendingAllocation);
+      await refetchIfStarted(refetchPendingSaleConfirm);
     } catch {
       toast.error(`Giữ hàng đơn #${id} thất bại`, { id: t });
     }
@@ -578,8 +621,8 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
     try {
       await autoProposeAllocationAsStaff(id).unwrap();
       toast.success(`Đã tạo đề xuất FEFO cho đơn #${id}`, { id: t });
-      await refetchPendingAllocation();
-      await refetchPendingWarehouseConfirm();
+      await refetchIfStarted(refetchPendingAllocation);
+      await refetchIfStarted(refetchPendingWarehouseConfirm);
     } catch {
       toast.error(`Auto-propose FEFO thất bại cho đơn #${id}`, { id: t });
     }
@@ -590,9 +633,9 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
     try {
       await confirmCodPayment(paymentId).unwrap();
       toast.success(`Xác nhận thành công cho đơn #${orderId}`, { id: t });
-      await refetchPendingCod();
-      await refetchPendingAllocation();
-      await refetchPendingSaleConfirm();
+      await refetchIfStarted(refetchPendingCod);
+      await refetchIfStarted(refetchPendingAllocation);
+      await refetchIfStarted(refetchPendingSaleConfirm);
     } catch {
       toast.error(`Xác nhận thất bại cho đơn #${orderId}`, { id: t });
     }
@@ -607,7 +650,7 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
     try {
       await confirmDeliveredAsStaff(id).unwrap();
       toast.success(`Đã xác nhận đã giao cho đơn #${id}.`, { id: t });
-      await refetchApprovedExport();
+      await refetchIfStarted(refetchApprovedExport);
     } catch (err: unknown) {
       const msg =
         typeof err === "object" && err !== null && "data" in err
@@ -651,11 +694,11 @@ export default function SalesOrdersPage({ forcedQueue, hideQueueTabs = !!forcedQ
     }
     toast.success(`${title}: thành công ${success}/${selectedOrderIds.length}`, { id: t });
     await Promise.all([
-      refetchPendingSaleConfirm(),
-      refetchPendingAllocation(),
-      refetchPendingWarehouseConfirm(),
-      refetchPendingCod(),
-      refetchApprovedExport(),
+      refetchIfStarted(refetchPendingSaleConfirm),
+      refetchIfStarted(refetchPendingAllocation),
+      refetchIfStarted(refetchPendingWarehouseConfirm),
+      refetchIfStarted(refetchPendingCod),
+      refetchIfStarted(refetchApprovedExport),
     ]);
   };
 
