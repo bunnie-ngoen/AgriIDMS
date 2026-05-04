@@ -197,41 +197,46 @@ export default function InventoryIssueManagementPage() {
           Danh sách hàng hư hỏng
         </div>
         <div className="mt-3 overflow-x-auto">
-          <table className="min-w-[900px] w-full text-sm">
+          <table className="w-full table-fixed text-sm">
+            <colgroup>
+              <col className="w-[17%]" />
+              <col className="w-[21%]" />
+              <col />
+              <col className="w-[14%]" />
+              {isWarehouseRoute ? <col className="w-[18%]" /> : null}
+            </colgroup>
             <thead className="bg-slate-50 text-slate-600">
               <tr>
-                <th className="px-3 py-2 text-left">Hàng</th>
-                <th className="px-3 py-2 text-left">Lô hàng</th>
-                <th className="px-3 py-2 text-left">Sản phẩm</th>
-                <th className="px-3 py-2 text-left">Kho</th>
-                <th className="px-3 py-2 text-right">Khối lượng</th>
-                <th className="px-3 py-2 text-left">Vị trí</th>
+                <th className="px-4 py-2.5 text-left font-medium">Hàng</th>
+                <th className="px-4 py-2.5 text-left font-medium">Lô hàng</th>
+                <th className="px-4 py-2.5 text-left font-medium">Sản phẩm</th>
+                <th className="px-4 py-2.5 text-right font-medium">Khối lượng</th>
                 {isWarehouseRoute ? (
-                  <th className="px-3 py-2 text-right">Thao tác</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Thao tác</th>
                 ) : null}
               </tr>
             </thead>
             <tbody>
               {damagedBoxes.length === 0 ? (
                 <tr>
-                  <td className="px-3 py-4 text-center text-slate-500" colSpan={isWarehouseRoute ? 7 : 6}>
+                  <td className="px-4 py-4 text-center text-slate-500" colSpan={isWarehouseRoute ? 5 : 4}>
                     Không có hàng hư hỏng.
                   </td>
                 </tr>
               ) : (
                 damagedBoxes.map((b) => (
                   <tr key={b.id} className="border-t border-slate-100">
-                    <td className="px-3 py-2 font-semibold text-slate-900">{b.boxCode}</td>
-                    <td className="px-3 py-2 text-slate-700">{b.lotCode ?? "—"}</td>
-                    <td className="px-3 py-2 text-slate-700">
+                    <td className="px-4 py-2.5 font-semibold text-slate-900 align-top">{b.boxCode}</td>
+                    <td className="px-4 py-2.5 text-slate-700 align-top break-words">{b.lotCode ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-slate-700 align-top break-words">
                       {b.productName ?? "—"}
                       {b.productVariantName ? ` · ${b.productVariantName}` : ""}
                     </td>
-                    <td className="px-3 py-2 text-slate-700">{b.warehouseName ?? "—"}</td>
-                    <td className="px-3 py-2 text-right text-slate-700">{formatKg(b.weight)} kg</td>
-                    <td className="px-3 py-2 text-slate-700">{b.slotCode ?? "Chưa xếp"}</td>
+                    <td className="px-4 py-2.5 text-right text-slate-700 align-top whitespace-nowrap">
+                      {formatKg(b.weight)} kg
+                    </td>
                     {isWarehouseRoute ? (
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-4 py-2.5 text-right align-top">
                         <button
                           type="button"
                           onClick={() =>
